@@ -84,9 +84,15 @@ def projetos_que_casam(sessoes: list[Sessao], termo: str) -> list[str]:
     if not procurado:
         return []
 
+    # A deduplicacao ignora a caixa porque no Windows omni-api e OMNI-API sao a
+    # mesma pasta. Vence a grafia da sessao mais recente, que e a primeira da
+    # lista.
     nomes = []
+    vistos = set()
     for sessao in sessoes:
-        if sessao.projeto not in nomes:
+        chave = sessao.projeto.lower()
+        if chave not in vistos:
+            vistos.add(chave)
             nomes.append(sessao.projeto)
 
     exatos = [n for n in nomes if n.lower() == procurado]
@@ -96,8 +102,12 @@ def projetos_que_casam(sessoes: list[Sessao], termo: str) -> list[str]:
 
 
 def sessao_mais_recente(sessoes: list[Sessao], projeto: str) -> Sessao | None:
-    """A sessao daquele projeto que se moveu por ultimo, ou None."""
+    """A sessao daquele projeto que se moveu por ultimo, ou None.
+
+    A comparacao ignora a caixa, pelo mesmo motivo da deduplicacao acima.
+    """
+    procurado = (projeto or '').lower()
     for sessao in sessoes:
-        if sessao.projeto == projeto:
+        if sessao.projeto.lower() == procurado:
             return sessao
     return None

@@ -914,6 +914,22 @@ git commit -m "Acha a sessao certa pelo cwd, e nome exato nao vira pergunta"
 
 ### Tarefa 4: A fronteira de linha de comando
 
+> **Nota de execucao (20/08/2026).** O passo 6 desta tarefa - provar contra as
+> transcricoes reais - encontrou dois pontos que os testes sinteticos nao
+> pegariam, e o codigo commitado ja os inclui. O codigo que vale e o do
+> repositorio, nao os blocos abaixo:
+>
+> 1. `omni-api` e `OMNI-API` apareciam como projetos diferentes. No Windows sao
+>    a mesma pasta, e listar as duas anuncia um projeto que nao existe. O
+>    comando `projetos` passou a agrupar por nome sem diferenciar caixa,
+>    mantendo a grafia da sessao mais recente, via `_um_por_projeto`.
+> 2. A saida passou a forcar UTF-8 em `main`. Isso e correcao preventiva de
+>    fronteira, nao conserto de corrupcao observada: a leitura ja entregava
+>    acento correto, e o que estragava era so a exibicao no console. Mas quem
+>    captura essa saida na Tarefa 5 e o PowerShell, e um console em cp1252
+>    transformaria acento em fala errada.
+
+
 Aqui o mascaramento da Tarefa 1 é aplicado. Ele fica na fronteira, num lugar só,
 para não haver caminho que devolva texto sem passar por ele.
 

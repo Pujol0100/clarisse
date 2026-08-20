@@ -103,3 +103,25 @@ def test_sessao_mais_recente_de_um_projeto(tmp_path):
 
 def test_sessao_mais_recente_de_projeto_inexistente_e_nula(tmp_path):
     assert sessao_mais_recente([], 'alvo') is None
+
+
+def test_mesma_pasta_com_caixa_diferente_e_um_projeto_so(tmp_path):
+    # No Windows o sistema de arquivos nao diferencia maiuscula: omni-api e
+    # OMNI-API sao a mesma pasta. Tratar como dois projetos faria a Clarisse
+    # perguntar qual dos dois, para uma pergunta que nao existe.
+    _montar_projeto(tmp_path, 'a', 'velha.jsonl', r'C:\dev\omni-api', 1000.0)
+    _montar_projeto(tmp_path, 'b', 'nova.jsonl', r'C:\dev\OMNI-API', 3000.0)
+    sessoes = listar_sessoes(str(tmp_path))
+
+    assert projetos_que_casam(sessoes, 'omni-api') == ['OMNI-API']
+
+
+def test_sessao_mais_recente_ignora_a_caixa_do_nome(tmp_path):
+    _montar_projeto(tmp_path, 'a', 'velha.jsonl', r'C:\dev\omni-api', 1000.0)
+    _montar_projeto(tmp_path, 'b', 'nova.jsonl', r'C:\dev\OMNI-API', 3000.0)
+    sessoes = listar_sessoes(str(tmp_path))
+
+    escolhida = sessao_mais_recente(sessoes, 'omni-api')
+
+    assert escolhida is not None
+    assert escolhida.sessao_id == 'nova'
