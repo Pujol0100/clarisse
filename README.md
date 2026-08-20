@@ -141,6 +141,8 @@ Depois, abra `/hooks` uma vez no Claude Code ou reinicie — hooks são lidos na
 |---|---|
 | `/clarisse` | Mostra o status |
 | `/clarisse ler` | Lê o próximo resumo da fila (mesmo efeito do `Ctrl+Alt+L`) |
+| `/clarisse o que esta rolando no <projeto>` | Lê a sessão daquele projeto e **fala** o que aconteceu |
+| `/clarisse quais projetos` | Lista os projetos com sessão gravada, do mais ativo para o menos |
 | `/clarisse pausar` | Congela a fala; de novo, retoma do mesmo ponto |
 | `/clarisse cancelar` | Corta a fala **na hora** |
 | `/clarisse atalhos off` | Encerra o escutador de atalhos |
@@ -155,6 +157,31 @@ Depois, abra `/hooks` uma vez no Claude Code ou reinicie — hooks são lidos na
 | `/clarisse nao ligar sozinha` | Desativa o autostart |
 
 Frases naturais também funcionam: `/clarisse perdi`, `/clarisse não ouvi`, `/clarisse cala`.
+
+### Ela lê as suas sessões no seu lugar
+
+O resumo de fim de resposta só cobre o instante em que uma sessão termina. Ele não responde *"o que está rolando no omni-api agora"*, nem *"o que ele decidiu sobre a conciliação"*.
+
+O Claude Code grava a conversa de cada sessão em disco **enquanto ela acontece**. A Clarisse lê esses arquivos e conta o que houve — de qualquer projeto, a qualquer momento, sem depender daquela sessão ter terminado.
+
+```
+/clarisse o que esta rolando no omni-api
+```
+
+> *"No omni-api: os vinte e sete testes passaram, mas a conversão de data continua sem cobertura. Ficou pendente decidir se o desconto entra antes ou depois do imposto."*
+
+Nome parcial serve: `o que esta rolando no concil` acha `conciliacao-bancaria`. Nome ambíguo faz ela **perguntar** em vez de escolher — `omni` casa com mais de um projeto, e adivinhar ali seria relatar o projeto errado. Nome exato ganha sozinho: pedir `omni-api` não devolve `omni-api-legado` junto.
+
+Ela lê **as suas sessões**, não a memória dela. Isso vale para todos os projetos ao mesmo tempo, que é o ponto quando há dez terminais abertos e ninguém consegue acompanhar todos.
+
+**Privacidade — leia antes de usar com dado de cliente.** Transcrição de sessão contém tudo que passou pelo terminal. Um filtro mecânico barra formatos evidentes de segredo — chave, token, senha, cabeçalho de autorização — antes de qualquer texto virar áudio. Esse filtro pega **formato, não sentido**: nome de cliente dito em texto corrido passa. A segunda defesa é a instrução dada ao Claude que compõe o resumo, e instrução não é garantia.
+
+A verificação do projeto agora são **dois** comandos, porque a Leitora é Python e o resto é PowerShell:
+
+```powershell
+Invoke-Pester -Path .\tests
+python -m pytest
+```
 
 ## Vozes disponíveis
 
