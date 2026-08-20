@@ -800,9 +800,8 @@ nao da para separar o hifen do caminho do hifen do nome. O cwd e exato.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 LINHAS_PROCURADAS_PELO_CWD = 50
 
@@ -816,8 +815,13 @@ class Sessao:
 
 
 def _nome_do_caminho(cwd: str) -> str:
-    partes = [p for p in re.split(r'[\\/]+', cwd) if p]
-    return partes[-1] if partes else ''
+    """O ultimo pedaco do caminho, aceitando os dois separadores.
+
+    PureWindowsPath entende barra normal e barra invertida, entao serve tanto
+    para o cwd gravado no Windows quanto para um caminho estilo Unix, sem
+    expressao regular e sem escape.
+    """
+    return PureWindowsPath(cwd).name
 
 
 def _projeto_do_arquivo(caminho: Path) -> str:
