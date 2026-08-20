@@ -165,10 +165,22 @@ if (Test-Path $ScriptDest) {
     try { & $ScriptDest -Mode atalhos-off | Out-Null } catch { }
 }
 
-foreach ($arq in @('clarisse.ps1', 'nucleo.ps1', 'atalhos.ps1', 'falar.py')) {
+foreach ($arq in @('clarisse.ps1', 'nucleo.ps1', 'atalhos.ps1', 'falar.py', '__init__.py')) {
     Copy-Item (Join-Path $Origem "clarisse\$arq") (Join-Path $DestClarisse $arq) -Force
 }
 Passo "motor de voz, nucleo, escutador de atalhos e sintetizador em $DestClarisse"
+
+# A Leitora e um pacote Python: o cli.py importa clarisse.leitora.* subindo dois
+# niveis a partir de si mesmo, o que instalado aterra em ~\.claude. Por isso o
+# __init__.py da pasta clarisse vai junto, acima.
+$DestLeitora = Join-Path $DestClarisse 'leitora'
+if (-not (Test-Path $DestLeitora)) {
+    New-Item -ItemType Directory -Path $DestLeitora -Force | Out-Null
+}
+foreach ($arq in @('__init__.py', 'segredo.py')) {
+    Copy-Item (Join-Path $Origem "clarisse\leitora\$arq") (Join-Path $DestLeitora $arq) -Force
+}
+Passo "leitora de sessoes em $DestLeitora"
 
 $destConfig = Join-Path $DestClarisse 'config.json'
 if (Test-Path $destConfig) {

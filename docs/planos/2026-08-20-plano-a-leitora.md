@@ -37,6 +37,16 @@ PowerShell**: `clarisse.ps1 -Mode say -Text "..."` já fala na hora.
   hash — regra que já vale no projeto.
 - Nada de credencial, token ou senha no texto falado. Garantido mecanicamente pela
   Tarefa 1.
+- **Todo arquivo `.py` novo em `clarisse/` precisa ser nomeado em `instalar.ps1`
+  na mesma tarefa que o cria.** O teste Pester `instalador / copia todo arquivo de
+  codigo que existe na pasta clarisse` cobra isso e falha se você esquecer. A
+  lista dos arquivos da Leitora fica no laço `foreach ($arq in @('__init__.py',
+  'segredo.py'))` de `instalar.ps1`; acrescente o nome ali. Esse teste existe
+  porque a falha oposta é silenciosa: a instalação anuncia sucesso e a Clarisse
+  fica muda.
+- Não rode `instalar.ps1` até a Tarefa 5. Ele **sobrescreve** arquivos em
+  `%USERPROFILE%\.claude` — é a única ação irreversível deste plano. Os testes do
+  instalador leem o arquivo como texto e não precisam executá-lo.
 
 ## Estrutura de arquivos
 
@@ -56,7 +66,7 @@ PowerShell**: `clarisse.ps1 -Mode say -Text "..."` já fala na hora.
 | `tests/leitora/test_cli.py` | Testes da fronteira de linha de comando |
 | `comandos/clarisse.md` | Ganha os argumentos de relato |
 | `instalar.ps1` | Passa a copiar a pasta `leitora` |
-| `README.md` | Documenta o relato e corrige a contagem de testes |
+| `README.md` | Documenta o relato e registra que a verificação passou a ser dois comandos |
 
 ---
 
@@ -71,6 +81,9 @@ repositório.
 - Criar: `clarisse/leitora/__init__.py`
 - Criar: `clarisse/leitora/segredo.py`
 - Criar: `pytest.ini`
+- Modificar: `instalar.ps1` (laco de copia, linha 168)
+- Modificar: `tests/instalador.Tests.ps1` (fechar o ponto cego de subpasta)
+- Modificar: `.gitignore` (caches do Python)
 - Testar: `tests/leitora/test_segredo.py`
 
 **Interfaces:**
@@ -115,8 +128,15 @@ def test_mascara_chave_da_anthropic():
 
 def test_mascara_cabecalho_bearer():
     texto = 'mandei Authorization: Bearer eyJhbGciOiJIUzI1NiJ9 no header'
-    assert '[oculto]' in mascarar(texto)
-    assert 'eyJhbGciOiJIUzI1NiJ9' not in mascarar(texto)
+    assert mascarar(texto) == 'mandei Authorization: Bearer [oculto] no header'
+
+
+def test_bearer_nao_deixa_o_token_sobrar_atras_da_palavra_mascarada():
+    # A palavra Authorization casa com o padrao de atribuicao, e a palavra
+    # Bearer parece o valor. Mascarar Bearer e deixar o token e o modo de
+    # falhar que engana: [oculto] aparece e o segredo sobrevive.
+    saida = mascarar('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9')
+    assert 'eyJhbGciOiJIUzI1NiJ9' not in saida
 
 
 def test_mascara_chave_de_acesso_da_aws():
@@ -173,9 +193,13 @@ import re
 
 OCULTO = '[oculto]'
 
+# O valor de uma atribuicao nunca pode ser a palavra Bearer nem uma marca ja
+# aplicada. Sem essa restricao, "Authorization: Bearer <token>" mascara a
+# palavra Bearer e deixa o token inteiro exposto - com [oculto] na saida
+# fingindo que o filtro funcionou.
 _ATRIBUICAO = re.compile(
     r'(?i)\b(senha|password|secret|token|api[_-]?key|chave[_-]?api|authorization)'
-    r'(\s*[:=]\s*)("?)([^\s"\']+)\3'
+    r'(\s*[:=]\s*)("?)((?!Bearer\b)(?!\[oculto\])[^\s"\']+)\3'
 )
 _BEARER = re.compile(r'(?i)\bBearer\s+[A-Za-z0-9._\-]{8,}')
 _CHAVE_ANTHROPIC = re.compile(r'\bsk-ant-[A-Za-z0-9._\-]+')
@@ -187,12 +211,16 @@ _CHAVE_PRIVADA = re.compile(
 
 
 def mascarar(texto: str) -> str:
-    """Devolve o texto com os segredos reconhecidos trocados por [oculto]."""
+    """Devolve o texto com os segredos reconhecidos trocados por [oculto].
+
+    A ordem importa: o cabecalho Bearer e resolvido antes da atribuicao, para o
+    token nao sobreviver escondido atras da palavra mascarada.
+    """
     if not texto:
         return texto
     limpo = _CHAVE_PRIVADA.sub(OCULTO, texto)
-    limpo = _ATRIBUICAO.sub(lambda m: f'{m.group(1)}{m.group(2)}{OCULTO}', limpo)
     limpo = _BEARER.sub(f'Bearer {OCULTO}', limpo)
+    limpo = _ATRIBUICAO.sub(lambda m: f'{m.group(1)}{m.group(2)}{OCULTO}', limpo)
     limpo = _CHAVE_ANTHROPIC.sub(OCULTO, limpo)
     limpo = _CHAVE_AWS.sub(OCULTO, limpo)
     return limpo
@@ -209,26 +237,126 @@ def contem_segredo(texto: str) -> bool:
 python -m pytest tests/leitora/test_segredo.py -v
 ```
 
-Esperado: `7 passed`.
+Esperado: `8 passed`.
 
-Atenção ao teste do Bearer: `_ATRIBUICAO` casa `Authorization: Bearer` e mascara
-a palavra `Bearer`, produzindo `Authorization: [oculto] eyJ...`; depois `_BEARER`
-não encontra mais o padrão. O teste só exige que o token não sobre e que
-`[oculto]` apareça — as duas coisas acontecem. Se você mudar a ordem das
-substituições, esse teste é o que avisa.
+**Se a ordem das substituições estiver invertida**, o teste
+`test_mascara_cabecalho_bearer` falha com o token visível na mensagem:
+`Authorization: [oculto] eyJhbGciOiJIUzI1NiJ9`. É o modo de falhar que engana —
+`[oculto]` aparece e o segredo sobrevive. Só `_BEARER` antes de `_ATRIBUICAO`
+resolve.
 
-- [ ] **Passo 6: Confirmar que o Pester não regrediu**
+- [ ] **Passo 6: Fazer o instalador copiar os arquivos novos**
+
+Sem isto, o teste Pester `instalador / copia todo arquivo de codigo` falha. Em
+`instalar.ps1`, troque o laço de cópia (linha 168) por:
+
+```powershell
+foreach ($arq in @('clarisse.ps1', 'nucleo.ps1', 'atalhos.ps1', 'falar.py', '__init__.py')) {
+    Copy-Item (Join-Path $Origem "clarisse\$arq") (Join-Path $DestClarisse $arq) -Force
+}
+Passo "motor de voz, nucleo, escutador de atalhos e sintetizador em $DestClarisse"
+
+# A Leitora e um pacote Python: o cli.py importa clarisse.leitora.* subindo dois
+# niveis a partir de si mesmo, o que instalado aterra em ~\.claude. Por isso o
+# __init__.py da pasta clarisse vai junto, acima.
+$DestLeitora = Join-Path $DestClarisse 'leitora'
+if (-not (Test-Path $DestLeitora)) {
+    New-Item -ItemType Directory -Path $DestLeitora -Force | Out-Null
+}
+foreach ($arq in @('__init__.py', 'segredo.py')) {
+    Copy-Item (Join-Path $Origem "clarisse\leitora\$arq") (Join-Path $DestLeitora $arq) -Force
+}
+Passo "leitora de sessoes em $DestLeitora"
+```
+
+- [ ] **Passo 7: Fechar o ponto cego do teste do instalador**
+
+O teste existente só olhava arquivos soltos em `clarisse/` e **não entrava em
+subpasta** — a `leitora/` inteira ficaria sem vigilância, justamente onde todo o
+código novo vai morar.
+
+Em `tests/instalador.Tests.ps1`, no teste que já existe, troque a listagem por
+uma recursiva e sem repetição:
+
+```powershell
+        # A busca e recursiva porque a Leitora vive em clarisse\leitora. Sem
+        # recursao, uma subpasta inteira ficava fora da vigilancia - justamente
+        # onde o codigo novo passou a morar.
+        #
+        # A comparacao e por nome de arquivo, nao por caminho, porque o
+        # instalador monta o caminho com interpolacao e o caminho literal nunca
+        # aparece no texto. Limite conhecido: dois arquivos de mesmo nome em
+        # pastas diferentes se cobrem. Hoje isso vale so para __init__.py, que o
+        # instalador nomeia nas duas listas.
+        $origem = Join-Path $PSScriptRoot '..\clarisse'
+        $codigo = @(
+            Get-ChildItem $origem -File -Recurse |
+                Where-Object { @('.ps1', '.py') -contains $_.Extension } |
+                ForEach-Object { $_.Name } |
+                Sort-Object -Unique
+        )
+        $codigo.Count | Should BeGreaterThan 0
+```
+
+E acrescente um segundo teste dentro do mesmo `Describe 'instalador'`, porque
+nomear o arquivo não basta se a pasta de destino não existir:
+
+```powershell
+    It 'cria toda subpasta de codigo que existe na pasta clarisse' {
+        # Nomear os arquivos nao basta: sem criar a pasta de destino, o
+        # Copy-Item falha na instalacao e a mesma falha silenciosa volta.
+        #
+        # So conta pasta que tem codigo dentro. Isso exclui __pycache__ e
+        # qualquer outro cache de ferramenta sem precisar mante-los numa lista.
+        $origem = Join-Path $PSScriptRoot '..\clarisse'
+        $pastas = @(
+            Get-ChildItem $origem -Directory |
+                Where-Object {
+                    @(Get-ChildItem $_.FullName -File |
+                        Where-Object { @('.ps1', '.py') -contains $_.Extension }).Count -gt 0
+                } |
+                ForEach-Object { $_.Name }
+        )
+        $pastas.Count | Should BeGreaterThan 0
+
+        $instalador = [System.IO.File]::ReadAllText(
+            (Join-Path $PSScriptRoot '..\instalar.ps1'), [System.Text.Encoding]::UTF8)
+
+        $faltando = @($pastas | Where-Object { $instalador -notmatch [regex]::Escape($_) })
+        ($faltando -join ', ') | Should BeNullOrEmpty
+    }
+```
+
+- [ ] **Passo 8: Manter os caches do Python fora do controle de versão**
+
+Acrescente no fim de `.gitignore`:
+
+```
+# Cache de ferramenta Python - nunca versionar
+__pycache__/
+*.pyc
+.pytest_cache/
+```
+
+- [ ] **Passo 9: Rodar as duas suítes**
 
 ```
 $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Passaram: $($r.PassedCount) Falharam: $($r.FailedCount)"
 ```
 
-Esperado: `Total: 126 Passaram: 126 Falharam: 0`.
+Esperado: `Total: 127 Passaram: 127 Falharam: 0` — 126 de antes mais a guarda
+nova de subpasta.
 
-- [ ] **Passo 7: Commitar**
+```
+python -m pytest -q
+```
+
+Esperado: `8 passed`.
+
+- [ ] **Passo 10: Commitar**
 
 ```bash
-git add clarisse/__init__.py clarisse/leitora/__init__.py clarisse/leitora/segredo.py pytest.ini tests/leitora/test_segredo.py
+git add clarisse/__init__.py clarisse/leitora/__init__.py clarisse/leitora/segredo.py pytest.ini .gitignore tests/leitora/test_segredo.py tests/instalador.Tests.ps1 instalar.ps1
 git commit -m "Barra formato de segredo antes do texto virar voz"
 ```
 
@@ -1032,13 +1160,13 @@ Esperado: `7 passed`.
 python -m pytest -v
 ```
 
-Esperado: `32 passed` — 7 do segredo, 8 da transcrição, 10 das sessões, 7 do CLI.
+Esperado: `33 passed` — 8 do segredo, 8 da transcrição, 10 das sessões, 7 do CLI.
 
 ```
 $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Passaram: $($r.PassedCount) Falharam: $($r.FailedCount)"
 ```
 
-Esperado: `Total: 126 Passaram: 126 Falharam: 0`.
+Esperado: `Total: 127 Passaram: 127 Falharam: 0`.
 
 - [ ] **Passo 6: Provar na prática, contra as suas transcrições de verdade**
 
@@ -1264,13 +1392,13 @@ resto é PowerShell:
 python -m pytest -q
 ```
 
-Esperado: `32 passed`.
+Esperado: `33 passed`.
 
 ```
 $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Passaram: $($r.PassedCount) Falharam: $($r.FailedCount)"
 ```
 
-Esperado: `Total: 126 Passaram: 126 Falharam: 0`.
+Esperado: `Total: 127 Passaram: 127 Falharam: 0`.
 
 - [ ] **Passo 7: Commitar**
 

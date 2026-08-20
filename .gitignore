@@ -24,3 +24,8 @@ settings.json.bak*
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Cache de ferramenta Python - nunca versionar
+__pycache__/
+*.pyc
+.pytest_cache/
