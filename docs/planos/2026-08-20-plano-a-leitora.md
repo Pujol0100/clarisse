@@ -91,7 +91,7 @@ repositório.
 - Produz: `mascarar(texto: str) -> str` e `contem_segredo(texto: str) -> bool`,
   em `clarisse.leitora.segredo`.
 
-- [ ] **Passo 1: Criar os arquivos de pacote e a configuração do pytest**
+- [x] **Passo 1: Criar os arquivos de pacote e a configuração do pytest**
 
 Crie `clarisse/__init__.py` **vazio** (zero bytes).
 
@@ -108,7 +108,7 @@ python_files = test_*.py
 `python_files = test_*.py` é o que impede o pytest de tentar coletar os arquivos
 `*.Tests.ps1` do Pester que vivem na mesma pasta.
 
-- [ ] **Passo 2: Escrever o teste que falha**
+- [x] **Passo 2: Escrever o teste que falha**
 
 Crie `tests/leitora/test_segredo.py`:
 
@@ -159,7 +159,7 @@ def test_texto_vazio_nao_quebra():
     assert contem_segredo('') is False
 ```
 
-- [ ] **Passo 3: Rodar o teste e confirmar que falha**
+- [x] **Passo 3: Rodar o teste e confirmar que falha**
 
 No PowerShell, na raiz do worktree:
 
@@ -171,7 +171,7 @@ Esperado: **erro de coleta**, com `ModuleNotFoundError: No module named
 'clarisse.leitora.segredo'`. Se em vez disso vier "no tests ran", o `pytest.ini`
 está no lugar errado — ele vai na raiz do repositório.
 
-- [ ] **Passo 4: Escrever a implementação mínima**
+- [x] **Passo 4: Escrever a implementação mínima**
 
 Crie `clarisse/leitora/segredo.py`:
 
@@ -231,7 +231,7 @@ def contem_segredo(texto: str) -> bool:
     return mascarar(texto) != texto
 ```
 
-- [ ] **Passo 5: Rodar o teste e confirmar que passa**
+- [x] **Passo 5: Rodar o teste e confirmar que passa**
 
 ```
 python -m pytest tests/leitora/test_segredo.py -v
@@ -245,7 +245,7 @@ Esperado: `8 passed`.
 `[oculto]` aparece e o segredo sobrevive. Só `_BEARER` antes de `_ATRIBUICAO`
 resolve.
 
-- [ ] **Passo 6: Fazer o instalador copiar os arquivos novos**
+- [x] **Passo 6: Fazer o instalador copiar os arquivos novos**
 
 Sem isto, o teste Pester `instalador / copia todo arquivo de codigo` falha. Em
 `instalar.ps1`, troque o laço de cópia (linha 168) por:
@@ -269,7 +269,7 @@ foreach ($arq in @('__init__.py', 'segredo.py')) {
 Passo "leitora de sessoes em $DestLeitora"
 ```
 
-- [ ] **Passo 7: Fechar o ponto cego do teste do instalador**
+- [x] **Passo 7: Fechar o ponto cego do teste do instalador**
 
 O teste existente só olhava arquivos soltos em `clarisse/` e **não entrava em
 subpasta** — a `leitora/` inteira ficaria sem vigilância, justamente onde todo o
@@ -327,7 +327,7 @@ nomear o arquivo não basta se a pasta de destino não existir:
     }
 ```
 
-- [ ] **Passo 8: Manter os caches do Python fora do controle de versão**
+- [x] **Passo 8: Manter os caches do Python fora do controle de versão**
 
 Acrescente no fim de `.gitignore`:
 
@@ -338,7 +338,7 @@ __pycache__/
 .pytest_cache/
 ```
 
-- [ ] **Passo 9: Rodar as duas suítes**
+- [x] **Passo 9: Rodar as duas suítes**
 
 ```
 $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Passaram: $($r.PassedCount) Falharam: $($r.FailedCount)"
@@ -353,7 +353,7 @@ python -m pytest -q
 
 Esperado: `8 passed`.
 
-- [ ] **Passo 10: Commitar**
+- [x] **Passo 10: Commitar**
 
 ```bash
 git add clarisse/__init__.py clarisse/leitora/__init__.py clarisse/leitora/segredo.py pytest.ini .gitignore tests/leitora/test_segredo.py tests/instalador.Tests.ps1 instalar.ps1
@@ -378,7 +378,7 @@ git commit -m "Barra formato de segredo antes do texto virar voz"
     `ferramenta: str`
   - `ler_eventos(caminho: str) -> list[Evento]`
 
-- [ ] **Passo 1: Escrever a ajuda de teste**
+- [x] **Passo 1: Escrever a ajuda de teste**
 
 Crie `tests/leitora/conftest.py`:
 
@@ -402,7 +402,7 @@ def escrever_jsonl(tmp_path):
     return _escrever
 ```
 
-- [ ] **Passo 2: Escrever os testes que falham**
+- [x] **Passo 2: Escrever os testes que falham**
 
 Crie `tests/leitora/test_transcricao.py`:
 
@@ -515,7 +515,7 @@ def test_arquivo_inexistente_devolve_lista_vazia(tmp_path):
     assert ler_eventos(str(tmp_path / 'nao-existe.jsonl')) == []
 ```
 
-- [ ] **Passo 3: Rodar os testes e confirmar que falham**
+- [x] **Passo 3: Rodar os testes e confirmar que falham**
 
 ```
 python -m pytest tests/leitora/test_transcricao.py -v
@@ -524,7 +524,7 @@ python -m pytest tests/leitora/test_transcricao.py -v
 Esperado: erro de coleta com `ModuleNotFoundError: No module named
 'clarisse.leitora.transcricao'`.
 
-- [ ] **Passo 4: Escrever a implementação mínima**
+- [x] **Passo 4: Escrever a implementação mínima**
 
 Crie `clarisse/leitora/transcricao.py`:
 
@@ -623,7 +623,7 @@ Remova a importação `field` se o seu editor apontar que ela não é usada — 
 é. O arquivo acima está correto sem ela; a linha de importação deve ser
 `from dataclasses import dataclass`.
 
-- [ ] **Passo 5: Rodar os testes e confirmar que passam**
+- [x] **Passo 5: Rodar os testes e confirmar que passam**
 
 ```
 python -m pytest tests/leitora/test_transcricao.py -v
@@ -635,7 +635,7 @@ Se vier `ImportError: cannot import name 'field'`, você copiou uma versão anti
 do bloco acima: a linha de importação é `from dataclasses import dataclass`, sem
 `field`.
 
-- [ ] **Passo 6: Commitar**
+- [x] **Passo 6: Commitar**
 
 ```bash
 git add clarisse/leitora/transcricao.py tests/leitora/conftest.py tests/leitora/test_transcricao.py
@@ -664,7 +664,7 @@ nome da pasta. O nome da pasta é higienizado com hifens
 (`C--Users-...-api-gestora`) e não dá para separar o hífen do caminho do hífen do
 nome. O `cwd` é exato.
 
-- [ ] **Passo 1: Escrever os testes que falham**
+- [x] **Passo 1: Escrever os testes que falham**
 
 Crie `tests/leitora/test_sessoes.py`:
 
@@ -776,7 +776,7 @@ def test_sessao_mais_recente_de_projeto_inexistente_e_nula(tmp_path):
     assert sessao_mais_recente([], 'alvo') is None
 ```
 
-- [ ] **Passo 2: Rodar os testes e confirmar que falham**
+- [x] **Passo 2: Rodar os testes e confirmar que falham**
 
 ```
 python -m pytest tests/leitora/test_sessoes.py -v
@@ -785,7 +785,7 @@ python -m pytest tests/leitora/test_sessoes.py -v
 Esperado: erro de coleta com `ModuleNotFoundError: No module named
 'clarisse.leitora.sessoes'`.
 
-- [ ] **Passo 3: Escrever a implementação mínima**
+- [x] **Passo 3: Escrever a implementação mínima**
 
 Crie `clarisse/leitora/sessoes.py`:
 
@@ -895,7 +895,7 @@ def sessao_mais_recente(sessoes: list[Sessao], projeto: str) -> Sessao | None:
     return None
 ```
 
-- [ ] **Passo 4: Rodar os testes e confirmar que passam**
+- [x] **Passo 4: Rodar os testes e confirmar que passam**
 
 ```
 python -m pytest tests/leitora/test_sessoes.py -v
@@ -903,7 +903,7 @@ python -m pytest tests/leitora/test_sessoes.py -v
 
 Esperado: `10 passed`.
 
-- [ ] **Passo 5: Commitar**
+- [x] **Passo 5: Commitar**
 
 ```bash
 git add clarisse/leitora/sessoes.py tests/leitora/test_sessoes.py
@@ -945,7 +945,7 @@ para não haver caminho que devolva texto sem passar por ele.
   - `executar(argumentos: list[str]) -> dict`
   - `main() -> int`
 
-- [ ] **Passo 1: Escrever os testes que falham**
+- [x] **Passo 1: Escrever os testes que falham**
 
 Crie `tests/leitora/test_cli.py`:
 
@@ -1050,7 +1050,7 @@ def test_relatar_sem_projeto_usa_a_sessao_mais_ativa(tmp_path):
     assert saida['projeto'] == 'recente'
 ```
 
-- [ ] **Passo 2: Rodar os testes e confirmar que falham**
+- [x] **Passo 2: Rodar os testes e confirmar que falham**
 
 ```
 python -m pytest tests/leitora/test_cli.py -v
@@ -1059,7 +1059,7 @@ python -m pytest tests/leitora/test_cli.py -v
 Esperado: erro de coleta com `ModuleNotFoundError: No module named
 'clarisse.leitora.cli'`.
 
-- [ ] **Passo 3: Escrever a implementação mínima**
+- [x] **Passo 3: Escrever a implementação mínima**
 
 Crie `clarisse/leitora/cli.py`:
 
@@ -1166,7 +1166,7 @@ if __name__ == '__main__':
     raise SystemExit(main())
 ```
 
-- [ ] **Passo 4: Rodar os testes e confirmar que passam**
+- [x] **Passo 4: Rodar os testes e confirmar que passam**
 
 ```
 python -m pytest tests/leitora/test_cli.py -v
@@ -1174,7 +1174,7 @@ python -m pytest tests/leitora/test_cli.py -v
 
 Esperado: `7 passed`.
 
-- [ ] **Passo 5: Rodar a suíte Python inteira e o Pester**
+- [x] **Passo 5: Rodar a suíte Python inteira e o Pester**
 
 ```
 python -m pytest -v
@@ -1188,7 +1188,7 @@ $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Pass
 
 Esperado: `Total: 127 Passaram: 127 Falharam: 0`.
 
-- [ ] **Passo 6: Provar na prática, contra as suas transcrições de verdade**
+- [x] **Passo 6: Provar na prática, contra as suas transcrições de verdade**
 
 Este passo não é teste automatizado: é a verificação de que a Leitora funciona
 contra os arquivos reais desta máquina.
@@ -1208,7 +1208,7 @@ python .\clarisse\leitora\cli.py relatar --projeto voz-ao-claude --maximo 6
 Esperado: um JSON com os últimos seis eventos desta própria conversa. É aqui que
 você confirma que o conteúdo é reconhecível e útil.
 
-- [ ] **Passo 7: Commitar**
+- [x] **Passo 7: Commitar**
 
 ```bash
 git add clarisse/leitora/cli.py tests/leitora/test_cli.py
@@ -1228,7 +1228,7 @@ git commit -m "Expoe a Leitora por linha de comando, mascarando na fronteira"
 - Consome: `python <clarisse>/leitora/cli.py relatar --projeto <termo>` (Tarefa 4).
 - Produz: os argumentos de relato no comando `/clarisse`.
 
-- [ ] **Passo 1: Fazer o instalador copiar a Leitora**
+- [x] **Passo 1: Fazer o instalador copiar a Leitora**
 
 Em `instalar.ps1`, o laço das linhas 168-169 é hoje:
 
@@ -1255,7 +1255,7 @@ O `__init__.py` da pasta `clarisse` também é copiado porque o `cli.py` importa
 `clarisse.leitora.*`, e ele resolve a raiz subindo dois níveis a partir de si
 mesmo — o que, instalado, aterra em `%USERPROFILE%\.claude`.
 
-- [ ] **Passo 2: Verificar que a instalação copiou tudo**
+- [x] **Passo 2: Verificar que a instalação copiou tudo**
 
 ```
 powershell -ExecutionPolicy Bypass -File .\instalar.ps1
@@ -1279,7 +1279,7 @@ python "$env:USERPROFILE\.claude\clarisse\leitora\cli.py" relatar --projeto voz-
 Esperado: JSON com quatro eventos. Se vier `ModuleNotFoundError`, o
 `__init__.py` da pasta `clarisse` não foi copiado.
 
-- [ ] **Passo 3: Ensinar o comando `/clarisse` a relatar**
+- [x] **Passo 3: Ensinar o comando `/clarisse` a relatar**
 
 Em `comandos/clarisse.md`, na tabela de argumentos, acrescente estas três linhas
 logo **abaixo** da linha que começa com `` | `proximo`, `pula` ``:
@@ -1327,7 +1327,7 @@ Quando o argumento pedir relato de uma sessao, faca nesta ordem:
    Nao repita na tela o texto que ela acabou de falar.
 ```
 
-- [ ] **Passo 4: Provar o caminho completo, ponta a ponta**
+- [x] **Passo 4: Provar o caminho completo, ponta a ponta**
 
 Reinstale para levar o comando atualizado:
 
@@ -1357,7 +1357,7 @@ errado:
 Esperado: ela **pergunta** qual dos projetos `omni` você quer, em uma linha, e
 **não** fala nenhum relato.
 
-- [ ] **Passo 5: Atualizar o README**
+- [x] **Passo 5: Atualizar o README**
 
 Em `README.md`, na tabela de comandos, acrescente logo abaixo da linha
 `/clarisse ler`:
@@ -1406,7 +1406,7 @@ resto é PowerShell:
     python -m pytest
 ```
 
-- [ ] **Passo 6: Rodar as duas suítes uma última vez**
+- [x] **Passo 6: Rodar as duas suítes uma última vez**
 
 ```
 python -m pytest -q
@@ -1420,7 +1420,7 @@ $r = Invoke-Pester -Path .\tests -PassThru -Quiet; "Total: $($r.TotalCount) Pass
 
 Esperado: `Total: 127 Passaram: 127 Falharam: 0`.
 
-- [ ] **Passo 7: Commitar**
+- [x] **Passo 7: Commitar**
 
 ```bash
 git add comandos/clarisse.md instalar.ps1 README.md
