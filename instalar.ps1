@@ -177,7 +177,7 @@ $DestLeitora = Join-Path $DestClarisse 'leitora'
 if (-not (Test-Path $DestLeitora)) {
     New-Item -ItemType Directory -Path $DestLeitora -Force | Out-Null
 }
-foreach ($arq in @('__init__.py', 'segredo.py')) {
+foreach ($arq in @('__init__.py', 'segredo.py', 'transcricao.py')) {
     Copy-Item (Join-Path $Origem "clarisse\leitora\$arq") (Join-Path $DestLeitora $arq) -Force
 }
 Passo "leitora de sessoes em $DestLeitora"
