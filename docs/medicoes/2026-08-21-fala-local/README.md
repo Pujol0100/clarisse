@@ -6,7 +6,17 @@ Data: 21/08/2026. Máquina: i7-1355U (15 W, 10 núcleos físicos / 12 lógicos),
 Responde à pergunta que o design deixou aberta: dá para transcrever português
 localmente, sem a nuvem, com latência e precisão aceitáveis?
 
-**Não para transcrever. Sim para acordar.**
+**Dá — com `faster-whisper small` alimentado com os nomes dos projetos como
+dica.** Espera de 2,74 s, 9,2% de erro, todos os nomes de projeto corretos, custo
+zero para sempre. A Azure saiu do projeto.
+
+Duas rodadas, e a primeira concluiu o contrário. A diferença entre elas não foi
+máquina nem motor: foi a **dica**. Vale ler nesta ordem, porque a reviravolta é a
+parte instrutiva.
+
+A palavra de ativação, medida na primeira rodada, foi **descartada por inteiro**
+depois — não por causa da medição, mas porque o usuário decidiu ficar só com a
+tecla. Ver `docs/planos/2026-08-21-decisoes-que-substituem-o-desenho.md`.
 
 ## Como refazer
 
@@ -74,9 +84,14 @@ small  : clarice roda os testes do projeto e me avisa quando terminar
 O design diz que adivinhar o projeto é falhar em silêncio na pasta errada. Um
 motor que ouve `omni-api` e escreve `homem in api` não pode decidir onde agir.
 
-**Conclusão:** local é rápido e errado (`base`, 1,03 s) ou certo e lento
-(`small`, 3,08 s). Os dois reprovam. A transcrição fica na Azure, em `pt-BR`,
-região `brazilsouth`.
+**Conclusão desta rodada:** local é rápido e errado (`base`, 1,03 s) ou certo e
+lento (`small`, 3,08 s). Os dois reprovam.
+
+> **Revertido pela segunda rodada.** Esta conclusão levou à decisão de usar a
+> Azure, e ela estava errada por uma razão que esta rodada não testou: faltava
+> dar ao motor os **nomes dos projetos como dica**. Com a dica, o erro do `small`
+> cai de 52,3% para 9,2% com voz real, e todos os nomes de projeto saem certos.
+> A Azure saiu do projeto. Ver "Segunda rodada" no fim deste documento.
 
 ## Acordar quando você chama
 
@@ -111,7 +126,12 @@ Com o vocabulário inteiro, o mesmo modelo escreve "clareza", "esclareceu" e
 "classificar" corretamente, e nunca acorda. As duas perdas do modo livre foram as
 falas mais curtas: o nome sozinho, e "Clarisse, escuta".
 
-**Conclusão:** vocabulário livre, e a tecla `F6` como forma garantida de chamar.
+**Conclusão desta rodada:** vocabulário livre, e a tecla como forma garantida
+de chamar.
+
+> **Superado.** A palavra de ativação saiu do projeto por inteiro em 21/08/2026:
+> ficou só a tecla. Esta seção fica como registro de por que nenhuma das quatro
+> opções de palavra de ativação servia.
 
 ## Ganho lateral
 
