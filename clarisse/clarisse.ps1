@@ -277,8 +277,17 @@ switch ($Mode) {
 
     'notify' {
         # Hook Notification: o Claude Code manda um JSON no stdin.
-        # Continua falando sozinho: aqui o Claude esta parado esperando voce,
-        # e com varias sessoes abertas a fala precisa dizer qual delas.
+        #
+        # Nao fala. Ele falava, de proposito, com o argumento de que aqui o
+        # Claude esta parado esperando voce. O argumento estava errado: uma
+        # notificacao nao e resposta a nada que voce pediu. Ela chega quando
+        # uma sessao qualquer trava, na hora dela - e com varias abertas isso
+        # virou a Clarisse anunciando em voz alta que um terminal precisa de
+        # atencao, no meio de uma reuniao, na frente de outras pessoas.
+        #
+        # A regra: audio toca sozinho apenas dentro de um turno que voce abriu.
+        # O notify nao abre turno nenhum, entao ele bipa e guarda. O conteudo
+        # nao se perde: sai quando voce pedir.
         if (-not $cfg.enabled) { exit 0 }
         $bruto = Read-StdinDoHook
         $msg = ''
@@ -290,7 +299,11 @@ switch ($Mode) {
                 $msg = $bruto
             }
         }
-        $falado = Format-FalaNotificacao $msg (Get-NomeProjeto (Get-CwdDoHook $bruto))
-        if ($falado) { Start-FalaAssincrona $falado }
+        $projeto = Get-NomeProjeto (Get-CwdDoHook $bruto)
+        $falado = Format-FalaNotificacao $msg $projeto
+        if ($falado) {
+            Add-Pendente (ConvertTo-Falavel $falado $cfg.maxChars) $projeto
+            Send-Bipe
+        }
     }
 }
