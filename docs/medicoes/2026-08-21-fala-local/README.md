@@ -133,3 +133,84 @@ fora do Brasil.
    não competindo pelos mesmos 15 W.
 
 Cada item acima é tarefa do Plano B, antes de fechar o Ouvinte.
+
+---
+
+# Segunda rodada: a voz real do usuário
+
+Oito frases gravadas pelo usuário no headset Bluetooth (FK Wise BT), de 3,4 s a
+5,1 s, 34,3 s de áudio. `int8`, 8 threads, busca gulosa. Scripts: `gravar.py`
+(grava, Enter começa e Enter para, imitando a tecla) e `medir_voz.py`.
+
+"Espera" é o que importa: o tempo entre soltar a tecla e o texto estar pronto.
+
+| Configuração | Espera mediana | Pior espera | × tempo real | Erro de palavra |
+|---|---|---|---|---|
+| `base` sem dica | 1,11 s | **6,14 s** | 0,42× | 76,9% |
+| `base` com dica | **0,88 s** | 2,06 s | 0,24× | 24,6% |
+| `small` sem dica | 2,81 s | 2,98 s | 0,65× | 52,3% |
+| **`small` com dica** | 2,74 s | 3,19 s | 0,66× | **9,2%** |
+
+## A dica é o achado
+
+"Dica" é o `initial_prompt` do whisper, alimentado com os nomes dos projetos:
+
+```
+Projetos: omni-api, compliance-app, voz-ao-claude, consultor-financeiro,
+conciliacao-bancaria, velocimetro-tokens, cadeia-sequencial. Clarisse.
+```
+
+O efeito não é marginal, é estrutural:
+
+| Motor | Sem dica | Com dica |
+|---|---|---|
+| `base` | 76,9% | 24,6% |
+| `small` | 52,3% | **9,2%** |
+
+E ela conserta exatamente o defeito que mais importava. Sem dica o `small` ouvia
+`omni-api` e escrevia "almea pi"; com dica escreve `omni api`. **Todos os nomes de
+projeto saíram certos** na rodada `small` com dica: omni api, compliance app, voz
+ao claude, consultor financeiro, velocimetro de tokens, conciliacao bancaria.
+
+Quatro das oito frases saíram **perfeitas**, com zero de erro. O que restou é
+ruído de concordância, não de conteúdo — "passam" no lugar de "passaram",
+"comparo" no lugar de "compara", e um "o que está" que virou "aqui está".
+
+## Por que o `base` continua reprovado, mesmo com dica
+
+Duas razões, e a segunda é pior que a primeira:
+
+1. Ele ainda erra o nome: escreveu `omni app` onde era `omni api`.
+2. **Ele fica instável com áudio difícil.** Na frase da conciliação bancária, sem
+   dica, ele devolveu "pladei se de contastar a espada se eu me aconselhar se eu
+   nao me cria" — 214% de erro — e levou **6,14 s**, seis vezes a própria mediana.
+   É alucinação em laço, o modo de falha clássico do whisper pequeno com entrada
+   ruim. Com dica ele melhora, mas ainda dá 85,7% naquela frase e 2,06 s.
+
+Um motor que ocasionalmente devolve uma frase inventada é pior que um motor lento,
+porque a frase inventada **parece** uma resposta.
+
+## Veredito
+
+**`faster-whisper small` com dica dos nomes de projeto.** Espera de 2,74 s
+mediana, 3,19 s no pior caso, 9,2% de erro, nomes de projeto todos corretos, e
+custo zero para sempre. A Azure sai do projeto.
+
+## A folga que existe e não foi usada
+
+O `small` roda a **0,66× o tempo real** — processa mais rápido do que se fala.
+Os 2,74 s são o custo de transcrever o áudio **inteiro depois** que a tecla é
+solta. Se a transcrição rodar enquanto o usuário ainda fala, o que sobra depois
+da tecla é só o último trecho, e a espera cai bem abaixo de 1 s.
+
+Isso **não foi medido**, e é a primeira tarefa do Plano B. O que a medição
+estabelece é que a folga existe: 0,66× é headroom, não gargalo.
+
+## Ainda não medido
+
+- Transcrição em fluxo, que é onde estão os 2 s de ganho.
+- O microfone embutido do notebook. Tudo acima é headset Bluetooth, que tem
+  qualidade menor. Os erros de "o que" → "aqui" e da conciliação podem ser do
+  microfone, não do motor — trocar de microfone é mais barato que trocar de
+  arquitetura.
+- Ruído de fundo real, e a CPU competindo com as outras sessões.
