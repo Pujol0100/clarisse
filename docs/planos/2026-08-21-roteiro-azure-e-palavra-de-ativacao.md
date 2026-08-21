@@ -30,7 +30,7 @@ está publicado** — a tabela oficial mostra `$-`.
 | Azure Custom Keyword | Não. Só en-US e zh | Grátis | Mínimo: digitar a palavra no portal e testar no navegador | Viável, mas força a região fora do Brasil e aposta que a pronúncia inglesa de "Clarisse" pegue |
 | Picovoice Porcupine | **Sim, nativo** | **Morto** | Mínimo | **Descartado.** A Picovoice encerrou a camada gratuita em 30/06/2026 e declarou: *"There is no non-commercial tier planned"* |
 | openWakeWord | Oficialmente **não** | Grátis, Apache 2.0 | Alto: treinar no Colab, cerca de 1 h, mais calibrar limiar | Descartado como primeira escolha. O README diz *"Currently, openWakeWord only supports English"*. Português só por caminho não suportado, com TTS Piper |
-| **Vosk com gramática restrita** | **Sim**, modelo pt de 31 MB | Grátis, Apache 2.0, sem conta | Médio: nenhum treino, mas reconhecimento contínuo na CPU | **Escolhido** |
+| **Vosk local** | **Sim**, modelo pt de 31 MB | Grátis, Apache 2.0, sem conta | Médio: nenhum treino, mas reconhecimento contínuo na CPU | **Escolhido**, no modo de vocabulário livre |
 
 ### Por que Vosk
 
@@ -45,14 +45,27 @@ está publicado** — a tabela oficial mostra `$-`.
 5. O modo de falha é benigno: se ela não ouvir o nome, você aperta `F6`. A tecla
    já é a outra forma de ativar, decidida no design.
 
-Sobre a precisão: o modelo pequeno de português tem taxa de erro de palavra de
-32,60% no teste CommonVoice, ruim para transcrever. Mas aqui ele não transcreve —
-ele roda com a gramática restrita a uma frase só, o que é um problema muito mais
-fácil que reconhecimento aberto. Isso precisa ser **medido** antes de fechar o
-Plano B, e a medição é a primeira tarefa dele.
+### Corrigido pela medição de 21/08/2026
 
-Se a medição reprovar o Vosk, a queda é para o openWakeWord com voz Piper em
-pt-BR, não para o Porcupine — que deixou de ser opção.
+Esta seção dizia originalmente que o Vosk rodaria com a **gramática restrita** a
+uma frase só, e que isso seria um problema mais fácil que reconhecimento aberto.
+**A medição reprovou essa ideia.** Ver `docs/medicoes/2026-08-21-fala-local/`.
+
+Travada em `["clarisse","[unk]"]`, o reconhecedor é obrigado a encaixar todo som
+numa das duas opções, e o português está cheio de palavras que colidem com o nome:
+*clareza, esclarecimento, esclareceu, classificar, esclarecimentos*. Resultado
+medido: **6 falsos positivos em 12** frases de trabalho. Cortar por confiança não
+resolve, porque as distribuições estão invertidas — os falsos vêm com confiança
+1,00 e o acerto real do nome sozinho vem com 0,76.
+
+O modo correto é o **vocabulário livre**: com o modelo inteiro disponível, "clareza"
+é reconhecida como "clareza". Medido: **0 falsos positivos em 12**, latência
+mediana de 1096 ms, pior caso 1597 ms. O custo é perder as falas mais curtas — o
+nome dito sozinho falhou 2 vezes em 5 — e é por isso que a tecla `F6` deixa de ser
+alternativa e passa a ser a rede de segurança.
+
+Se a validação com voz real reprovar o Vosk, a queda é para o openWakeWord com voz
+Piper em pt-BR, não para o Porcupine — que deixou de ser opção.
 
 ## A armadilha que custaria dinheiro
 

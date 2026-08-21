@@ -1,0 +1,213 @@
+{
+  "transcricao": [
+    {
+      "motor": "vosk small pt",
+      "latencia_mediana_s": 2.3587256999999227,
+      "latencia_max_s": 3.039306900000156,
+      "rtf_mediano": 0.555255579096027,
+      "wer_global": 0.36538461538461536,
+      "amostras": [
+        {
+          "amostra": "acao",
+          "duracao_s": 4.248,
+          "frio_s": 1.555472699999882,
+          "quente_s": 2.3587256999999227,
+          "wer": 0.09090909090909091,
+          "texto": "clarice roda os testes do projeto e me avisa quando terminar"
+        },
+        {
+          "amostra": "curta",
+          "duracao_s": 3.048,
+          "frio_s": 2.6625703999998223,
+          "quente_s": 2.7117698000001837,
+          "wer": 0.375,
+          "texto": "clarice o que esta rolando no home"
+        },
+        {
+          "amostra": "longa",
+          "duracao_s": 5.448,
+          "frio_s": 3.2982207000000017,
+          "quente_s": 3.039306900000156,
+          "wer": 0.42857142857142855,
+          "texto": "clarice que resume a ultima sessao do voz ao clube e disse quanto os testes passaram"
+        },
+        {
+          "amostra": "media",
+          "duracao_s": 3.84,
+          "frio_s": 1.8060208000001694,
+          "quente_s": 1.7859936999998354,
+          "wer": 0.2,
+          "texto": "clarice me conta o que aconteceu na cadeia sequencia hoje"
+        },
+        {
+          "amostra": "nomes",
+          "duracao_s": 4.128,
+          "frio_s": 1.5683890000000247,
+          "quente_s": 1.86869919999981,
+          "wer": 0.7777777777777778,
+          "texto": "clarice com para o homem e ate e com a cadeia sequencial"
+        }
+      ],
+      "carga_s": 0.37416880000000674,
+      "memoria_mb": 117.18359375
+    },
+    {
+      "motor": "faster-whisper tiny",
+      "latencia_mediana_s": 0.6425921000000017,
+      "latencia_max_s": 0.656147300000157,
+      "rtf_mediano": 0.15144263182666345,
+      "wer_global": 0.38461538461538464,
+      "amostras": [
+        {
+          "amostra": "acao",
+          "duracao_s": 4.248,
+          "frio_s": 0.5855673999999453,
+          "quente_s": 0.6433282999996663,
+          "wer": 0.36363636363636365,
+          "texto": "clarice rodo stestes do projeto e me avisa quando terminar"
+        },
+        {
+          "amostra": "curta",
+          "duracao_s": 3.048,
+          "frio_s": 0.5789431000002878,
+          "quente_s": 0.6152396000002227,
+          "wer": 0.625,
+          "texto": "clarice o que esta rolando no homem e a peir"
+        },
+        {
+          "amostra": "longa",
+          "duracao_s": 5.448,
+          "frio_s": 0.8368169000000307,
+          "quente_s": 0.6425921000000017,
+          "wer": 0.35714285714285715,
+          "texto": "clarice resumo a ultima sessao do vosau clod e diz quantos testes passaram"
+        },
+        {
+          "amostra": "media",
+          "duracao_s": 3.84,
+          "frio_s": 0.5734240000001591,
+          "quente_s": 0.656147300000157,
+          "wer": 0.1,
+          "texto": "clarice me conta o que aconteceu na cadeia sequencial hoje"
+        },
+        {
+          "amostra": "nomes",
+          "duracao_s": 4.128,
+          "frio_s": 0.6511586000001444,
+          "quente_s": 0.6060843000000204,
+          "wer": 0.5555555555555556,
+          "texto": "clarice comparou a minha pei com a cadeia sequencial"
+        }
+      ],
+      "carga_s": 6.754794700000275,
+      "memoria_mb": 135.90234375
+    },
+    {
+      "motor": "faster-whisper base",
+      "latencia_mediana_s": 1.181119899999885,
+      "latencia_max_s": 1.4888122000002113,
+      "rtf_mediano": 0.3169392187499417,
+      "wer_global": 0.25,
+      "amostras": [
+        {
+          "amostra": "acao",
+          "duracao_s": 4.248,
+          "frio_s": 1.489630600000055,
+          "quente_s": 1.4888122000002113,
+          "wer": 0.36363636363636365,
+          "texto": "tua a ris rodos testes do projeto e me avisa quando terminar"
+        },
+        {
+          "amostra": "curta",
+          "duracao_s": 3.048,
+          "frio_s": 1.2207931000002645,
+          "quente_s": 1.1384076999997887,
+          "wer": 0.375,
+          "texto": "clarice o que esta rolando no homem in api"
+        },
+        {
+          "amostra": "longa",
+          "duracao_s": 5.448,
+          "frio_s": 1.1889750000000276,
+          "quente_s": 1.181119899999885,
+          "wer": 0.14285714285714285,
+          "texto": "toarice resume a ultima sessao do voz ao clod e diz quantos testes passaram"
+        },
+        {
+          "amostra": "media",
+          "duracao_s": 3.84,
+          "frio_s": 1.051559300000008,
+          "quente_s": 1.217046599999776,
+          "wer": 0.1,
+          "texto": "clarice me conta o que aconteceu na cadeia sequencial hoje"
+        },
+        {
+          "amostra": "nomes",
+          "duracao_s": 4.128,
+          "frio_s": 1.232880600000044,
+          "quente_s": 1.1358706000000893,
+          "wer": 0.3333333333333333,
+          "texto": "clarice compara o homem in api com a cadeia sequencial"
+        }
+      ],
+      "carga_s": 6.9154404999999315,
+      "memoria_mb": 141.02734375
+    },
+    {
+      "motor": "faster-whisper small",
+      "latencia_mediana_s": 3.605250900000101,
+      "latencia_max_s": 4.075651900000139,
+      "rtf_mediano": 0.8754308139535437,
+      "wer_global": 0.1346153846153846,
+      "amostras": [
+        {
+          "amostra": "acao",
+          "duracao_s": 4.248,
+          "frio_s": 3.8408776999999645,
+          "quente_s": 3.569701200000054,
+          "wer": 0.09090909090909091,
+          "texto": "clarice roda os testes do projeto e me avisa quando terminar"
+        },
+        {
+          "amostra": "curta",
+          "duracao_s": 3.048,
+          "frio_s": 3.7089751999997134,
+          "quente_s": 3.605250900000101,
+          "wer": 0.25,
+          "texto": "clarice o que esta rolando no omin api"
+        },
+        {
+          "amostra": "longa",
+          "duracao_s": 5.448,
+          "frio_s": 3.808733299999858,
+          "quente_s": 3.5473823000002085,
+          "wer": 0.07142857142857142,
+          "texto": "clarice resume a ultima sessao do voz ao claude e diz quantos testes passaram"
+        },
+        {
+          "amostra": "media",
+          "duracao_s": 3.84,
+          "frio_s": 4.087188199999673,
+          "quente_s": 4.075651900000139,
+          "wer": 0.1,
+          "texto": "clarice me conta o que aconteceu na cadeia sequencial hoje"
+        },
+        {
+          "amostra": "nomes",
+          "duracao_s": 4.128,
+          "frio_s": 3.7458040000001347,
+          "quente_s": 3.6137784000002284,
+          "wer": 0.2222222222222222,
+          "texto": "clarice compara o omin api com a cadeia sequencial"
+        }
+      ],
+      "carga_s": 16.91403799999989,
+      "memoria_mb": 323.83203125
+    }
+  ],
+  "ativacao": {
+    "acerto_no_nome": "2/2",
+    "falso_positivo": "1/3",
+    "latencia_mediana_ms": 82.98469999999725
+  }
+}

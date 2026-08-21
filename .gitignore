@@ -29,3 +29,9 @@ desktop.ini
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Medicoes: modelos e amostras baixados sob demanda
+docs/medicoes/**/audio/
+docs/medicoes/**/audio_ativacao/
+docs/medicoes/**/modelos/
+docs/medicoes/**/venv/
