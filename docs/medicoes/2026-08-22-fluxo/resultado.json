@@ -1,0 +1,42 @@
+[
+  {
+    "estrategia": "bloco (21/08)",
+    "espera_mediana": 3.2121587000001455,
+    "espera_pior": 3.246551400000044,
+    "wer": 0.09230769230769231,
+    "trabalho_total": 25.345488900000873,
+    "idas_medianas": 1.0
+  },
+  {
+    "estrategia": "silencio 400ms",
+    "espera_mediana": 3.0041848499997865,
+    "espera_pior": 6.829209799999505,
+    "wer": 0.24615384615384617,
+    "trabalho_total": 38.31049039999971,
+    "idas_medianas": 1.0
+  },
+  {
+    "estrategia": "tempo 2,0s",
+    "espera_mediana": 6.477232800000035,
+    "espera_pior": 7.92870190000016,
+    "wer": 0.2923076923076923,
+    "trabalho_total": 70.31125060000022,
+    "idas_medianas": 2.0
+  },
+  {
+    "estrategia": "tempo 2,0s + contexto",
+    "espera_mediana": 5.8515748499998725,
+    "espera_pior": 8.767202499999396,
+    "wer": 0.5230769230769231,
+    "trabalho_total": 71.16143479999937,
+    "idas_medianas": 2.0
+  },
+  {
+    "estrategia": "tempo 1,5s",
+    "espera_mediana": 15.304262599999866,
+    "espera_pior": 20.71356089999986,
+    "wer": 0.4461538461538462,
+    "trabalho_total": 146.23346139999967,
+    "idas_medianas": 3.0
+  }
+]

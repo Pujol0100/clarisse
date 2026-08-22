@@ -226,9 +226,19 @@ da tecla é só o último trecho, e a espera cai bem abaixo de 1 s.
 Isso **não foi medido**, e é a primeira tarefa do Plano B. O que a medição
 estabelece é que a folga existe: 0,66× é headroom, não gargalo.
 
+> **Medido em 22/08/2026, e esta seção está errada.** A folga não é aproveitável:
+> o custo do `faster-whisper` é **por chamada**, não por segundo de áudio —
+> transcrever 0,5 s custa 6,17 s e transcrever 5,0 s custa 6,45 s. Cortar a fala
+> em pedaços multiplica o trabalho em vez de dividi-lo, e a espera **dobra**
+> (3,21 s → 6,48 s) com o erro triplicando (9,2% → 29,2%). Os 0,66× são uma razão
+> entre um custo fixo e a duração daquela frase, não uma taxa que escale para
+> baixo. A transcrição em fluxo saiu do projeto. Ver
+> `docs/medicoes/2026-08-22-fluxo/`.
+
 ## Ainda não medido
 
-- Transcrição em fluxo, que é onde estão os 2 s de ganho.
+- ~~Transcrição em fluxo, que é onde estão os 2 s de ganho.~~ Medido em
+  22/08/2026: os 2 s de ganho não existem. Ver `docs/medicoes/2026-08-22-fluxo/`.
 - O microfone embutido do notebook. Tudo acima é headset Bluetooth, que tem
   qualidade menor. Os erros de "o que" → "aqui" e da conciliação podem ser do
   microfone, não do motor — trocar de microfone é mais barato que trocar de

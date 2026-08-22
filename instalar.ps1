@@ -182,6 +182,17 @@ foreach ($arq in @('__init__.py', 'segredo.py', 'transcricao.py', 'sessoes.py', 
 }
 Passo "leitora de sessoes em $DestLeitora"
 
+# O Ouvinte e o outro lado: a dica de vocabulario que o motor de fala recebe e a
+# leitura do silencio da gravacao. Mesmo arranjo de pacote da Leitora.
+$DestOuvinte = Join-Path $DestClarisse 'ouvinte'
+if (-not (Test-Path $DestOuvinte)) {
+    New-Item -ItemType Directory -Path $DestOuvinte -Force | Out-Null
+}
+foreach ($arq in @('__init__.py', 'cortador.py', 'dica.py')) {
+    Copy-Item (Join-Path $Origem "clarisse\ouvinte\$arq") (Join-Path $DestOuvinte $arq) -Force
+}
+Passo "ouvinte em $DestOuvinte"
+
 $destConfig = Join-Path $DestClarisse 'config.json'
 if (Test-Path $destConfig) {
     # Config existente e preservado; so ganha os campos que a versao nova exige.
