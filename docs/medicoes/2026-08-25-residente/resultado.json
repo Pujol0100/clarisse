@@ -1,0 +1,53 @@
+{
+  "modelo": "small",
+  "threads": 8,
+  "interpretador_s": 0.12827679999986685,
+  "import_s": 1.506992400000172,
+  "carga_fria_s": 6.78064930000005,
+  "carga_morna_s": 3.9836115999999038,
+  "custo_fixo_por_tecla_s": 8.415918500000089,
+  "transcricao_mediana_s": 11.96883385000001,
+  "transcricoes": [
+    {
+      "arquivo": "compara.wav",
+      "segundos": 7.28869090000012,
+      "texto": "Clarisse, comparo o omni-api com o compliance-app?"
+    },
+    {
+      "arquivo": "compliance.wav",
+      "segundos": 42.103477500000054,
+      "texto": "Clarisse, me conta o que aconteceu com o compliance-app?"
+    },
+    {
+      "arquivo": "conciliacao.wav",
+      "segundos": 12.461013199999798,
+      "texto": "Clarisse o quanto esteja-se-passe, a gente aconselhou-se a um bancário."
+    },
+    {
+      "arquivo": "consultor.wav",
+      "segundos": 44.80128370000011,
+      "texto": "Clarisse, como está o consultor financeiro?"
+    },
+    {
+      "arquivo": "omni.wav",
+      "segundos": 14.821785199999795,
+      "texto": "Clarisse, aqui está rolando no omni-api."
+    },
+    {
+      "arquivo": "testes.wav",
+      "segundos": 11.476654500000222,
+      "texto": "Clarisse, roda os testes e me avisa quando terminar."
+    },
+    {
+      "arquivo": "velocimetro.wav",
+      "segundos": 7.84048410000014,
+      "texto": "Clarisse, o que falta no velocímetro de tokens?"
+    },
+    {
+      "arquivo": "voz.wav",
+      "segundos": 6.9665100000001985,
+      "texto": "Clarisse resume a última sessão do voz-ao-claude."
+    }
+  ],
+  "veredito": "residente se justifica"
+}

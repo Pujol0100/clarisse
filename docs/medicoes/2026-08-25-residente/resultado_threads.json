@@ -1,0 +1,61 @@
+{
+  "amostra": "voz.wav",
+  "modelo": "small",
+  "medidas": [
+    {
+      "threads": 2,
+      "carga_s": 7.169172200000048,
+      "mediana_s": 14.694302699999753,
+      "tempos_s": [
+        14.694302699999753,
+        16.220097299999907,
+        12.850914799999828
+      ],
+      "texto": "Clarisse, resume a última sessão do voz-ao-claude."
+    },
+    {
+      "threads": 4,
+      "carga_s": 16.78093889999991,
+      "mediana_s": 26.26144690000001,
+      "tempos_s": [
+        26.26144690000001,
+        32.995966599999974,
+        15.548946199999591
+      ],
+      "texto": "Clarisse, resume a última sessão do voz-ao-claude."
+    },
+    {
+      "threads": 6,
+      "carga_s": 8.062857699999768,
+      "mediana_s": 63.426946399999906,
+      "tempos_s": [
+        63.426946399999906,
+        23.321938000000046,
+        82.00949750000018
+      ],
+      "texto": "Clarisse, resume a última sessão do voz-ao-claude."
+    },
+    {
+      "threads": 8,
+      "carga_s": 12.044460299999628,
+      "mediana_s": 60.014307200000076,
+      "tempos_s": [
+        65.4372128,
+        60.014307200000076,
+        37.41568860000007
+      ],
+      "texto": "Clarisse, resume a última sessão do voz-ao-claude."
+    },
+    {
+      "threads": 12,
+      "carga_s": 11.182784099999935,
+      "mediana_s": 91.93239920000042,
+      "tempos_s": [
+        91.93239920000042,
+        116.25231140000005,
+        23.109274200000073
+      ],
+      "texto": "Clarisse, resume a última sessão do voz-ao-claude."
+    }
+  ]
+}
