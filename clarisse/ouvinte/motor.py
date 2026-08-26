@@ -11,6 +11,7 @@ fixados com teste para nao voltarem por descuido.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 import numpy as np
@@ -49,7 +50,17 @@ def transcrever(motor, onda: np.ndarray, *, dica: str) -> str:
         condition_on_previous_text=False,
         initial_prompt=dica or None,
     )
-    return ''.join(s.text for s in segmentos).strip()
+    return sanear(''.join(s.text for s in segmentos))
+
+
+def sanear(texto: str) -> str:
+    """Deixa o texto em uma linha so, pronto para ser colado.
+
+    A quebra de linha e o que importa: o texto vai para a janela em foco, e uma
+    quebra de linha no prompt do Claude Code **envia** a mensagem. O Ouvinte
+    digita para revisao e nunca envia — entao ela vira espaco aqui.
+    """
+    return re.sub(r'\s+', ' ', texto).strip()
 
 
 class Gravador:
