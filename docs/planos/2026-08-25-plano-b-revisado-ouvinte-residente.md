@@ -26,13 +26,31 @@ Um processo residente carrega o modelo uma vez e espera pedido. É o mesmo padr�
 que o `atalhos.ps1` já usa e que já provou funcionar nesta máquina.
 
 ```
-tecla --> atalhos.ps1 --> escreve comando.txt --> servidor.py (residente)
-                                                       | modelo já em memória
-                                                       | grava, transcreve
-                         le texto.txt  <-- pronto.flag -+
-                               |
-                         cola na janela em foco
+1ª tecla --> atalhos.ps1 --> comando.txt: "gravar" --> servidor.py (residente)
+                                                            | abre o microfone
+                                                            | carrega o modelo
+                                                            |   enquanto se fala
+2ª tecla --> atalhos.ps1 --> comando.txt: "parar"  -------->| fecha e transcreve
+                                                            |
+                            le texto.txt  <-- pronto.flag ---+
+                                  |
+                            cola na janela em foco
 ```
+
+### Por que dois comandos, e não um
+
+O `RegisterHotKey` do Windows avisa quando a tecla **desce**, e nunca quando ela
+sobe. Sem evento de subida não existe "segurar para falar", então a tecla alterna
+— e o servidor precisa ser avisado duas vezes: uma para abrir o microfone, outra
+para fechá-lo. Um comando único não teria como dizer que a fala acabou.
+
+O desenho de 25/08 descrevia um comando só. Corrigido em 26/08, ao construir a
+Tarefa 3.
+
+**De brinde, a carga do modelo some da conta.** O `gravar` abre o microfone e
+**depois** manda carregar o modelo: os ~6,8 s de carga acontecem enquanto o
+usuário ainda está falando. Numa máquina que acabou de descarregar o modelo por
+ócio, isso é a diferença entre esperar e não esperar.
 
 ### Por que arquivo, e não pipe ou porta local
 
@@ -94,15 +112,25 @@ pedir gravação nova ao usuário.**
 - Criar: `clarisse/ouvinte/servidor.py`
 - Testar: `tests/fluxo/test_servidor.py`
 
-A parte testável é o protocolo, não o áudio: o motor e o microfone entram por
-injeção, e os testes usam dublês. Regras que os testes fixam:
+A parte testável é o protocolo, não o áudio: o motor, o microfone e a
+transcrição entram por injeção, e os testes usam dublês. Regras que os testes
+fixam (30 testes, feito em 26/08/2026):
 
 - `pronto.flag` só aparece depois de `texto.txt` estar fechado;
 - comando desconhecido não derruba o servidor;
 - PID de processo morto não impede a subida;
 - PID de processo vivo impede;
 - ocioso além do limite descarrega o modelo e o servidor continua respondendo;
-- texto vazio não gera `pronto.flag` — string vazia nunca é digitada.
+- gravação em andamento impede a descarga por ócio;
+- texto vazio não gera `pronto.flag` — string vazia nunca é digitada;
+- `parar` sem `gravar` antes não faz nada, e um segundo `gravar` não reinicia a
+  gravação em curso;
+- gravação sem áudio não chega ao motor;
+- transcrição que estoura não derruba o servidor, e a fala seguinte é atendida.
+
+O teste de vida do PID usa `OpenProcess` por `ctypes`, e **não** `os.kill(pid, 0)`:
+no Windows o CPython implementa `os.kill` chamando `TerminateProcess`, então o
+teste de vida mataria o servidor que deveria apenas encontrar.
 
 ## Tarefa 4: transcrever com a dica
 

@@ -26,7 +26,8 @@ COMANDO = 'comando.txt'
 TEXTO = 'texto.txt'
 SINAL = 'pronto.flag'
 
-DITAR = 'ditar'
+GRAVAR = 'gravar'
+PARAR = 'parar'
 
 OCIOSO_S = 15 * 60
 INTERVALO_S = 0.12  # o mesmo passo com que o reprodutor le o controle da pausa
@@ -106,11 +107,11 @@ def registrar_no_log(pasta: Path, mensagem: str) -> None:
 
 
 class Servidor:
-    """Atende um pedido por vez, guardando o motor entre pedidos.
+    """Atende uma fala por vez, guardando o motor entre elas.
 
-    O motor abre no primeiro pedido, nao na construcao: subir junto com a sessao
-    do Claude Code custaria 500 a 700 MB de RAM de quem talvez nunca aperte a
-    tecla.
+    A tecla alterna: `gravar` abre o microfone, `parar` fecha e transcreve. Nao
+    ha comando unico porque o `RegisterHotKey` do Windows so avisa quando a tecla
+    desce — sem evento de subida, "segurar para falar" nao existe.
     """
 
     def __init__(
@@ -118,7 +119,8 @@ class Servidor:
         pasta: Path,
         *,
         abrir_motor: Callable[[], object],
-        ditar: Callable[[object], str],
+        gravador: object,
+        transcrever: Callable[[object, object], str],
         registrar: Callable[[str], None] | None = None,
         ocioso_s: float = OCIOSO_S,
         relogio: Callable[[], float] = time.monotonic,
@@ -126,11 +128,13 @@ class Servidor:
         self.pasta = Path(pasta)
         self.pasta.mkdir(parents=True, exist_ok=True)
         self._abrir_motor = abrir_motor
-        self._ditar = ditar
+        self._gravador = gravador
+        self._transcrever = transcrever
         self._registrar = registrar or (lambda msg: registrar_no_log(self.pasta, msg))
         self._ocioso_s = ocioso_s
         self._relogio = relogio
         self._motor: object | None = None
+        self._gravando = False
         self._ultimo_uso = relogio()
 
     @property
@@ -160,33 +164,79 @@ class Servidor:
             self._talvez_descarregar()
             return
 
-        self._limpar_resposta()
-
-        if comando != DITAR:
+        self._ultimo_uso = self._relogio()
+        if comando == GRAVAR:
+            self._comecar()
+        elif comando == PARAR:
+            self._fechar()
+        else:
             self._registrar(f'comando desconhecido: {comando!r}')
+
+    def _comecar(self) -> None:
+        if self._gravando:
+            self._registrar('ja estava gravando - pedido ignorado')
+            return
+
+        self._limpar_resposta()
+        try:
+            self._gravador.iniciar()
+        except Exception as erro:  # fronteira: o servidor nao pode cair
+            self._registrar(f'microfone nao abriu: {erro!r}')
+            return
+        self._gravando = True
+
+        # O modelo carrega enquanto o usuario ainda fala. Sao ~6,8 s de carga
+        # que ninguem espera, porque a espera ja esta acontecendo de qualquer
+        # jeito. Se ele ja estiver na memoria, isto nao custa nada.
+        try:
+            self._motor_pronto()
+        except Exception as erro:
+            self._registrar(f'motor nao carregou: {erro!r}')
+
+    def _fechar(self) -> None:
+        if not self._gravando:
+            self._registrar('nao havia gravacao aberta - pedido ignorado')
             return
 
         try:
-            texto = self._ditar(self._motor_pronto())
+            onda = self._encerrar_gravacao()
         except Exception as erro:  # fronteira: o servidor nao pode cair
-            self._registrar(f'ditado falhou: {erro!r}')
+            self._registrar(f'gravacao falhou: {erro!r}')
+            return
+        finally:
+            self._ultimo_uso = self._relogio()
+
+        if onda is None or len(onda) == 0:
+            self._registrar('gravacao sem audio - nada a transcrever')
+            return
+
+        try:
+            texto = self._transcrever(self._motor_pronto(), onda)
+        except Exception as erro:  # fronteira: o servidor nao pode cair
+            self._registrar(f'transcricao falhou: {erro!r}')
             return
         finally:
             # O ocio conta do fim do trabalho: transcrever leva segundos, e
-            # contar do inicio encurtaria a folga de quem acabou de ditar.
+            # contar do inicio encurtaria a folga de quem acabou de falar.
             self._ultimo_uso = self._relogio()
 
         if not texto:
-            self._registrar('ditado sem texto - nada a digitar')
+            self._registrar('transcricao sem texto - nada a digitar')
             return
 
         escrever(self.pasta / TEXTO, texto)
         escrever(self.pasta / SINAL, '')
 
+    def _encerrar_gravacao(self):
+        """Fecha o microfone. A gravacao cai mesmo se o encerramento estourar."""
+        try:
+            return self._gravador.encerrar()
+        finally:
+            self._gravando = False
+
     def _motor_pronto(self) -> object:
         if self._motor is None:
             self._motor = self._abrir_motor()
-        self._ultimo_uso = self._relogio()
         return self._motor
 
     def _talvez_descarregar(self) -> None:
@@ -194,9 +244,9 @@ class Servidor:
 
         Sao 500 a 700 MB de RAM parados numa maquina que ja segura dez sessoes
         do Claude Code. O proximo pedido paga a carga de novo, e tudo bem: quem
-        ficou quinze minutos sem ditar nao esta cronometrando a proxima frase.
+        ficou quinze minutos sem falar nao esta cronometrando a proxima frase.
         """
-        if self._motor is None:
+        if self._motor is None or self._gravando:
             return
         if self._relogio() - self._ultimo_uso < self._ocioso_s:
             return
@@ -206,7 +256,7 @@ class Servidor:
         self._registrar('motor descarregado por ocio')
 
     def _pegar_comando(self) -> str | None:
-        """Le e apaga o pedido. Pedido lido duas vezes seria ditado duas vezes."""
+        """Le e apaga o pedido. Pedido lido duas vezes seria fala dobrada."""
         arquivo = self.pasta / COMANDO
         try:
             comando = arquivo.read_text(encoding='utf-8').strip()
