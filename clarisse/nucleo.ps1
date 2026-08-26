@@ -887,3 +887,157 @@ function Start-FalaAssincrona([string]$texto, [switch]$PularHistorico, [switch]$
         -ArgumentList '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', "`"$(Join-Path $Root 'clarisse.ps1')`"", '-Mode', 'speak', '-File', "`"$arq`"" `
         -WindowStyle Hidden | Out-Null
 }
+
+# --- Ouvinte: o texto ditado chega na janela em foco ------------------------
+
+# Descobre de qual projeto e a janela que vai receber o texto.
+#
+# O servidor do Ouvinte e um por maquina e nao sabe onde o usuario esta. A unica
+# pista disponivel e o titulo da janela em foco: o Windows Terminal mostra o
+# titulo da aba ativa, e ele costuma vir cortado - a aba do financeiro-areceber
+# aparece so como "areceber". Dai o casamento por pedaco, igual ao que o
+# Read-Pendente -Projeto ja faz.
+#
+# Titulo curto demais nao casa: duas letras casariam com quase todo projeto, e
+# marcar o turno do projeto errado faria a Clarisse falar na sessao errada.
+function Resolve-ProjetoDoTitulo([string]$titulo, $projetos) {
+    if ([string]::IsNullOrWhiteSpace($titulo)) { return '' }
+    if (-not $projetos)                        { return '' }
+
+    $alvo = $titulo.Trim().ToLowerInvariant()
+    if ($alvo.Length -lt 3) { return '' }
+
+    $achados = @()
+    foreach ($p in $projetos) {
+        if ([string]::IsNullOrWhiteSpace($p)) { continue }
+        $nome = $p.Trim().ToLowerInvariant()
+        if ($alvo.Contains($nome) -or $nome.Contains($alvo)) { $achados += $p }
+    }
+    if (-not $achados) { return '' }
+
+    # O nome mais longo e o mais especifico: entre "api" e "omni-api", quem casa
+    # com os dois quis dizer o segundo.
+    return ($achados | Sort-Object { $_.Length } -Descending | Select-Object -First 1)
+}
+
+function Get-TituloDaJanelaEmFoco {
+    # O tipo e compilado aqui dentro, e nao no topo do arquivo: este nucleo e
+    # carregado por todo hook, e compilar C# em cada Stop custaria caro por nada.
+    if (-not ('ClarisseJanela' -as [type])) {
+        Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class ClarisseJanela {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder texto, int tamanho);
+
+    public static string TituloEmFoco() {
+        IntPtr janela = GetForegroundWindow();
+        if (janela == IntPtr.Zero) { return ""; }
+        StringBuilder texto = new StringBuilder(512);
+        GetWindowText(janela, texto, texto.Capacity);
+        return texto.ToString();
+    }
+}
+'@
+    }
+    try { return [ClarisseJanela]::TituloEmFoco() } catch { return '' }
+}
+
+# Digita o texto na janela em foco, caractere por caractere, pelo SendInput.
+#
+# NAO vai pela area de transferencia. Medido em 26/08/2026: nesta maquina a area
+# ficou indisponivel de forma persistente - leitura e escrita estouravam com
+# "operacao de Area de Transferencia nao foi bem-sucedida" - e antes disso, em
+# uso normal, falhava calada em 2 de 25 idas, deixando a area VAZIA. Ela e
+# recurso disputado da maquina inteira, e o ditado nao pode depender de ganhar
+# essa disputa. De quebra, some o risco de perder o que o usuario tinha copiado.
+#
+# O KEYEVENTF_UNICODE manda o codigo do caractere, e nao a tecla: e por isso que
+# acento sai certo aqui e nao sai pelo SendKeys, que foi o motivo de o desenho
+# original ter escolhido colar.
+function Send-TextoUnicode([string]$texto) {
+    if (-not ('ClarisseTeclado' -as [type])) {
+        Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ClarisseTeclado {
+    const uint INPUT_KEYBOARD    = 1;
+    const uint KEYEVENTF_KEYUP   = 0x0002;
+    const uint KEYEVENTF_UNICODE = 0x0004;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct KEYBDINPUT {
+        public ushort wVk;
+        public ushort wScan;
+        public uint   dwFlags;
+        public uint   time;
+        public IntPtr dwExtraInfo;
+    }
+
+    // O INPUT do Windows e uma uniao. O deslocamento 8 vale para 64 bits, que e
+    // onde os hooks rodam; em 32 bits seria 4, e o Digitar recusa antes de
+    // mandar lixo para o teclado do usuario.
+    [StructLayout(LayoutKind.Explicit)]
+    struct INPUT {
+        [FieldOffset(0)] public uint       type;
+        [FieldOffset(8)] public KEYBDINPUT ki;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    public static int Digitar(string texto) {
+        if (IntPtr.Size != 8) {
+            throw new NotSupportedException("O ditado precisa de PowerShell de 64 bits.");
+        }
+        if (string.IsNullOrEmpty(texto)) { return 0; }
+
+        INPUT[] eventos = new INPUT[texto.Length * 2];
+        for (int i = 0; i < texto.Length; i++) {
+            eventos[i * 2].type       = INPUT_KEYBOARD;
+            eventos[i * 2].ki.wScan   = texto[i];
+            eventos[i * 2].ki.dwFlags = KEYEVENTF_UNICODE;
+
+            eventos[i * 2 + 1].type       = INPUT_KEYBOARD;
+            eventos[i * 2 + 1].ki.wScan   = texto[i];
+            eventos[i * 2 + 1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+        }
+
+        return (int)SendInput((uint)eventos.Length, eventos, Marshal.SizeOf(typeof(INPUT)));
+    }
+}
+'@
+    }
+    return [ClarisseTeclado]::Digitar($texto)
+}
+
+# Ultima parada antes do texto virar tecla de verdade.
+#
+# A quebra de linha e barrada aqui de novo, mesmo o saneamento do Ouvinte ja
+# tendo tirado: no prompt do Claude Code ela ENVIA a mensagem, e enviar e a unica
+# coisa que este desenho nao pode fazer por engano. Ela vira espaco e o caso fica
+# no log, porque quebra de linha chegando aqui significa que algo a montante
+# quebrou.
+function Send-TextoNaJanela {
+    param(
+        [string]$texto,
+        [scriptblock]$Enviar = { param($t) Send-TextoUnicode $t }
+    )
+    if ([string]::IsNullOrWhiteSpace($texto)) { return $false }
+
+    $limpo = $texto
+    if ($limpo -match "[`r`n]") {
+        Write-Log 'ditado chegou com quebra de linha - trocada por espaco antes de digitar'
+        $limpo = ($limpo -replace "[`r`n]+", ' ').Trim()
+    }
+
+    & $Enviar $limpo
+    return $true
+}
