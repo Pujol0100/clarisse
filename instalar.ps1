@@ -105,7 +105,7 @@ if ($Desinstalar) {
         Copy-Item $SettingsPath $bkp -Force
         Passo "backup do settings.json em $bkp"
         $settings = Get-Content $SettingsPath -Raw -Encoding utf8 | ConvertFrom-Json
-        foreach ($ev in @('SessionStart', 'Stop', 'Notification')) {
+        foreach ($ev in @('SessionStart', 'Stop', 'Notification', 'UserPromptSubmit')) {
             Set-HookEvento $settings $ev $null
         }
         ($settings | ConvertTo-Json -Depth 20) | Out-File $SettingsPath -Encoding utf8
@@ -153,6 +153,29 @@ $argsInstall = $inv.pre + @('-m', 'pip', 'install', '--quiet', '--upgrade', 'edg
 & $inv.exe @argsInstall
 if ($LASTEXITCODE -ne 0) { Erro 'falha ao instalar edge-tts'; exit 1 }
 Passo 'edge-tts instalado'
+
+# O Ouvinte pesa: sao ~1 GB entre bibliotecas e modelo. Por isso ele so baixa
+# quando esta ligado no config, e nao na instalacao de quem so quer a voz.
+$cfgOrigem = Get-Content (Join-Path $Origem 'clarisse\config.json') -Raw -Encoding utf8 | ConvertFrom-Json
+$cfgDestino = $null
+$cfgDestinoPath = Join-Path $DestClarisse 'config.json'
+if (Test-Path $cfgDestinoPath) {
+    try { $cfgDestino = Get-Content $cfgDestinoPath -Raw -Encoding utf8 | ConvertFrom-Json } catch { }
+}
+$ouvinteLigado = $false
+foreach ($c in @($cfgDestino, $cfgOrigem)) {
+    if ($c -and $c.ouvinte -and $c.ouvinte.ativo) { $ouvinteLigado = $true; break }
+}
+
+if ($ouvinteLigado) {
+    Passo 'ouvinte ligado no config - baixando sounddevice e faster-whisper (~1 GB)'
+    $argsOuvinte = $inv.pre + @('-m', 'pip', 'install', '--quiet', 'sounddevice', 'faster-whisper')
+    & $inv.exe @argsOuvinte
+    if ($LASTEXITCODE -ne 0) { Aviso 'falha ao instalar as bibliotecas do ouvinte - o ditado nao vai funcionar' }
+    else { Passo 'sounddevice e faster-whisper instalados' }
+} else {
+    Passo 'ouvinte desligado no config - as bibliotecas do ditado nao foram baixadas'
+}
 
 # 2. Arquivos
 Titulo '2/5  Arquivos'
@@ -206,6 +229,16 @@ if (Test-Path $destConfig) {
         $mudou = $true
         Passo 'config.json ganhou o bloco de atalhos'
     }
+    if ($atual.PSObject.Properties.Name -notcontains 'ouvinte') {
+        # Desligado: quem ja usava a Clarisse so pela voz nao ganha um ditado que
+        # ocupa 500 a 700 MB de RAM sem ter pedido.
+        $atual | Add-Member -NotePropertyName ouvinte -NotePropertyValue ([pscustomobject]@{
+            ativo = $false; ditar = 'Ctrl+Alt+D'; modelo = 'small'
+        }) -Force
+        $mudou = $true
+        Passo 'config.json ganhou o bloco do ouvinte, desligado'
+    }
+
     # Quem ja tinha o bloco de atalhos nao tem a tecla de passear pelos projetos.
     if ($atual.atalhos -and ($atual.atalhos.PSObject.Properties.Name -notcontains 'pular')) {
         $atual.atalhos | Add-Member -NotePropertyName pular -NotePropertyValue 'Ctrl+Alt+J' -Force
@@ -247,11 +280,14 @@ if (Test-Path $SettingsPath) {
 Set-HookEvento $settings 'SessionStart' (New-EntradaHook 'autostart' 10)
 Set-HookEvento $settings 'Stop'         (New-EntradaHook 'stop'      15)
 Set-HookEvento $settings 'Notification' (New-EntradaHook 'notify'    15)
+# O UserPromptSubmit nao fala nem bipa: ele so da nome ao turno que o ditado
+# abriu. Sem ele, a Clarisse nao sabe em qual das dez sessoes voce falou.
+Set-HookEvento $settings 'UserPromptSubmit' (New-EntradaHook 'prompt' 10)
 ($settings | ConvertTo-Json -Depth 20) | Out-File $SettingsPath -Encoding utf8
 
 try {
     Get-Content $SettingsPath -Raw -Encoding utf8 | ConvertFrom-Json | Out-Null
-    Passo 'hooks SessionStart, Stop e Notification gravados'
+    Passo 'hooks SessionStart, Stop, Notification e UserPromptSubmit gravados'
 } catch {
     Erro 'settings.json ficou invalido - restaurando backup'
     Copy-Item "$SettingsPath.bak" $SettingsPath -Force
@@ -296,6 +332,14 @@ Write-Host 'Ctrl+Alt+L  ler o resumo - com varios projetos esperando, anuncia qu
 Write-Host 'Ctrl+Alt+J  passear para o proximo projeto da fila'
 Write-Host 'Ctrl+Alt+P  pausar e retomar do mesmo ponto'
 Write-Host 'Ctrl+Alt+X  cancelar a fala - o resumo volta para a fila'
+if ($ouvinteLigado) {
+    Write-Host 'Ctrl+Alt+D  ditar - aperta, fala, aperta de novo, e o texto e digitado'
+} else {
+    Write-Host ''
+    Write-Host 'O ditado por voz vem desligado. Para ligar: ponha "ativo": true no bloco'
+    Write-Host '"ouvinte" do config.json e rode este instalador de novo (baixa ~1 GB).'
+}
 Write-Host ''
 Write-Host 'Quando o Claude terminar, voce ouve um bipe curto - a fala so sai no Ctrl+Alt+L.'
+Write-Host 'Depois de ditar, a resposta daquela sessao sai falada na hora.'
 Write-Host 'Use /clarisse status, /clarisse atalhos off, /clarisse repetir.'

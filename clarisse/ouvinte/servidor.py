@@ -272,3 +272,40 @@ class Servidor:
         """
         (self.pasta / SINAL).unlink(missing_ok=True)
         (self.pasta / TEXTO).unlink(missing_ok=True)
+
+
+def principal() -> int:
+    """Sobe o servidor, ou sai calado se ja existe um de pe nesta maquina.
+
+    Sao ~10 sessoes do Claude Code rodando o SessionStart. Dez servidores seriam
+    ~6 GB de RAM e dez processos disputando o mesmo microfone, entao quem chega
+    depois simplesmente vai embora.
+    """
+    import os
+
+    from clarisse.ouvinte.dica import montar_dica, projetos_da_maquina
+    from clarisse.ouvinte.motor import Gravador, abrir_motor, transcrever
+
+    raiz = Path.home() / '.claude'
+    pasta = raiz / 'clarisse' / 'ouvinte'
+
+    if not travar(pasta, pid=os.getpid()):
+        return 0
+
+    # A dica e montada uma vez, na subida. Projeto novo entra na dica na proxima
+    # vez que o servidor subir - e o servidor sobe a cada reinicio da maquina.
+    dica = montar_dica(projetos_da_maquina(raiz / 'projects'))
+    registrar_no_log(pasta, f'servidor de pe (pid {os.getpid()}) com a dica: {dica}')
+
+    servidor = Servidor(
+        pasta,
+        abrir_motor=abrir_motor,
+        gravador=Gravador(),
+        transcrever=lambda motor, onda: transcrever(motor, onda, dica=dica),
+    )
+    servidor.rodar()
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(principal())

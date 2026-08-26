@@ -67,12 +67,41 @@ Describe 'o modo notify nao interrompe quem nao pediu' {
 
 Describe 'nenhum hook automatico fala sem pedido' {
 
-    It 'o modo stop tambem nao dispara fala' {
-        # Guarda de regressao: o stop sempre bipou. Se alguem o fizer falar, a
-        # mesma interrupcao volta por outra porta.
-        $bloco = Get-BlocoDoModo (Join-Path $raizClarisse 'clarisse.ps1') 'stop'
+    # O stop ganhou uma porta de saida em 26/08: com o Ouvinte, quem dita abre um
+    # turno e ouve a resposta na hora. A regra nao mudou - audio sozinho so
+    # dentro de um turno que o usuario abriu - mas agora existe um turno de
+    # verdade para consultar, e nao so o silencio.
+
+    $bloco = Get-BlocoDoModo (Join-Path $raizClarisse 'clarisse.ps1') 'stop'
+
+    It 'o modo stop bipa, como sempre bipou' {
         $bloco | Should Not BeNullOrEmpty
-        $bloco | Should Not Match 'Start-FalaAssincrona'
         $bloco | Should Match 'Send-Bipe'
+    }
+
+    It 'o modo stop nao fala por conta propria' {
+        # Guarda de regressao: fala direta aqui traz de volta a interrupcao em
+        # reuniao, sem passar por turno nenhum.
+        $bloco | Should Not Match 'Start-FalaAssincrona'
+        $bloco | Should Not Match 'Invoke-Fala'
+    }
+
+    It 'a unica fala do stop esta atras do turno' {
+        # Se um dia aparecer um Start-Modo no stop sem Read-Turno junto, a fala
+        # automatica voltou por outra porta.
+        $bloco | Should Match 'Read-Turno'
+        $linhasComFala = @(($bloco -split "`n") | Where-Object { $_ -match 'Start-Modo' })
+        $linhasComFala.Count | Should Be 1
+    }
+
+    It 'o hook de prompt nao fala nem bipa' {
+        # Ele dispara em todo prompt, inclusive digitado. Falar aqui seria a
+        # Clarisse abrindo a boca nas dez sessoes.
+        $prompt = Get-BlocoDoModo (Join-Path $raizClarisse 'clarisse.ps1') 'prompt'
+        $prompt | Should Not BeNullOrEmpty
+        $prompt | Should Not Match 'Start-FalaAssincrona'
+        $prompt | Should Not Match 'Invoke-Fala'
+        $prompt | Should Not Match 'Start-Modo'
+        $prompt | Should Not Match 'Send-Bipe'
     }
 }

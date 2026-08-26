@@ -13,5 +13,10 @@
     "pular": "Ctrl+Alt+J",
     "pausar": "Ctrl+Alt+P",
     "cancelar": "Ctrl+Alt+X"
+  },
+  "ouvinte": {
+    "ativo": false,
+    "ditar": "Ctrl+Alt+D",
+    "modelo": "small"
   }
 }

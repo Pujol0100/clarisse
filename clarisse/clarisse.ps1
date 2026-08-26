@@ -28,7 +28,8 @@
 param(
     [ValidateSet('say', 'speak', 'stop', 'notify', 'autostart', 'ler', 'proximo', 'alternar-pausa', 'cancelar',
                  'atalhos-on', 'atalhos-off', 'on', 'off', 'toggle',
-                 'pausar', 'continuar', 'repetir', 'historico', 'status', 'test')]
+                 'pausar', 'continuar', 'repetir', 'historico', 'status', 'test',
+                 'ditar', 'prompt')]
     [string]$Mode = 'say',
     [string]$Text = '',
     [string]$Projeto = '',
@@ -57,6 +58,11 @@ switch ($Mode) {
         }
         if ($cfg.atalhos -and $cfg.atalhos.ativo -and -not (Test-AtalhosAtivos)) {
             Start-Atalhos
+        }
+        # O servidor do Ouvinte decide sozinho se ja existe um de pe, pela trava
+        # de PID. Aqui a gente so tenta, em toda sessao.
+        if ($cfg.ouvinte -and $cfg.ouvinte.ativo) {
+            Start-Ouvinte $cfg | Out-Null
         }
     }
 
@@ -239,6 +245,33 @@ switch ($Mode) {
         if ($cfg.enabled) { Invoke-Fala $Text | Out-Null }
     }
 
+    'ditar' {
+        # Disparado pela segunda batida na tecla de ditado. Espera o servidor
+        # transcrever e digita o texto na janela em foco.
+        #
+        # Roda em processo separado de proposito: o escutador de atalhos nao
+        # pode ficar presa esperando a transcricao, que leva segundos.
+        $texto = Wait-DitadoPronto
+        if (-not $texto) { exit 0 }
+
+        if (Send-TextoNaJanela $texto) {
+            # O turno abre aqui, ainda sem dono: este processo nao sabe em qual
+            # sessao o texto caiu. O prompt enviado a seguir e que da o nome.
+            Set-DitadoRecente
+        }
+    }
+
+    'prompt' {
+        # Hook UserPromptSubmit. Nao fala, nao bipa, nao abre turno sozinho:
+        # ele dispara em todo prompt, inclusive digitado, e a Clarisse voltaria
+        # a falar nas dez sessoes abertas.
+        #
+        # A unica coisa que ele faz e dar nome a um turno que o ditado ja abriu.
+        if (-not $cfg.enabled) { exit 0 }
+        $projeto = Get-NomeProjeto (Get-CwdDoHook (Read-StdinDoHook))
+        if ($projeto) { Resolve-TurnoDoProjeto -Projeto $projeto | Out-Null }
+    }
+
     'speak' {
         # Processo filho: le o arquivo pendente, fala e apaga.
         if ($File -and (Test-Path $File)) {
@@ -272,6 +305,14 @@ switch ($Mode) {
                 Add-Historico (ConvertTo-Falavel $n.texto $cfg.maxChars)
             }
             Send-Bipe
+        }
+
+        # A unica porta pela qual a fala sai sozinha: um turno que o usuario
+        # abriu ditando, e que o prompt dele batizou com o nome deste projeto.
+        # Sem turno, o comportamento e o de sempre - bipa e espera o atalho.
+        $projeto = Get-NomeProjeto (Get-CwdDoHook (Read-StdinDoHook))
+        if ($projeto -and (Read-Turno -Projeto $projeto)) {
+            Start-Modo 'ler' $projeto
         }
     }
 

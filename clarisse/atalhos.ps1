@@ -55,6 +55,17 @@ $mapa = @(
     @{ id = 4; combo = [string]$cfg.atalhos.pular }
 )
 
+# A tecla de ditado so entra quando o Ouvinte esta ligado: registrar um atalho
+# global que nao faz nada tiraria a combinacao de outro programa a toa.
+if ($cfg.ouvinte -and $cfg.ouvinte.ativo -and $cfg.ouvinte.ditar) {
+    $mapa += @{ id = 5; combo = [string]$cfg.ouvinte.ditar }
+}
+
+# A tecla alterna, e o estado mora aqui: este processo e um so por maquina e
+# vive enquanto os atalhos existirem. O RegisterHotKey do Windows avisa quando a
+# tecla desce e nunca quando ela sobe, entao nao ha "segurar para falar".
+$gravando = $false
+
 $registrados = @()
 foreach ($item in $mapa) {
     $cod = ConvertTo-CodigoAtalho $item.combo
@@ -92,6 +103,19 @@ try {
             2 { Switch-Pausa | Out-Null }
             3 { Stop-Fala | Out-Null }
             4 { Start-Modo 'proximo' }
+            5 {
+                # Primeira batida abre o microfone; a segunda fecha e manda
+                # transcrever. Quem espera a resposta e o modo 'ditar', em outro
+                # processo, para este laco nunca ficar preso.
+                if ($gravando) {
+                    Set-ComandoOuvinte 'parar'
+                    Start-Modo 'ditar'
+                    $gravando = $false
+                } else {
+                    Set-ComandoOuvinte 'gravar'
+                    $gravando = $true
+                }
+            }
         }
     }
 } finally {

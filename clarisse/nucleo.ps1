@@ -21,6 +21,9 @@ $HistPath       = Join-Path $Root 'historico.txt'
 $PidPath        = Join-Path $Root 'player.pid'
 $AtalhosPidPath = Join-Path $Root 'atalhos.pid'
 $PendDir        = Join-Path $Root 'pending'
+$TurnoDir       = Join-Path $Root 'turno'
+$DitadoPath     = Join-Path $Root 'ditado.txt'
+$OuvinteDir     = Join-Path $Root 'ouvinte'
 $LogPath        = Join-Path $Root 'clarisse.log'
 $Separador      = '---CLARISSE---'
 $MaxHist        = 5
@@ -53,6 +56,13 @@ function Get-Config {
             pular    = 'Ctrl+Alt+J'
             pausar   = 'Ctrl+Alt+P'
             cancelar = 'Ctrl+Alt+X'
+        }
+        ouvinte   = [pscustomobject]@{
+            # Desligado por padrao: o modelo ocupa 500 a 700 MB de RAM e a
+            # instalacao das bibliotecas passa de 1 GB. Quem quer ditar liga.
+            ativo  = $false
+            ditar  = 'Ctrl+Alt+D'
+            modelo = 'small'
         }
     }
 }
@@ -867,10 +877,28 @@ function Invoke-Fala {
 # Dispara um modo do clarisse.ps1 em outro processo. O escutador de atalhos usa
 # isso para nao duplicar a logica de leitura: ela vive num lugar so, e o laco de
 # mensagens do escutador volta na hora em vez de esperar a fala.
-function Start-Modo([string]$modo) {
-    Start-Process -FilePath 'powershell.exe' `
-        -ArgumentList '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', "`"$(Join-Path $Root 'clarisse.ps1')`"", '-Mode', $modo `
-        -WindowStyle Hidden | Out-Null
+function Start-Modo([string]$modo, [string]$projeto = '') {
+    # Nao usar $args aqui: e variavel automatica do PowerShell.
+    $argumentos = @('-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', "`"$(Join-Path $Root 'clarisse.ps1')`"", '-Mode', $modo)
+    if ($projeto) { $argumentos += @('-Projeto', "`"$projeto`"") }
+    Start-Process -FilePath 'powershell.exe' -ArgumentList $argumentos -WindowStyle Hidden | Out-Null
+}
+
+# Sobe o servidor residente do Ouvinte, se ele ainda nao estiver de pe.
+#
+# Quem decide se ja ha um e o proprio servidor, pela trava de PID: sao ~10
+# sessoes rodando o SessionStart, e dez modelos carregados seriam ~6 GB de RAM
+# disputando o mesmo microfone. Aqui a gente so tenta; o segundo sai calado.
+function Start-Ouvinte($cfg) {
+    $inv = Get-PythonInvocacao $cfg
+    if (-not $inv) {
+        Write-Log 'ouvinte nao subiu: nenhum Python encontrado'
+        return $false
+    }
+    $argumentos = $inv.pre + @('-m', 'clarisse.ouvinte.servidor')
+    Start-Process -FilePath $inv.exe -ArgumentList $argumentos `
+        -WorkingDirectory (Split-Path $Root -Parent) -WindowStyle Hidden | Out-Null
+    return $true
 }
 
 # O sufixo .fila no nome do arquivo diz ao processo filho que esta fala consome
@@ -1040,4 +1068,123 @@ function Send-TextoNaJanela {
 
     & $Enviar $limpo
     return $true
+}
+
+# --- Turno: quando a Clarisse pode falar sozinha ---------------------------
+#
+# Sao duas etapas. Ditar deixa um marcador SEM projeto, porque o servidor do
+# Ouvinte e um por maquina e nao sabe em qual sessao o texto caiu. O prompt
+# enviado logo depois da nome ao turno: o hook UserPromptSubmit sabe o cwd dele.
+#
+# O UserPromptSubmit nao abre turno sozinho, e isso e deliberado: ele dispara em
+# todo prompt, inclusive digitado, e a Clarisse voltaria a falar nas dez sessoes
+# abertas - exatamente o que foi corrigido em 21/08, depois de ela interromper
+# uma reuniao. Ele so batiza um turno que o ditado ja abriu.
+
+$DitadoValidadeS = 60    # entre soltar a tecla e apertar Enter
+$TurnoValidadeS  = 900   # entre enviar o prompt e o Claude terminar
+
+function Get-Agora { return [int][double]::Parse(((Get-Date).ToUniversalTime() - (Get-Date '1970-01-01')).TotalSeconds) }
+
+function Get-CaminhoTurno([string]$projeto) {
+    if ([string]::IsNullOrWhiteSpace($projeto)) { return '' }
+    $limpo = $projeto
+    foreach ($c in [System.IO.Path]::GetInvalidFileNameChars()) { $limpo = $limpo.Replace($c, '-') }
+    return (Join-Path $TurnoDir "$limpo.txt")
+}
+
+function Read-Instante([string]$caminho) {
+    # Instante ilegivel e tratado como marcador estragado: some, e nao vale.
+    if (-not (Test-Path $caminho)) { return $null }
+    try {
+        $bruto = [System.IO.File]::ReadAllText($caminho).Trim()
+        return [int]$bruto
+    } catch {
+        Remove-Item $caminho -Force -ErrorAction SilentlyContinue
+        return $null
+    }
+}
+
+# O ditado acabou de entregar texto na janela. Ainda nao se sabe de quem e.
+function Set-DitadoRecente([int]$Agora = -1) {
+    if ($Agora -lt 0) { $Agora = Get-Agora }
+    if (-not (Test-Path $Root)) { New-Item -ItemType Directory -Force $Root | Out-Null }
+    [System.IO.File]::WriteAllText($DitadoPath, "$Agora", $Utf8SemBom)
+}
+
+# O prompt foi enviado neste projeto. Se veio de um ditado recente, o turno abre.
+function Resolve-TurnoDoProjeto([string]$Projeto, [int]$Agora = -1) {
+    if ($Agora -lt 0) { $Agora = Get-Agora }
+
+    $alvo = Get-CaminhoTurno $Projeto
+    if (-not $alvo) { return $false }
+
+    $ditado = Read-Instante $DitadoPath
+    if ($null -eq $ditado) { return $false }
+
+    # O ditado e gasto de qualquer jeito: velho ou aproveitado, ele nao pode
+    # sobrar para abrir a boca de uma segunda sessao.
+    Remove-Item $DitadoPath -Force -ErrorAction SilentlyContinue
+
+    $idade = $Agora - $ditado
+    if ($idade -lt 0 -or $idade -gt $DitadoValidadeS) { return $false }
+
+    if (-not (Test-Path $TurnoDir)) { New-Item -ItemType Directory -Force $TurnoDir | Out-Null }
+    [System.IO.File]::WriteAllText($alvo, "$Agora", $Utf8SemBom)
+    return $true
+}
+
+# O Claude terminou neste projeto. Pode falar na hora?
+function Read-Turno([string]$Projeto, [int]$Agora = -1) {
+    if ($Agora -lt 0) { $Agora = Get-Agora }
+
+    $alvo = Get-CaminhoTurno $Projeto
+    if (-not $alvo) { return $false }
+
+    $marcado = Read-Instante $alvo
+    if ($null -eq $marcado) { return $false }
+
+    Remove-Item $alvo -Force -ErrorAction SilentlyContinue
+
+    $idade = $Agora - $marcado
+    return ($idade -ge 0 -and $idade -le $TurnoValidadeS)
+}
+
+# --- Ouvinte: a conversa com o servidor residente --------------------------
+#
+# O servidor e um processo Python que fica de pe com o modelo carregado. A tecla
+# so escreve o comando; quem espera a resposta e um processo a parte, para o
+# escutador de atalhos nunca ficar preso esperando a transcricao.
+
+function Set-ComandoOuvinte([string]$comando) {
+    if (-not (Test-Path $OuvinteDir)) { New-Item -ItemType Directory -Force $OuvinteDir | Out-Null }
+    [System.IO.File]::WriteAllText((Join-Path $OuvinteDir 'comando.txt'), $comando, $Utf8SemBom)
+}
+
+# Espera o servidor levantar o sinal e devolve o texto transcrito.
+#
+# O sinal e obrigatorio, e nao a presenca do texto.txt: arquivo ainda em escrita
+# e lido pela metade. O projeto ja pagou por isso uma vez com o mp3, e aqui o
+# preco seria frase pela metade digitada na janela do usuario.
+#
+# O prazo e largo de proposito. Medido em 25/08, a mesma frase levou de 6 a 116
+# segundos nesta maquina conforme o que mais estivesse rodando.
+function Wait-DitadoPronto([int]$TimeoutS = 120) {
+    $sinal = Join-Path $OuvinteDir 'pronto.flag'
+    $texto = Join-Path $OuvinteDir 'texto.txt'
+    $limite = [datetime]::Now.AddSeconds($TimeoutS)
+
+    while ([datetime]::Now -lt $limite) {
+        if (Test-Path $sinal) {
+            $conteudo = ''
+            try { $conteudo = [System.IO.File]::ReadAllText($texto, [System.Text.Encoding]::UTF8) } catch { }
+            Remove-Item $sinal -Force -ErrorAction SilentlyContinue
+            Remove-Item $texto -Force -ErrorAction SilentlyContinue
+            return $conteudo
+        }
+        Start-Sleep -Milliseconds 120
+    }
+
+    Write-Log "ouvinte nao respondeu em $TimeoutS segundos"
+    return ''
 }

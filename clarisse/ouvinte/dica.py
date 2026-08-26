@@ -9,6 +9,7 @@ repetir em laco; medido em 22/08/2026.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 
 TETO = 12
 ASSINATURA = "Clarisse."
@@ -31,3 +32,19 @@ def montar_dica(projetos: Iterable[str], *, limite: int = TETO) -> str:
     if not nomes:
         return ASSINATURA
     return f"Projetos: {', '.join(nomes)}. {ASSINATURA}"
+
+
+def projetos_da_maquina(raiz: Path) -> list[str]:
+    """Lista os projetos desta maquina, do mais mexido para o mais esquecido.
+
+    A ordem alimenta o teto da dica: quem cai fora e o projeto em que ninguem
+    toca ha mais tempo. Vem das sessoes do Claude Code, que e a unica lista que
+    existe e ja e mantida sozinha.
+    """
+    from clarisse.leitora.sessoes import listar_sessoes
+
+    vistos: list[str] = []
+    for sessao in listar_sessoes(str(raiz)):
+        if sessao.projeto and sessao.projeto not in vistos:
+            vistos.append(sessao.projeto)
+    return vistos

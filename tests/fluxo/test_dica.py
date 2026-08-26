@@ -6,7 +6,7 @@ certos. Por isso ela nao pode ser uma lista escrita a mao: no dia em que um proj
 novo aparece, o nome dele volta a sair errado.
 """
 
-from clarisse.ouvinte.dica import montar_dica
+from clarisse.ouvinte.dica import montar_dica, projetos_da_maquina
 
 
 def test_a_dica_traz_os_nomes_dos_projetos():
@@ -53,3 +53,38 @@ def test_nome_vazio_e_ignorado():
     dica = montar_dica(["omni-api", "", "   "])
 
     assert dica == "Projetos: omni-api. Clarisse."
+
+
+def _montar_projeto(raiz, pasta, arquivo, cwd, mtime):
+    import json
+    import os
+
+    destino = raiz / pasta
+    destino.mkdir(parents=True, exist_ok=True)
+    caminho = destino / arquivo
+    caminho.write_text(
+        json.dumps({'type': 'user', 'cwd': cwd, 'timestamp': '2026-08-26T10:00:00Z',
+                    'message': {'role': 'user', 'content': 'oi'}}) + '\n',
+        encoding='utf-8',
+    )
+    os.utime(caminho, (mtime, mtime))
+
+
+def test_os_projetos_saem_do_mais_recente_para_o_mais_antigo(tmp_path):
+    # A ordem importa: a dica tem teto de doze, e quem cai fora e o projeto em
+    # que o usuario nao mexe ha mais tempo.
+    _montar_projeto(tmp_path, 'p-antigo', 'a.jsonl', r'C:\dev\antigo', 1000.0)
+    _montar_projeto(tmp_path, 'p-novo', 'b.jsonl', r'C:\dev\novo', 2000.0)
+
+    assert projetos_da_maquina(tmp_path) == ['novo', 'antigo']
+
+
+def test_projeto_com_varias_sessoes_aparece_uma_vez(tmp_path):
+    _montar_projeto(tmp_path, 'p-um', 'a.jsonl', r'C:\dev\omni-api', 1000.0)
+    _montar_projeto(tmp_path, 'p-um', 'b.jsonl', r'C:\dev\omni-api', 2000.0)
+
+    assert projetos_da_maquina(tmp_path) == ['omni-api']
+
+
+def test_pasta_que_nao_existe_devolve_lista_vazia(tmp_path):
+    assert projetos_da_maquina(tmp_path / 'nao-existe') == []

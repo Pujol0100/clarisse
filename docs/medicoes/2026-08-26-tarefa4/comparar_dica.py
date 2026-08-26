@@ -24,9 +24,9 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(RAIZ))
 
-from clarisse.ouvinte.dica import montar_dica  # noqa: E402
+from clarisse.ouvinte.dica import montar_dica, projetos_da_maquina  # noqa: E402
 from clarisse.ouvinte.motor import abrir_motor, transcrever  # noqa: E402
-from verificar import VOZ, erro_de_palavras, le_wav, projetos_da_maquina  # noqa: E402
+from verificar import PROJETOS, VOZ, erro_de_palavras, le_wav  # noqa: E402
 
 MAO = (
     'Projetos: omni-api, compliance-app, voz-ao-claude, consultor-financeiro, '
@@ -40,7 +40,7 @@ def principal() -> None:
 
     configs = {
         'sem dica': '',
-        'da maquina': montar_dica(projetos_da_maquina()),
+        'da maquina': montar_dica(projetos_da_maquina(PROJETOS)),
         'escrita a mao': MAO,
     }
 

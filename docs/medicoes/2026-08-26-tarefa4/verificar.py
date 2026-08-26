@@ -24,8 +24,7 @@ import numpy as np
 RAIZ = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(RAIZ))
 
-from clarisse.leitora.sessoes import listar_sessoes  # noqa: E402
-from clarisse.ouvinte.dica import montar_dica  # noqa: E402
+from clarisse.ouvinte.dica import montar_dica, projetos_da_maquina  # noqa: E402
 from clarisse.ouvinte.motor import abrir_motor, transcrever  # noqa: E402
 
 VOZ = Path.home() / '.claude' / 'clarisse' / 'medicoes' / 'voz_real'
@@ -64,20 +63,12 @@ def le_wav(caminho: Path) -> np.ndarray:
     return np.frombuffer(bruto, dtype=np.int16).astype(np.float32) / 32768.0
 
 
-def projetos_da_maquina() -> list[str]:
-    vistos = []
-    for sessao in listar_sessoes(str(PROJETOS)):
-        if sessao.projeto and sessao.projeto not in vistos:
-            vistos.append(sessao.projeto)
-    return vistos
-
-
 def principal() -> None:
     if not VOZ.exists():
         print('Nao achei as gravacoes da voz real.')
         return
 
-    dica = montar_dica(projetos_da_maquina())
+    dica = montar_dica(projetos_da_maquina(PROJETOS))
     print(f'dica: {dica}\n')
 
     referencias = json.loads((VOZ / 'referencias.json').read_text(encoding='utf-8'))
