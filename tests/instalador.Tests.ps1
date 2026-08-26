@@ -30,6 +30,28 @@ Describe 'instalador' {
         ($faltando -join ', ') | Should BeNullOrEmpty
     }
 
+    It 'nao manda copiar arquivo de codigo que nao existe mais' {
+        # O contrario do teste acima, e a falha e pior: o Copy-Item estoura no
+        # meio da instalacao e ela para na metade, com uns arquivos novos e
+        # outros velhos. Aconteceu em 26/08, ao mover o turno.py para o nucleo.
+        $origem = Join-Path $PSScriptRoot '..\clarisse'
+        $existentes = @(
+            Get-ChildItem $origem -File -Recurse |
+                Where-Object { $_.Extension -eq '.py' } |
+                ForEach-Object { $_.Name } |
+                Sort-Object -Unique
+        )
+
+        $instalador = [System.IO.File]::ReadAllText(
+            (Join-Path $PSScriptRoot '..\instalar.ps1'), [System.Text.Encoding]::UTF8)
+        $citados = @([regex]::Matches($instalador, "'([A-Za-z0-9_]+\.py)'") |
+            ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+        $citados.Count | Should BeGreaterThan 0
+
+        $fantasmas = @($citados | Where-Object { $existentes -notcontains $_ })
+        ($fantasmas -join ', ') | Should BeNullOrEmpty
+    }
+
     It 'cria toda subpasta de codigo que existe na pasta clarisse' {
         # Nomear os arquivos nao basta: sem criar a pasta de destino, o
         # Copy-Item falha na instalacao e a mesma falha silenciosa volta.
