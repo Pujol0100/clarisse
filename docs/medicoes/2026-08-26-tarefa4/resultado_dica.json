@@ -1,0 +1,194 @@
+{
+  "dicas": {
+    "sem dica": "",
+    "da maquina": "Projetos: voz-ao-claude, consultor-financeiro, financeiro-areceber, gatilhos-themis, omni-api, compliance-app, salao-do-turismo, PROGRAMASSMART, sicoob-captcha-v2, conciliacao, meusProgramas, Conciliacao. Clarisse.",
+    "escrita a mao": "Projetos: omni-api, compliance-app, voz-ao-claude, consultor-financeiro, conciliacao-bancaria, velocimetro-tokens, cadeia-sequencial. Clarisse."
+  },
+  "resumo": {
+    "sem dica": {
+      "erro_medio": 0.544,
+      "erro_pior": 1.714,
+      "espera_mediana_s": 4.84
+    },
+    "da maquina": {
+      "erro_medio": 0.106,
+      "erro_pior": 0.375,
+      "espera_mediana_s": 4.59
+    },
+    "escrita a mao": {
+      "erro_medio": 0.287,
+      "erro_pior": 1.714,
+      "espera_mediana_s": 4.53
+    }
+  },
+  "detalhe": [
+    {
+      "frase": "compara",
+      "config": "sem dica",
+      "erro": 0.667,
+      "espera_s": 8.08,
+      "saida": "Clarice, comparo o Home app com o com live app?"
+    },
+    {
+      "frase": "compara",
+      "config": "da maquina",
+      "erro": 0.111,
+      "espera_s": 4.37,
+      "saida": "Clarisse, comparo o omni-api com o compliance-app?"
+    },
+    {
+      "frase": "compara",
+      "config": "escrita a mao",
+      "erro": 0.111,
+      "espera_s": 4.03,
+      "saida": "Clarisse, comparo o omni-api com o compliance-app?"
+    },
+    {
+      "frase": "compliance",
+      "config": "escrita a mao",
+      "erro": 0.222,
+      "espera_s": 4.34,
+      "saida": "Clarisse, me conta o que aconteceu com o compliance-app?"
+    },
+    {
+      "frase": "compliance",
+      "config": "da maquina",
+      "erro": 0.222,
+      "espera_s": 4.21,
+      "saida": "Clarisse, me conta o que aconteceu com o compliance-app?"
+    },
+    {
+      "frase": "compliance",
+      "config": "sem dica",
+      "erro": 0.333,
+      "espera_s": 4.74,
+      "saida": "Clarice me conta o que aconteceu com o compliance app"
+    },
+    {
+      "frase": "conciliacao",
+      "config": "sem dica",
+      "erro": 1.714,
+      "espera_s": 4.86,
+      "saida": "Clarice de quanto o teste se passa, a gente aconselhou a samba bancária."
+    },
+    {
+      "frase": "conciliacao",
+      "config": "da maquina",
+      "erro": 0.143,
+      "espera_s": 5.22,
+      "saida": "Clarisse quantos testes passam na conciliação bancária."
+    },
+    {
+      "frase": "conciliacao",
+      "config": "escrita a mao",
+      "erro": 1.714,
+      "espera_s": 4.69,
+      "saida": "Clarisse o quanto esteja-se-passe, a gente aconselhou-se a um bancário."
+    },
+    {
+      "frase": "consultor",
+      "config": "escrita a mao",
+      "erro": 0.0,
+      "espera_s": 3.65,
+      "saida": "Clarisse, como está o consultor financeiro?"
+    },
+    {
+      "frase": "consultor",
+      "config": "da maquina",
+      "erro": 0.0,
+      "espera_s": 3.9,
+      "saida": "Clarisse, como está o consultor financeiro?"
+    },
+    {
+      "frase": "consultor",
+      "config": "sem dica",
+      "erro": 0.333,
+      "espera_s": 4.06,
+      "saida": "Clarice, como está o consultor financeira?"
+    },
+    {
+      "frase": "omni",
+      "config": "sem dica",
+      "erro": 0.625,
+      "espera_s": 5.54,
+      "saida": "Clarice, aqui está rolando no Almea PI"
+    },
+    {
+      "frase": "omni",
+      "config": "da maquina",
+      "erro": 0.375,
+      "espera_s": 4.59,
+      "saida": "Aqui está rolando no Omni-api."
+    },
+    {
+      "frase": "omni",
+      "config": "escrita a mao",
+      "erro": 0.25,
+      "espera_s": 8.56,
+      "saida": "Clarisse, aqui está rolando no omni-api."
+    },
+    {
+      "frase": "testes",
+      "config": "escrita a mao",
+      "erro": 0.0,
+      "espera_s": 13.42,
+      "saida": "Clarisse, roda os testes e me avisa quando terminar."
+    },
+    {
+      "frase": "testes",
+      "config": "da maquina",
+      "erro": 0.0,
+      "espera_s": 7.52,
+      "saida": "Clarisse, roda os testes e me avisa quando terminar."
+    },
+    {
+      "frase": "testes",
+      "config": "sem dica",
+      "erro": 0.111,
+      "espera_s": 4.84,
+      "saida": "Clarice, roda os testes e me avisa quando terminar."
+    },
+    {
+      "frase": "velocimetro",
+      "config": "sem dica",
+      "erro": 0.125,
+      "espera_s": 4.07,
+      "saida": "Clarice, o que falta no velocímetro de tokens?"
+    },
+    {
+      "frase": "velocimetro",
+      "config": "da maquina",
+      "erro": 0.0,
+      "espera_s": 5.71,
+      "saida": "Clarisse, o que falta no velocímetro de tokens?"
+    },
+    {
+      "frase": "velocimetro",
+      "config": "escrita a mao",
+      "erro": 0.0,
+      "espera_s": 4.53,
+      "saida": "Clarisse, o que falta no velocímetro de tokens?"
+    },
+    {
+      "frase": "voz",
+      "config": "escrita a mao",
+      "erro": 0.0,
+      "espera_s": 4.33,
+      "saida": "Clarisse resume a última sessão do voz-ao-claude."
+    },
+    {
+      "frase": "voz",
+      "config": "da maquina",
+      "erro": 0.0,
+      "espera_s": 4.57,
+      "saida": "Clarisse resume a última sessão do voz-ao-claude."
+    },
+    {
+      "frase": "voz",
+      "config": "sem dica",
+      "erro": 0.444,
+      "espera_s": 4.36,
+      "saida": "Clarice resume a última sessão do Vazalclav."
+    }
+  ]
+}

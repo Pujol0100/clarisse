@@ -188,7 +188,7 @@ $DestOuvinte = Join-Path $DestClarisse 'ouvinte'
 if (-not (Test-Path $DestOuvinte)) {
     New-Item -ItemType Directory -Path $DestOuvinte -Force | Out-Null
 }
-foreach ($arq in @('__init__.py', 'cortador.py', 'dica.py', 'servidor.py')) {
+foreach ($arq in @('__init__.py', 'cortador.py', 'dica.py', 'servidor.py', 'motor.py')) {
     Copy-Item (Join-Path $Origem "clarisse\ouvinte\$arq") (Join-Path $DestOuvinte $arq) -Force
 }
 Passo "ouvinte em $DestOuvinte"

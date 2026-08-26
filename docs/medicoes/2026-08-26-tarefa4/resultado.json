@@ -1,0 +1,72 @@
+{
+  "dica": "Projetos: consultor-financeiro, voz-ao-claude, gatilhos-themis, financeiro-areceber, omni-api, compliance-app, salao-do-turismo, PROGRAMASSMART, sicoob-captcha-v2, conciliacao, meusProgramas, Conciliacao. Clarisse.",
+  "carga_s": 14.0,
+  "espera_mediana_s": 5.35,
+  "erro_medio": 0.263,
+  "frases": [
+    {
+      "frase": "compara",
+      "duracao_s": 4.52,
+      "espera_s": 9.83,
+      "erro": 0.111,
+      "referencia": "clarisse compara o omni api com o compliance app",
+      "saida": "Clarisse, comparo o omni-api com o compliance-app?"
+    },
+    {
+      "frase": "compliance",
+      "duracao_s": 5.15,
+      "espera_s": 20.26,
+      "erro": 0.222,
+      "referencia": "clarisse me conta o que aconteceu no compliance app",
+      "saida": "Clarisse, me conta o que aconteceu com o compliance-app?"
+    },
+    {
+      "frase": "conciliacao",
+      "duracao_s": 4.16,
+      "espera_s": 5.92,
+      "erro": 1.143,
+      "referencia": "clarisse quantos testes passaram na conciliacao bancaria",
+      "saida": "Clarisse de quanto está, se se passa, a uma conciliação bancária."
+    },
+    {
+      "frase": "consultor",
+      "duracao_s": 4.21,
+      "espera_s": 5.04,
+      "erro": 0.0,
+      "referencia": "clarisse como esta o consultor financeiro",
+      "saida": "Clarisse, como está o consultor financeiro?"
+    },
+    {
+      "frase": "omni",
+      "duracao_s": 4.76,
+      "espera_s": 5.35,
+      "erro": 0.5,
+      "referencia": "clarisse o que esta rolando no omni api",
+      "saida": "Aqui está rolando o Omni-api."
+    },
+    {
+      "frase": "testes",
+      "duracao_s": 3.8,
+      "espera_s": 4.56,
+      "erro": 0.0,
+      "referencia": "clarisse roda os testes e me avisa quando terminar",
+      "saida": "Clarisse, roda os testes e me avisa quando terminar."
+    },
+    {
+      "frase": "velocimetro",
+      "duracao_s": 3.38,
+      "espera_s": 4.3,
+      "erro": 0.125,
+      "referencia": "clarisse o que falta no velocimetro de tokens",
+      "saida": "Clarisse, o que falta no velocímetro de Tolkien?"
+    },
+    {
+      "frase": "voz",
+      "duracao_s": 4.37,
+      "espera_s": 4.11,
+      "erro": 0.0,
+      "referencia": "clarisse resume a ultima sessao do voz ao claude",
+      "saida": "Clarisse, resume a última sessão do voz-ao-claude."
+    }
+  ]
+}
