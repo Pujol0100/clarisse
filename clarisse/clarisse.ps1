@@ -255,6 +255,21 @@ switch ($Mode) {
         if (-not $texto) { exit 0 }
 
         if (Send-TextoNaJanela $texto) {
+            # Primeira metade do par: o que o motor entendeu, e o que custou.
+            # So entra aqui o texto que chegou a ser digitado - frase que nao
+            # apareceu na janela nao e ditado, e o par nunca fecharia.
+            $ditadoId = New-IdDitado
+            $medida   = Read-MedidaDitado $OuvinteDir
+            Add-LinhaDiario -Arquivo $DiarioPath -Ligado (Test-DiarioLigado) -Teto $DiarioTeto -Dados @{
+                tipo                 = 'ditado'
+                id                   = $ditadoId
+                quando               = (Get-Date -Format 's')
+                bruto                = $texto
+                segundos_audio       = $medida.segundos_audio
+                segundos_transcricao = $medida.segundos_transcricao
+            }
+            Set-IdDitadoRecente -Id $ditadoId
+
             # O turno abre aqui, ainda sem dono: este processo nao sabe em qual
             # sessao o texto caiu. O prompt enviado a seguir e que da o nome.
             Set-DitadoRecente
@@ -268,8 +283,27 @@ switch ($Mode) {
         #
         # A unica coisa que ele faz e dar nome a um turno que o ditado ja abriu.
         if (-not $cfg.enabled) { exit 0 }
-        $projeto = Get-NomeProjeto (Get-CwdDoHook (Read-StdinDoHook))
+
+        # O stdin e lido uma vez so: Read-StdinDoHook consome o fluxo ate o fim,
+        # e uma segunda chamada devolveria vazio.
+        $stdin   = Read-StdinDoHook
+        $projeto = Get-NomeProjeto (Get-CwdDoHook $stdin)
         if ($projeto) { Resolve-TurnoDoProjeto -Projeto $projeto | Out-Null }
+
+        # Segunda metade do par: o texto que sobreviveu a sua revisao. So fecha
+        # se este prompt veio mesmo de um ditado recente - prompt digitado nao
+        # entra no diario.
+        $recente = Read-IdDitadoRecente
+        if ($recente) {
+            Add-LinhaDiario -Arquivo $DiarioPath -Ligado (Test-DiarioLigado) -Teto $DiarioTeto -Dados @{
+                tipo                = 'enviado'
+                id                  = $recente.id
+                quando              = (Get-Date -Format 's')
+                projeto             = $projeto
+                enviado             = (Get-PromptDoHook $stdin)
+                segundos_ate_enviar = $recente.segundos_ate_enviar
+            }
+        }
     }
 
     'speak' {

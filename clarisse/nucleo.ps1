@@ -590,6 +590,17 @@ function Get-CwdDoHook([string]$bruto) {
     return ''
 }
 
+# O texto que o usuario enviou, depois de revisar o que o ditado digitou. E a
+# outra metade do par que o diario mede.
+function Get-PromptDoHook([string]$bruto) {
+    if ([string]::IsNullOrWhiteSpace($bruto)) { return '' }
+    try {
+        $dados = $bruto | ConvertFrom-Json
+        if ($dados.prompt) { return [string]$dados.prompt }
+    } catch { }
+    return ''
+}
+
 # Le o stdin sem travar quando o script e chamado a mao num terminal.
 function Read-StdinDoHook {
     try {
@@ -1244,4 +1255,60 @@ function Add-LinhaDiario {
         $mantem = $linhas[($linhas.Count - $Teto)..($linhas.Count - 1)]
         [System.IO.File]::WriteAllLines($Arquivo, $mantem, $Utf8SemBom)
     }
+}
+
+# O id que liga as duas metades do par.
+#
+# Ele viaja separado do marcador de turno de proposito, porque os dois medem
+# coisas diferentes: o turno vale 60 s e decide se a Clarisse pode falar sozinha;
+# o par vale 15 min e so registra o que foi ditado contra o que foi enviado.
+# Voce pode revisar devagar sem ganhar fala automatica, e a medida continua.
+
+$DiarioIdPath       = Join-Path $OuvinteDir 'ditado-id.txt'
+$DiarioParValidadeS = 900
+
+function New-IdDitado {
+    return '{0}-{1}' -f [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(), $PID
+}
+
+function Read-MedidaDitado([string]$Pasta) {
+    $vazio = [pscustomobject]@{ segundos_audio = 0; segundos_transcricao = 0 }
+    $caminho = Join-Path $Pasta 'medida.json'
+    if (-not (Test-Path $caminho)) { return $vazio }
+    try {
+        $d = (Get-Content $caminho -Raw -Encoding utf8) | ConvertFrom-Json
+        return [pscustomobject]@{
+            segundos_audio       = [double]$d.segundos_audio
+            segundos_transcricao = [double]$d.segundos_transcricao
+        }
+    } catch { return $vazio }
+}
+
+function Set-IdDitadoRecente([string]$Id, [int]$Agora = -1) {
+    if ($Agora -lt 0) { $Agora = Get-Agora }
+    if (-not (Test-Path $OuvinteDir)) { New-Item -ItemType Directory -Force $OuvinteDir | Out-Null }
+    [System.IO.File]::WriteAllText($DiarioIdPath, "$Agora`t$Id", $Utf8SemBom)
+}
+
+function Read-IdDitadoRecente([int]$Agora = -1) {
+    if ($Agora -lt 0) { $Agora = Get-Agora }
+    if (-not (Test-Path $DiarioIdPath)) { return $null }
+
+    $bruto = ''
+    try { $bruto = [System.IO.File]::ReadAllText($DiarioIdPath).Trim() } catch { }
+
+    # Gasto de qualquer jeito, valido ou nao: um id que sobra fecharia o par com
+    # o proximo prompt digitado, e o diario registraria um ditado que nao houve.
+    Remove-Item $DiarioIdPath -Force -ErrorAction SilentlyContinue
+
+    $partes = $bruto -split "`t", 2
+    if ($partes.Count -lt 2) { return $null }
+
+    $quando = 0
+    if (-not [int]::TryParse($partes[0], [ref]$quando)) { return $null }
+
+    $idade = $Agora - $quando
+    if ($idade -lt 0 -or $idade -gt $DiarioParValidadeS) { return $null }
+
+    return [pscustomobject]@{ id = $partes[1]; segundos_ate_enviar = $idade }
 }

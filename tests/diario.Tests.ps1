@@ -112,3 +112,189 @@ Describe 'Test-DiarioLigado' {
         Test-DiarioLigado | Should Be $true
     }
 }
+
+Describe 'New-IdDitado' {
+    It 'devolve dois pedacos separados por hifen' {
+        New-IdDitado | Should Match '^\d+-\d+$'
+    }
+
+    It 'nao repete em duas chamadas seguidas' {
+        $a = New-IdDitado
+        Start-Sleep -Milliseconds 3
+        $b = New-IdDitado
+        $a | Should Not Be $b
+    }
+}
+
+Describe 'Read-MedidaDitado' {
+    BeforeEach {
+        $script:pasta = Nova-Pasta
+    }
+    AfterEach {
+        Remove-Item $script:pasta -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'devolve zeros quando o servidor nao deixou medida' {
+        $m = Read-MedidaDitado $script:pasta
+        $m.segundos_audio | Should Be 0
+        $m.segundos_transcricao | Should Be 0
+    }
+
+    It 'devolve o que o servidor mediu' {
+        Set-Content (Join-Path $script:pasta 'medida.json') '{"segundos_audio":4.2,"segundos_transcricao":3.1}' -Encoding utf8
+        $m = Read-MedidaDitado $script:pasta
+        $m.segundos_audio | Should Be 4.2
+        $m.segundos_transcricao | Should Be 3.1
+    }
+
+    It 'devolve zeros quando a medida esta estragada' {
+        Set-Content (Join-Path $script:pasta 'medida.json') 'isto nao e json' -Encoding utf8
+        $m = Read-MedidaDitado $script:pasta
+        $m.segundos_audio | Should Be 0
+    }
+}
+
+Describe 'o id que liga as duas metades do par' {
+    BeforeEach {
+        Remove-Item (Join-Path $OuvinteDir 'ditado-id.txt') -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'nao devolve nada quando nenhum ditado aconteceu' {
+        Read-IdDitadoRecente -Agora $AGORA | Should BeNullOrEmpty
+    }
+
+    It 'devolve o id que o ditado deixou' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora $AGORA
+        (Read-IdDitadoRecente -Agora $AGORA).id | Should Be 'abc-1'
+    }
+
+    It 'serve uma vez so, para nao fechar o par de dois prompts' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora $AGORA
+        Read-IdDitadoRecente -Agora $AGORA | Out-Null
+        Read-IdDitadoRecente -Agora $AGORA | Should BeNullOrEmpty
+    }
+
+    It 'diz quantos segundos o usuario passou revisando' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora $AGORA
+        (Read-IdDitadoRecente -Agora ($AGORA + 18)).segundos_ate_enviar | Should Be 18
+    }
+
+    It 'aceita revisao demorada, ao contrario do turno' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora $AGORA
+        (Read-IdDitadoRecente -Agora ($AGORA + 300)).id | Should Be 'abc-1'
+    }
+
+    It 'id de mais de quinze minutos nao fecha par nenhum' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora $AGORA
+        Read-IdDitadoRecente -Agora ($AGORA + 901) | Should BeNullOrEmpty
+    }
+
+    It 'marcador do futuro nao vale' {
+        Set-IdDitadoRecente -Id 'abc-1' -Agora ($AGORA + 60)
+        Read-IdDitadoRecente -Agora $AGORA | Should BeNullOrEmpty
+    }
+
+    It 'marcador estragado nao vale, e some' {
+        [System.IO.File]::WriteAllText((Join-Path $OuvinteDir 'ditado-id.txt'), 'lixo sem tempo', $Utf8SemBom)
+        Read-IdDitadoRecente -Agora $AGORA | Should BeNullOrEmpty
+        Test-Path (Join-Path $OuvinteDir 'ditado-id.txt') | Should Be $false
+    }
+}
+
+# As duas metades do par sao escritas por processos diferentes, e nenhum teste de
+# funcao prova que os modos do clarisse.ps1 chamam o diario. Estes olham o codigo
+# que vai rodar, no mesmo estilo dos guardas do modo notify.
+
+function Get-BlocoDoModo([string]$arquivo, [string]$modo) {
+    $linhas = @([System.IO.File]::ReadAllText($arquivo, [System.Text.Encoding]::UTF8) -split "`r?`n")
+    $inicio = -1
+    for ($i = 0; $i -lt $linhas.Count; $i++) {
+        if ($linhas[$i] -match "^(\s*)'$modo'\s*\{") { $inicio = $i; break }
+    }
+    if ($inicio -lt 0) { return '' }
+
+    $recuo = $Matches[1].Length
+    $fim = $linhas.Count - 1
+    for ($i = $inicio + 1; $i -lt $linhas.Count; $i++) {
+        if ($linhas[$i] -match "^\s{$recuo}'[a-z-]+'\s*\{") { $fim = $i - 1; break }
+    }
+    return ($linhas[$inicio..$fim] -join "`n")
+}
+
+Describe 'os modos que alimentam o diario' {
+
+    $script = Join-Path $PSScriptRoot '..\clarisse\clarisse.ps1'
+
+    It 'o modo ditar registra o que o motor entendeu' {
+        $bloco = Get-BlocoDoModo $script 'ditar'
+        $bloco | Should Not BeNullOrEmpty
+        $bloco | Should Match 'Add-LinhaDiario'
+        $bloco | Should Match "tipo\s*=\s*'ditado'"
+    }
+
+    It 'o modo ditar guarda o id para o prompt fechar o par' {
+        $bloco = Get-BlocoDoModo $script 'ditar'
+        $bloco | Should Match 'Set-IdDitadoRecente'
+    }
+
+    It 'o modo ditar so registra o que chegou a ser digitado' {
+        # Texto que nao entrou na janela nao e ditado: registrar isso poria no
+        # diario uma frase que o usuario nunca viu, e o par nunca fecharia.
+        $bloco = Get-BlocoDoModo $script 'ditar'
+        $bloco | Should Match 'Send-TextoNaJanela'
+        $linhas = @(($bloco -split "`n"))
+        $iEnvio = ($linhas | Select-String -Pattern 'Send-TextoNaJanela').LineNumber
+        $iDiario = ($linhas | Select-String -Pattern 'Add-LinhaDiario').LineNumber
+        $iDiario | Should BeGreaterThan $iEnvio
+    }
+
+    It 'o modo prompt fecha o par com o texto enviado' {
+        $bloco = Get-BlocoDoModo $script 'prompt'
+        $bloco | Should Match 'Add-LinhaDiario'
+        $bloco | Should Match "tipo\s*=\s*'enviado'"
+        $bloco | Should Match 'Get-PromptDoHook'
+    }
+
+    It 'o modo prompt le o stdin uma vez so' {
+        # Read-StdinDoHook consome o fluxo ate o fim. Uma segunda chamada
+        # devolveria vazio, e o diario guardaria prompt em branco para sempre.
+        #
+        # Linha de comentario nao conta: o que se mede aqui e chamada, e o nome
+        # aparece tambem na explicacao acima dela.
+        $bloco = Get-BlocoDoModo $script 'prompt'
+        $chamadas = @(($bloco -split "`n") |
+            Where-Object { $_ -notmatch '^\s*#' -and $_ -match 'Read-StdinDoHook' })
+        $chamadas.Count | Should Be 1
+    }
+
+    It 'o modo prompt continua sem falar e sem bipar' {
+        # A regra de 21/08 nao muda por causa da medicao.
+        $bloco = Get-BlocoDoModo $script 'prompt'
+        $bloco | Should Not Match 'Invoke-Fala'
+        $bloco | Should Not Match 'Start-Modo'
+        $bloco | Should Not Match 'Send-Bipe'
+    }
+}
+
+Describe 'Get-PromptDoHook' {
+    It 'tira o prompt do JSON que o Claude Code manda no stdin' {
+        Get-PromptDoHook '{"cwd":"/p/omni","prompt":"roda os testes"}' | Should Be 'roda os testes'
+    }
+
+    It 'devolve vazio quando o JSON nao tem prompt' {
+        Get-PromptDoHook '{"cwd":"/p/omni"}' | Should Be ''
+    }
+
+    It 'nao quebra com entrada que nao e JSON' {
+        Get-PromptDoHook 'isto nao e json' | Should Be ''
+    }
+
+    It 'nao quebra com entrada vazia' {
+        Get-PromptDoHook '' | Should Be ''
+    }
+
+    It 'preserva acento vindo do JSON' {
+        $esperado = 'f' + [char]0xE9 + 'rias'
+        Get-PromptDoHook '{"prompt":"f\u00e9rias"}' | Should Be $esperado
+    }
+}
