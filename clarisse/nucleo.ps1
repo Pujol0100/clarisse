@@ -1188,3 +1188,60 @@ function Wait-DitadoPronto([int]$TimeoutS = 120) {
     Write-Log "ouvinte nao respondeu em $TimeoutS segundos"
     return ''
 }
+
+# --- Diario do ditado: dado para medir, nao log para ler --------------------
+#
+# Guarda o que o motor entendeu e o que voce acabou enviando, para que a taxa de
+# correcao possa ser calculada depois. Nasce desligado: e texto seu, em disco, e
+# ligar isso e decisao consciente.
+#
+# Ele nunca e lido por nenhum caminho de fala. O diario nao vira audio, e
+# portanto nao sai da maquina.
+#
+# Por que arquivo proprio e nao o clarisse.log: o log e linha livre lida por
+# gente, o diario e dado lido por script. Misturar os dois obrigaria o analisador
+# a fazer parsing de log, que quebra, e faria o log crescer com texto que ninguem
+# le.
+
+$DiarioPath = Join-Path $OuvinteDir 'diario.jsonl'
+$DiarioTeto = 300
+
+function Test-DiarioLigado {
+    $c = Get-Config
+    return [bool]($c.ouvinte -and $c.ouvinte.diario)
+}
+
+function Add-LinhaDiario {
+    param(
+        [string]$Arquivo,
+        [hashtable]$Dados,
+        [bool]$Ligado,
+        [int]$Teto = 300
+    )
+    if (-not $Ligado) { return }
+
+    $pasta = Split-Path $Arquivo -Parent
+    if ($pasta -and -not (Test-Path $pasta)) {
+        New-Item -ItemType Directory -Force $pasta | Out-Null
+    }
+
+    # -Compress porque cada registro tem que caber numa linha: o analisador le
+    # linha a linha, e JSON indentado partiria um registro em dezenas delas.
+    $linha = ($Dados | ConvertTo-Json -Compress -Depth 4) -replace "[`r`n]+", ' '
+
+    try {
+        [System.IO.File]::AppendAllText($Arquivo, $linha + "`n", $Utf8SemBom)
+    } catch {
+        # Fronteira: o diario e instrumentacao. Ele nunca pode derrubar o ditado.
+        Write-Log "diario nao pode ser escrito: $_"
+        return
+    }
+
+    # -Encoding utf8 nao e opcional aqui: sem ele o PowerShell 5.1 le o arquivo
+    # como ANSI, e a poda reescreveria todo acento ja gravado como lixo.
+    $linhas = @(Get-Content $Arquivo -Encoding utf8 -ErrorAction SilentlyContinue)
+    if ($linhas.Count -gt $Teto) {
+        $mantem = $linhas[($linhas.Count - $Teto)..($linhas.Count - 1)]
+        [System.IO.File]::WriteAllLines($Arquivo, $mantem, $Utf8SemBom)
+    }
+}
