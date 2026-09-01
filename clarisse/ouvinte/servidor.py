@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ctypes
 import gc
+import json
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -24,7 +25,10 @@ from pathlib import Path
 PID = 'servidor.pid'
 COMANDO = 'comando.txt'
 TEXTO = 'texto.txt'
+MEDIDA = 'medida.json'
 SINAL = 'pronto.flag'
+
+TAXA_AUDIO = 16000  # a mesma do motor; onda em outra taxa nao chega ate aqui
 
 GRAVAR = 'gravar'
 PARAR = 'parar'
@@ -210,6 +214,7 @@ class Servidor:
             self._registrar('gravacao sem audio - nada a transcrever')
             return
 
+        comeco = self._relogio()
         try:
             texto = self._transcrever(self._motor_pronto(), onda)
         except Exception as erro:  # fronteira: o servidor nao pode cair
@@ -220,11 +225,19 @@ class Servidor:
             # contar do inicio encurtaria a folga de quem acabou de falar.
             self._ultimo_uso = self._relogio()
 
+        gasto = self._relogio() - comeco
+
         if not texto:
             self._registrar('transcricao sem texto - nada a digitar')
             return
 
         escrever(self.pasta / TEXTO, texto)
+        escrever(self.pasta / MEDIDA, json.dumps({
+            'segundos_audio': round(len(onda) / TAXA_AUDIO, 2),
+            'segundos_transcricao': round(gasto, 2),
+        }))
+        # A sentinela continua sendo a ultima coisa escrita, e agora ela cobre
+        # dois arquivos em vez de um. A regra e a que o mp3 ensinou.
         escrever(self.pasta / SINAL, '')
 
     def _encerrar_gravacao(self):
@@ -272,6 +285,7 @@ class Servidor:
         """
         (self.pasta / SINAL).unlink(missing_ok=True)
         (self.pasta / TEXTO).unlink(missing_ok=True)
+        (self.pasta / MEDIDA).unlink(missing_ok=True)
 
 
 def principal() -> int:

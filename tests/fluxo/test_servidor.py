@@ -10,6 +10,7 @@ porque o `RegisterHotKey` do Windows so avisa quando a tecla desce, e sem evento
 de subida nao existe "segurar para falar".
 """
 
+import json
 import os
 
 from clarisse.ouvinte import servidor as modulo
@@ -156,7 +157,9 @@ class TestProtocolo:
 
         ditar(atendente, tmp_path)
 
-        assert ordem == ['texto.txt', 'pronto.flag']
+        # O sinal e sempre o ultimo, e agora ele cobre os dois arquivos de
+        # resposta: quem le o sinal encontra texto e medida ja fechados.
+        assert ordem == ['texto.txt', 'medida.json', 'pronto.flag']
 
     def test_o_pedido_e_consumido(self, tmp_path):
         atendente, _ = montar(tmp_path)
@@ -368,3 +371,52 @@ class TestLaco:
 
         assert (tmp_path / 'texto.txt').read_text(encoding='utf-8') == 'ate aqui'
         assert len(voltas) == 4
+
+
+class TestMedida:
+    """O servidor e o unico que sabe quanto durou o audio e a transcricao.
+
+    Sem esses dois numeros o ditado nao tem como ser medido depois: a latencia
+    de quem solta a tecla e espera o texto so existe aqui dentro.
+    """
+
+    def test_a_medida_sai_junto_com_o_texto(self, tmp_path):
+        relogio = Relogio()
+        atendente, _ = montar(
+            tmp_path,
+            texto=lambda _onda: (relogio.avancar(3.1), 'bom dia')[1],
+            gravador=GravadorFalso(onda=[0.0] * 32000),
+            relogio=relogio,
+        )
+
+        ditar(atendente, tmp_path)
+
+        medida = json.loads((tmp_path / 'medida.json').read_text(encoding='utf-8'))
+        assert medida['segundos_audio'] == 2.0
+        assert medida['segundos_transcricao'] == 3.1
+
+    def test_a_medida_esta_pronta_antes_do_sinal(self, tmp_path):
+        atendente, _ = montar(tmp_path, gravador=GravadorFalso(onda=[0.0] * 16000))
+
+        ditar(atendente, tmp_path)
+
+        assert (tmp_path / 'pronto.flag').exists()
+        assert (tmp_path / 'medida.json').exists()
+
+    def test_transcricao_sem_texto_nao_deixa_medida(self, tmp_path):
+        atendente, _ = montar(
+            tmp_path, texto='', gravador=GravadorFalso(onda=[0.0] * 16000)
+        )
+
+        ditar(atendente, tmp_path)
+
+        assert not (tmp_path / 'medida.json').exists()
+
+    def test_gravar_de_novo_apaga_a_medida_anterior(self, tmp_path):
+        (tmp_path / 'medida.json').write_text('{"segundos_audio": 99}', encoding='utf-8')
+        atendente, _ = montar(tmp_path)
+
+        pedir(tmp_path, 'gravar')
+        atendente.passo()
+
+        assert not (tmp_path / 'medida.json').exists()
