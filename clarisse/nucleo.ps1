@@ -1098,7 +1098,11 @@ function Send-TextoNaJanela {
 $DitadoValidadeS = 60    # entre soltar a tecla e apertar Enter
 $TurnoValidadeS  = 900   # entre enviar o prompt e o Claude terminar
 
-function Get-Agora { return [int][double]::Parse(((Get-Date).ToUniversalTime() - (Get-Date '1970-01-01')).TotalSeconds) }
+# O instante em segundos desde 1970. Nao passar por texto aqui e obrigatorio:
+# a versao anterior convertia TotalSeconds em string e chamava [double]::Parse,
+# e em maquina pt-BR o ponto decimal e lido como separador de milhar - o numero
+# saia mil vezes maior, o [int] estourava e o hook morria inteiro, em silencio.
+function Get-Agora { return [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
 
 function Get-CaminhoTurno([string]$projeto) {
     if ([string]::IsNullOrWhiteSpace($projeto)) { return '' }

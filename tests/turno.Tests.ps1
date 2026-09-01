@@ -150,3 +150,33 @@ Describe 'Read-Turno' {
         Read-Turno -Projeto 'voz-ao-claude' -Agora $AGORA | Should Be $false
     }
 }
+
+Describe 'Get-Agora' {
+    # Todo o turno e todo o ditado passam por aqui. Os testes acima passam o
+    # instante na mao, entao nenhum deles chegava a executar esta funcao - e ela
+    # estava quebrada em producao sem ninguem ver.
+
+    It 'devolve o instante em segundos, sem estourar' {
+        $agora = Get-Agora
+        $agora | Should BeGreaterThan 1750000000
+        $agora | Should BeLessThan 2000000000
+    }
+
+    It 'nao depende da cultura da maquina' {
+        # A versao anterior fazia [double]::Parse sobre o texto de TotalSeconds.
+        # Em maquina pt-BR o ponto decimal e lido como separador de milhar, o
+        # numero saia mil vezes maior e o [int] estourava - matando o hook
+        # inteiro em silencio.
+        $antes = [System.Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = 'en-US'
+            $emIngles = Get-Agora
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = 'pt-BR'
+            $emPortugues = Get-Agora
+        } finally {
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = $antes
+        }
+
+        [math]::Abs($emPortugues - $emIngles) | Should BeLessThan 5
+    }
+}
