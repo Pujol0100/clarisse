@@ -239,6 +239,14 @@ if (Test-Path $destConfig) {
         Passo 'config.json ganhou o bloco do ouvinte, desligado'
     }
 
+    # Quem ja ditava nao tem o diario, que so existe para medir. Desligado: ele
+    # guarda em disco tudo que for ditado, e isso e decisao do usuario.
+    if ($atual.ouvinte -and ($atual.ouvinte.PSObject.Properties.Name -notcontains 'diario')) {
+        $atual.ouvinte | Add-Member -NotePropertyName diario -NotePropertyValue $false -Force
+        $mudou = $true
+        Passo 'config.json ganhou o diario do ditado, desligado'
+    }
+
     # Quem ja tinha o bloco de atalhos nao tem a tecla de passear pelos projetos.
     if ($atual.atalhos -and ($atual.atalhos.PSObject.Properties.Name -notcontains 'pular')) {
         $atual.atalhos | Add-Member -NotePropertyName pular -NotePropertyValue 'Ctrl+Alt+J' -Force

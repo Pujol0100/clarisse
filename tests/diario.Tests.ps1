@@ -298,3 +298,30 @@ Describe 'Get-PromptDoHook' {
         Get-PromptDoHook '{"prompt":"f\u00e9rias"}' | Should Be $esperado
     }
 }
+
+Describe 'o diario no config e no instalador' {
+
+    It 'o config de referencia traz o diario, desligado' {
+        $c = Get-Content (Join-Path $PSScriptRoot '..\clarisse\config.json') -Raw -Encoding utf8 | ConvertFrom-Json
+        ($c.ouvinte.PSObject.Properties.Name -join ',') | Should Match 'diario'
+        $c.ouvinte.diario | Should Be $false
+    }
+
+    It 'o padrao embutido no nucleo traz o diario, desligado' {
+        # Quem roda sem config.json nenhum tem que cair no mesmo lugar: ligado
+        # por omissao seria gravar o que o usuario dita sem ele ter pedido.
+        $texto = Get-Content (Join-Path $PSScriptRoot '..\clarisse\nucleo.ps1') -Raw -Encoding utf8
+        $texto | Should Match 'diario\s*=\s*\$false'
+    }
+
+    It 'o instalador acrescenta o diario a quem ja tinha o bloco do ouvinte' {
+        $texto = Get-Content (Join-Path $PSScriptRoot '..\instalar.ps1') -Raw -Encoding utf8
+        $texto | Should Match "notcontains 'diario'"
+    }
+
+    It 'o status diz quantas linhas o diario ja tem' {
+        # Sem isso nao ha como saber quando a amostra fechou sem abrir o Python.
+        $bloco = Get-BlocoDoModo (Join-Path $PSScriptRoot '..\clarisse\clarisse.ps1') 'status'
+        $bloco | Should Match 'Test-DiarioLigado'
+    }
+}

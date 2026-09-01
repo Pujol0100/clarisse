@@ -63,6 +63,9 @@ function Get-Config {
             ativo  = $false
             ditar  = 'Ctrl+Alt+D'
             modelo = 'small'
+            # O diario guarda o texto ditado em disco. Ligado por omissao seria
+            # gravar o que o usuario fala sem ele ter pedido.
+            diario = $false
         }
     }
 }

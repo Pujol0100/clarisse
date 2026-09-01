@@ -233,7 +233,14 @@ switch ($Mode) {
         } else { 'DESLIGADOS' }
         $sel = Get-Selecao
         $selTexto = if ($sel) { " | selecionado: $sel" } else { '' }
-        Write-Output "Clarisse: $estado | atalhos: $atalhos | resumos na fila: $fila$selTexto | voz: $($cfg.voice) | velocidade: $($cfg.rate) | liga sozinha: $auto | falas guardadas: $qtd"
+        # So aparece com o diario ligado: quem nao esta medindo nao precisa ver.
+        # Quem esta precisa saber quando a amostra fechou sem abrir o Python.
+        $diarioTexto = if (Test-DiarioLigado) {
+            $nLinhas = 0
+            if (Test-Path $DiarioPath) { $nLinhas = @(Get-Content $DiarioPath -Encoding utf8).Count }
+            " | diario do ditado: LIGADO ($nLinhas linhas)"
+        } else { '' }
+        Write-Output "Clarisse: $estado | atalhos: $atalhos | resumos na fila: $fila$selTexto | voz: $($cfg.voice) | velocidade: $($cfg.rate) | liga sozinha: $auto | falas guardadas: $qtd$diarioTexto"
     }
 
     'test' {

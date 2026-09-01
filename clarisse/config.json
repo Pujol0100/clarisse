@@ -17,6 +17,7 @@
   "ouvinte": {
     "ativo": false,
     "ditar": "Ctrl+Alt+D",
-    "modelo": "small"
+    "modelo": "small",
+    "diario": false
   }
 }
