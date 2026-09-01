@@ -102,13 +102,41 @@ Describe 'Send-TextoNaJanela' {
         $visto.texto | Should Be 'roda os testes agora'
     }
 
-    It 'devolve verdadeiro quando digitou' {
-        Send-TextoNaJanela 'roda os testes' -Enviar { } | Should Be $true
+    It 'devolve verdadeiro quando o Windows aceitou o texto inteiro' {
+        # Dois eventos por caractere: um de descida e um de subida.
+        Send-TextoNaJanela 'roda os testes' -Enviar { param($t) $t.Length * 2 } | Should Be $true
+    }
+
+    It 'devolve falso quando o Windows nao aceitou nada' {
+        # Este e o buraco que escondeu o defeito: o SendInput devolve quantos
+        # eventos entraram na fila, e a versao anterior jogava esse numero fora e
+        # respondia verdadeiro sempre. O ditado registrava sucesso para um texto
+        # que nunca chegou na tela.
+        Send-TextoNaJanela 'roda os testes' -Enviar { param($t) 0 } | Should Be $false
+    }
+
+    It 'devolve falso quando o Windows aceitou so parte' {
+        # Meia frase digitada e pior que nenhuma: o usuario manda um comando
+        # cortado sem perceber.
+        Send-TextoNaJanela 'roda os testes' -Enviar { param($t) 4 } | Should Be $false
     }
 
     It 'o digitador de verdade existe e compila' {
         # Compila o interop sem disparar tecla nenhuma: texto vazio devolve zero
         # eventos enviados.
         Send-TextoUnicode '' | Should Be 0
+    }
+
+    It 'a estrutura entregue ao Windows tem o tamanho que ele exige' {
+        # A causa raiz de 01/09/2026, medida: o INPUT do Win32 e uma uniao, e o
+        # maior membro dela e o MOUSEINPUT com 32 bytes, nao o KEYBDINPUT com 24.
+        # Declarando so o teclado, o Marshal.SizeOf dava 32 em 64 bits; o Windows
+        # exige 40, recusava com ERROR_INVALID_PARAMETER e devolvia zero - sem
+        # lancar excecao nenhuma. O ditado nunca digitou um caractere.
+        #
+        # O Digitar recusa 32 bits antes de mandar qualquer coisa, entao aqui so
+        # existe o caso de 64 bits.
+        Send-TextoUnicode '' | Out-Null
+        [ClarisseTeclado]::TamanhoInput() | Should Be 40
     }
 }

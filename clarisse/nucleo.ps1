@@ -1023,14 +1023,38 @@ public static class ClarisseTeclado {
         public IntPtr dwExtraInfo;
     }
 
-    // O INPUT do Windows e uma uniao. O deslocamento 8 vale para 64 bits, que e
-    // onde os hooks rodam; em 32 bits seria 4, e o Digitar recusa antes de
-    // mandar lixo para o teclado do usuario.
+    // O MOUSEINPUT nao e usado para nada aqui, e mesmo assim precisa existir: o
+    // INPUT do Windows e uma uniao, e quem manda no tamanho dela e o MAIOR
+    // membro. Com 32 bytes, o mouse e maior que o teclado, que tem 24.
+    //
+    // Declarando so o teclado, o Marshal.SizeOf devolvia 32 em 64 bits. O
+    // Windows exige 40, recusava com ERROR_INVALID_PARAMETER, devolvia zero
+    // eventos aceitos e NAO lancava excecao. Medido em 01/09/2026: o ditado
+    // nunca digitou um caractere desde que foi escrito.
+    [StructLayout(LayoutKind.Sequential)]
+    struct MOUSEINPUT {
+        public int    dx;
+        public int    dy;
+        public uint   mouseData;
+        public uint   dwFlags;
+        public uint   time;
+        public IntPtr dwExtraInfo;
+    }
+
+    // O deslocamento 8 vale para 64 bits, que e onde os hooks rodam; em 32 bits
+    // seria 4, e o Digitar recusa antes de mandar lixo para o teclado.
     [StructLayout(LayoutKind.Explicit)]
     struct INPUT {
         [FieldOffset(0)] public uint       type;
         [FieldOffset(8)] public KEYBDINPUT ki;
+        [FieldOffset(8)] public MOUSEINPUT mi;
     }
+
+    // Exposto para o teste: e o unico numero que separa "digitou" de "o Windows
+    // recusou em silencio", e nenhum teste de dublê alcanca ele.
+    public static int TamanhoInput() { return Marshal.SizeOf(typeof(INPUT)); }
+
+    public static int UltimoErro = 0;
 
     [DllImport("user32.dll", SetLastError = true)]
     static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
@@ -1052,7 +1076,9 @@ public static class ClarisseTeclado {
             eventos[i * 2 + 1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
         }
 
-        return (int)SendInput((uint)eventos.Length, eventos, Marshal.SizeOf(typeof(INPUT)));
+        int aceitos = (int)SendInput((uint)eventos.Length, eventos, Marshal.SizeOf(typeof(INPUT)));
+        UltimoErro = aceitos == eventos.Length ? 0 : Marshal.GetLastWin32Error();
+        return aceitos;
     }
 }
 '@
@@ -1080,7 +1106,19 @@ function Send-TextoNaJanela {
         $limpo = ($limpo -replace "[`r`n]+", ' ').Trim()
     }
 
-    & $Enviar $limpo
+    # O SendInput devolve QUANTOS eventos entraram na fila, e nao um sim ou nao.
+    # Ignorar esse numero foi o que escondeu, por uma semana inteira, um ditado
+    # que nunca digitou nada: o diario registrava sucesso e a tela ficava vazia.
+    $esperados = $limpo.Length * 2
+    $aceitos = & $Enviar $limpo
+
+    if ($aceitos -ne $esperados) {
+        $motivo = ''
+        if ('ClarisseTeclado' -as [type]) { $motivo = " (erro do Windows: $([ClarisseTeclado]::UltimoErro))" }
+        Write-Log "ditado nao foi digitado: o Windows aceitou $aceitos de $esperados eventos$motivo"
+        return $false
+    }
+
     return $true
 }
 
