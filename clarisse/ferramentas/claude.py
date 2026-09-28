@@ -1,0 +1,167 @@
+"""Ponte com o Claude Code: na tela, com o pedido já digitado, ou em segundo plano, com o resultado falado."""
+import asyncio
+import json
+import logging
+from collections.abc import Awaitable, Callable
+from datetime import datetime
+from pathlib import Path
+
+from pydantic import Field, create_model
+
+from clarisse.config import Cadastros
+from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
+from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
+from clarisse.ferramentas.sistema import data_por_extenso
+
+log = logging.getLogger(__name__)
+
+FERRAMENTAS_DE_LEITURA = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
+_LER_AGENDA = "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
+_CRIAR_EVENTO = "mcp__claude_ai_Microsoft_365__outlook_create_event"
+_PARA_VOZ = (
+    "Sua resposta será lida em voz alta por uma assistente. Responda em português do Brasil, "
+    "em no máximo quatro frases curtas, sem markdown, sem listas e sem caminhos de arquivo."
+)
+_TIMEOUT_DA_AGENDA = 120
+
+
+class Delegacoes:
+    """Tarefas do Claude em segundo plano; o resultado de cada uma é entregue a `avisar`."""
+
+    def __init__(self, avisar: Callable[[str, str], Awaitable[None]]):
+        self._avisar = avisar
+        self._tarefas: set[asyncio.Task] = set()
+
+    def iniciar(self, titulo: str, trabalho: Awaitable[str]) -> None:
+        tarefa = asyncio.create_task(self._entregar(titulo, trabalho))
+        self._tarefas.add(tarefa)
+        tarefa.add_done_callback(self._tarefas.discard)
+
+    async def _entregar(self, titulo: str, trabalho: Awaitable[str]) -> None:
+        try:
+            texto = await trabalho
+        except Exception:
+            log.exception("delegação ao Claude falhou")
+            texto = "O Claude não conseguiu terminar a tarefa por um erro interno. Os detalhes estão no log."
+        await self._avisar(titulo, texto)
+
+    async def aguardar(self) -> None:
+        await asyncio.gather(*self._tarefas)
+
+
+async def rodar_claude(executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float) -> str:
+    resultado = await executor.executar(
+        [
+            "claude", "-p", pedido,
+            "--output-format", "json",
+            "--setting-sources", "project",
+            "--no-session-persistence",
+            "--model", modelo,
+            "--append-system-prompt", _PARA_VOZ,
+            "--allowedTools", ",".join(ferramentas),
+        ],
+        pasta=pasta,
+        timeout=timeout,
+    )
+    if resultado.estourou_tempo:
+        return f"O Claude demorou mais de {int(timeout // 60)} minutos e eu interrompi."
+    try:
+        dados = json.loads(resultado.saida)
+    except json.JSONDecodeError:
+        log.warning("saída do claude sem JSON (código %s): %s", resultado.codigo, resultado.erro[:500])
+        return "O Claude não conseguiu responder. O motivo está no log."
+    if dados.get("is_error") or not dados.get("result"):
+        return "O Claude não conseguiu concluir a tarefa."
+    return dados["result"].strip()
+
+
+def ferramentas_do_claude(
+    cadastros: Cadastros,
+    executor,
+    delegacoes: Delegacoes,
+    pasta_neutra: Path,
+    modelo: str,
+    timeout: float,
+    agora: Callable[[], datetime] = datetime.now,
+) -> list[Ferramenta]:
+    ArgsNaTela = create_model(
+        "ArgsNaTela",
+        __base__=Argumentos,
+        projeto=campo_projeto(cadastros),
+        pedido=(str, Field(max_length=2000, description="O que o Claude deve fazer, com as palavras do usuário")),
+    )
+    ArgsPedido = create_model(
+        "ArgsPedido",
+        __base__=Argumentos,
+        pedido=(str, Field(max_length=2000, description="A tarefa ou pergunta para o Claude")),
+        projeto=campo_projeto(cadastros, "Projeto, se o pedido for sobre um", obrigatorio=False),
+    )
+
+    class ArgsAgenda(Argumentos):
+        periodo: str = Field("hoje", max_length=100, description="Período, como o usuário falou")
+
+    class ArgsCompromisso(Argumentos):
+        titulo: str = Field(max_length=200, description="Título do compromisso")
+        quando: str = Field(max_length=100, description="Data e hora como o usuário falou")
+
+    def _pasta_neutra() -> Path:
+        pasta_neutra.mkdir(parents=True, exist_ok=True)
+        return pasta_neutra
+
+    async def abrir_claude_na_tela(args) -> str:
+        chave = cadastros.achar_projeto(args.projeto)
+        if chave is None:
+            return projeto_desconhecido(cadastros, args.projeto)
+        pasta = str(cadastros.projetos[chave])
+        await executor.iniciar(["code", pasta])
+        await executor.iniciar(["ptyxis", "--new-window", "-d", pasta, "--", "claude", args.pedido])
+        return f"Abri o VS Code e o Claude no projeto {chave}, já com o seu pedido."
+
+    async def pedir_ao_claude(args) -> str:
+        if args.projeto:
+            chave = cadastros.achar_projeto(args.projeto)
+            if chave is None:
+                return projeto_desconhecido(cadastros, args.projeto)
+            pasta, titulo = cadastros.projetos[chave], chave
+        else:
+            pasta, titulo = _pasta_neutra(), "Claude"
+        delegacoes.iniciar(titulo, rodar_claude(executor, args.pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout))
+        return "Pedi ao Claude. Aviso quando ele terminar."
+
+    async def consultar_agenda(args: ArgsAgenda) -> str:
+        pedido = (
+            f"Hoje é {data_por_extenso(agora())}. Liste meus compromissos de {args.periodo} "
+            "com horário e título, usando a busca de calendário."
+        )
+        return await rodar_claude(executor, pedido, _pasta_neutra(), [_LER_AGENDA], modelo, _TIMEOUT_DA_AGENDA)
+
+    async def criar_compromisso(args: ArgsCompromisso) -> str:
+        pedido = (
+            f"Hoje é {data_por_extenso(agora())}. Crie no meu calendário o compromisso "
+            f"'{args.titulo}' para {args.quando}, com uma hora de duração se nada for dito. "
+            "Confirme a data e a hora que ficaram."
+        )
+        return await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA)
+
+    def confirmar_compromisso(args: ArgsCompromisso) -> str:
+        return f"Vou criar na sua agenda: {args.titulo}, {args.quando}. Confirma?"
+
+    return [
+        Ferramenta(
+            "abrir_claude_na_tela",
+            "Abre o VS Code no projeto e inicia o Claude Code visível, já com o pedido do usuário. "
+            "Use quando o usuário quer ver o Claude trabalhando.",
+            ArgsNaTela, abrir_claude_na_tela,
+        ),
+        Ferramenta(
+            "pedir_ao_claude",
+            "Delega ao Claude, em segundo plano, uma tarefa complexa ou pergunta difícil: programação, análise, "
+            "leitura de sites e dashboards, conhecimento que exige precisão. O resultado é falado quando ficar pronto.",
+            ArgsPedido, pedir_ao_claude,
+        ),
+        Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda),
+        Ferramenta(
+            "criar_compromisso", "Cria um compromisso ou lembrete na agenda.", ArgsCompromisso, criar_compromisso,
+            risco=Risco.CONFIRMAR, descrever=confirmar_compromisso,
+        ),
+    ]
