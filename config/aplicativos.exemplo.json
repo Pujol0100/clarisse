@@ -1,0 +1,8 @@
+{
+  "vscode": {"abrir": ["code"], "processo": "code", "apelidos": ["vs code", "visual studio code", "visual code"]},
+  "chrome": {"abrir": ["google-chrome"], "processo": "chrome", "apelidos": ["google chrome", "navegador"]},
+  "firefox": {"abrir": ["firefox"], "processo": "firefox", "apelidos": []},
+  "terminal": {"abrir": ["ptyxis", "--new-window"], "processo": "ptyxis", "apelidos": ["console"]},
+  "arquivos": {"abrir": ["nautilus"], "processo": "nautilus", "apelidos": ["gerenciador de arquivos"]},
+  "calculadora": {"abrir": ["gnome-calculator"], "processo": "gnome-calculator", "apelidos": []}
+}
