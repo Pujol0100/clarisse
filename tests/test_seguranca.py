@@ -2,7 +2,7 @@ import pytest
 from pydantic import Field
 
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Registro, Risco
-from clarisse.seguranca import avaliar, confirma, pede_para_parar
+from clarisse.seguranca import avaliar, confirma, nega, pede_para_parar
 
 
 class ArgsGit(Argumentos):
@@ -85,3 +85,13 @@ def test_reconhece_pedido_para_parar(fala):
 @pytest.mark.parametrize("fala", ["abre o chrome para mim", "que horas são", "prepara o relatório de vendas do mês", ""])
 def test_nao_confunde_pedido_com_parada(fala):
     assert not pede_para_parar(fala)
+
+
+@pytest.mark.parametrize("fala", ["não", "Não, deixa.", "cancela", "esquece isso", "nao precisa"])
+def test_reconhece_recusa(fala):
+    assert nega(fala)
+
+
+@pytest.mark.parametrize("fala", ["sim", "abre o chrome", "que horas são", ""])
+def test_nao_confunde_pedido_com_recusa(fala):
+    assert not nega(fala)

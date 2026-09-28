@@ -53,6 +53,13 @@ def confirma(fala: str) -> bool:
     return bool(palavras & _SIM) and not palavras & _NAO
 
 
+_RECUSA = {"nao", "cancela", "cancelar", "esquece", "deixa"}
+
+
+def nega(fala: str) -> bool:
+    return bool(set(_palavras(fala)) & _RECUSA)
+
+
 def pede_para_parar(fala: str) -> bool:
     palavras = [p for p in _palavras(fala) if p != "clarisse"]
     return bool(palavras) and palavras[0] in _PARAR and len(palavras) <= 4
