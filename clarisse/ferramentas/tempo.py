@@ -1,4 +1,5 @@
 """Previsão do tempo pelo Open-Meteo (sem chave), em graus Celsius e km/h, no fuso de Brasília."""
+import logging
 import math
 from datetime import date
 from typing import Literal
@@ -8,6 +9,8 @@ from pydantic import Field
 
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 from clarisse.figuras import Retorno, figura_do_tempo
+
+log = logging.getLogger(__name__)
 
 _BUSCA = "https://geocoding-api.open-meteo.com/v1/search"
 _PREVISAO = "https://api.open-meteo.com/v1/forecast"
@@ -70,6 +73,7 @@ def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) 
             resposta.raise_for_status()
             dados = resposta.json()
         except httpx.HTTPError as erro:
+            log.warning("previsão do tempo falhou em %s: %r", erro.request.url, erro)
             return f"Não consegui consultar a previsão agora: {type(erro).__name__}."
 
         agora, dias = dados["current"], dados["daily"]

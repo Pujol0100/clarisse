@@ -116,3 +116,17 @@ def test_dia_fora_da_lista_e_invalido():
 
     with pytest.raises(ValueError):
         f.argumentos(dia="semana que vem")
+
+
+async def test_falha_deixa_no_log_o_erro_e_o_endereco(caplog):
+    def responder(pedido):
+        if pedido.url.host.startswith("geocoding"):
+            return httpx.Response(200, json=CURITIBA)
+        raise httpx.ReadTimeout("demorou")
+
+    f = _montar(responder)
+
+    await f.executar(f.argumentos(cidade="Curitiba"))
+
+    assert "ReadTimeout" in caplog.text
+    assert "api.open-meteo.com" in caplog.text
