@@ -108,7 +108,7 @@ def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) 
 
     async def _apertar(teclas: list[int]) -> str | None:
         resultado = await executor.executar(_combinacao(teclas))
-        if resultado.codigo != 0 or "failed to connect" in resultado.erro:
+        if resultado.codigo != 0:
             return _SEM_TECLADO
         return None
 

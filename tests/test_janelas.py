@@ -152,7 +152,8 @@ async def test_nao_digita_se_nao_achou_a_janela(ferramentas, executor):
 async def test_teclado_virtual_desligado_vira_mensagem(ferramentas, executor):
     executor.respostas += [
         _lista(), Resultado(0, "()", ""),
-        Resultado(2, "", "failed to connect socket `/run/user/1000/.ydotool_socket'"),
+        # Com o serviço parado o ydotool 1.0.4 sai com 2 e escreve o aviso na saída normal.
+        Resultado(2, "failed to connect socket `/run/user/1000/.ydotool_socket': Connection refused\n", ""),
     ]
     f = ferramentas["digitar_texto"]
 
