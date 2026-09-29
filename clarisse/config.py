@@ -23,6 +23,7 @@ class Ajustes(BaseSettings):
     claude_timeout: int = 600
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")
+    abrir_navegador: bool = True
 
 
 class Aplicativo(BaseModel):

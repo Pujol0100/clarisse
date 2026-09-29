@@ -15,7 +15,8 @@ from clarisse.seguranca import Decisao, avaliar, confirma, nega, pede_para_parar
 
 log = logging.getLogger(__name__)
 
-_TAMANHO_DO_HISTORICO = 12
+_CONVERSAS_LEMBRADAS = 4
+_LIMITE_DO_RESULTADO_LEMBRADO = 300
 
 
 def prompt_do_sistema(projetos: list[str], agora: datetime) -> str:
@@ -56,8 +57,8 @@ class Agente:
         self._agora = agora
         self._max_rodadas = max_rodadas
         self._timeout = timeout_da_ferramenta
-        self._historico: list[dict] = []
-        self._pendente: tuple[Decisao, list[dict]] | None = None
+        self._conversas: list[list[dict]] = []
+        self._pendente: tuple[Decisao, list[dict], int] | None = None
         self._trava = asyncio.Lock()
 
     async def responder(self, fala: str) -> Resposta:
@@ -68,31 +69,32 @@ class Agente:
                 return Resposta("Parei.", parar=True)
 
             if self._pendente:
-                decisao, mensagens = self._pendente
+                decisao, mensagens, inicio = self._pendente
                 self._pendente = None
                 if confirma(fala):
+                    self._conversas.pop()
                     mensagens.append(await self._executar(decisao))
-                    return await self._laco(mensagens, fala)
+                    return await self._laco(mensagens, inicio)
                 if nega(fala):
-                    return self._concluir(fala, "Tudo bem, cancelei.")
+                    return self._concluir([{"role": "user", "content": fala}], 0, "Tudo bem, cancelei.")
 
             mensagens = [
                 {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora())},
-                *self._historico,
+                *self._historico(),
                 {"role": "user", "content": fala},
             ]
-            return await self._laco(mensagens, fala)
+            return await self._laco(mensagens, len(mensagens) - 1)
 
-    async def _laco(self, mensagens: list[dict], fala: str) -> Resposta:
+    async def _laco(self, mensagens: list[dict], inicio: int) -> Resposta:
         for _ in range(self._max_rodadas):
             await self._eventos.estado(Estado.PENSANDO)
             try:
                 resposta = await self._modelo.conversar(mensagens, self._registro.esquemas())
             except ErroDoModelo as erro:
                 log.warning("modelo local falhou: %s", erro)
-                return self._concluir(fala, f"Não consegui falar com o modelo local: {erro}.")
+                return self._concluir(mensagens, inicio, f"Não consegui falar com o modelo local: {erro}.")
             if not resposta.chamadas:
-                return self._concluir(fala, resposta.texto or "Pronto.")
+                return self._concluir(mensagens, inicio, resposta.texto or "Pronto.")
 
             mensagens.append(resposta.mensagem)
             for chamada in resposta.chamadas:
@@ -100,12 +102,12 @@ class Agente:
                 if decisao.acao == "recusar":
                     mensagens.append(_mensagem_de_ferramenta(chamada.nome, f"Erro: {decisao.motivo}."))
                 elif decisao.acao == "confirmar":
-                    self._pendente = (decisao, mensagens)
+                    self._pendente = (decisao, mensagens, inicio)
                     frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
-                    return self._concluir(fala, frase, aguardando=True)
+                    return self._concluir(mensagens[inicio : inicio + 1], 0, frase, aguardando=True)
                 else:
                     mensagens.append(await self._executar(decisao))
-        return self._concluir(fala, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
+        return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
 
     async def _executar(self, decisao: Decisao) -> dict:
         nome = decisao.ferramenta.nome
@@ -129,10 +131,21 @@ class Agente:
         await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": situacao})
         return _mensagem_de_ferramenta(nome, resultado)
 
-    def _concluir(self, fala: str, texto: str, aguardando: bool = False) -> Resposta:
-        self._historico += [{"role": "user", "content": fala}, {"role": "assistant", "content": texto}]
-        self._historico = self._historico[-_TAMANHO_DO_HISTORICO:]
+    def _historico(self) -> list[dict]:
+        return [mensagem for conversa in self._conversas for mensagem in conversa]
+
+    def _concluir(self, mensagens: list[dict], inicio: int, texto: str, aguardando: bool = False) -> Resposta:
+        conversa = [_encurtar(m) for m in mensagens[inicio:]] + [{"role": "assistant", "content": texto}]
+        self._conversas = [*self._conversas, conversa][-_CONVERSAS_LEMBRADAS:]
         return Resposta(texto, aguardando_confirmacao=aguardando)
+
+
+def _encurtar(mensagem: dict) -> dict:
+    """O histórico guarda as chamadas de ferramenta: sem elas o modelo imita as respostas e para de agir."""
+    conteudo = mensagem.get("content") or ""
+    if mensagem["role"] == "tool" and len(conteudo) > _LIMITE_DO_RESULTADO_LEMBRADO:
+        return {**mensagem, "content": conteudo[:_LIMITE_DO_RESULTADO_LEMBRADO] + "…"}
+    return dict(mensagem)
 
 
 def _mensagem_de_ferramenta(nome: str, conteudo: str) -> dict:

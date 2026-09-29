@@ -21,8 +21,11 @@ class RespostaDoModelo:
     mensagem: dict = field(default_factory=dict)
 
 
+CONTEXTO = 8192
+
+
 class ClienteOllama:
-    def __init__(self, http: httpx.AsyncClient, modelo: str, contexto: int = 8192):
+    def __init__(self, http: httpx.AsyncClient, modelo: str, contexto: int = CONTEXTO):
         self._http = http
         self._modelo = modelo
         self._contexto = contexto

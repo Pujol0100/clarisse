@@ -15,6 +15,7 @@ RAIZ = Path(__file__).resolve().parent
 os.chdir(RAIZ)
 
 from clarisse.config import Ajustes, carregar_cadastros  # noqa: E402
+from clarisse.llm import CONTEXTO  # noqa: E402
 from clarisse.montagem import montar_app  # noqa: E402
 
 
@@ -64,7 +65,7 @@ def garantir_modelo(ajustes: Ajustes) -> None:
         return
     httpx.post(
         f"{ajustes.ollama_url}/api/generate",
-        json={"model": ajustes.modelo, "keep_alive": "30m"},
+        json={"model": ajustes.modelo, "keep_alive": "30m", "options": {"num_ctx": CONTEXTO}},
         timeout=120,
     )
     ok(f"Modelo {ajustes.modelo} carregado na placa")
@@ -95,7 +96,8 @@ def main() -> None:
     ok(f"Servidor em {endereco}")
     print("  Para desligar: Ctrl+C nesta janela.")
     print("=" * 44)
-    threading.Timer(1.5, webbrowser.open, args=(endereco,)).start()
+    if ajustes.abrir_navegador:
+        threading.Timer(1.5, webbrowser.open, args=(endereco,)).start()
     uvicorn.run(app, host="127.0.0.1", port=ajustes.porta, log_level="warning")
 
 

@@ -239,3 +239,41 @@ async def test_lembra_da_conversa_anterior(novo_agente):
 
     conversa = [(m["role"], m["content"]) for m in modelo.recebidas[1][1:]]
     assert conversa == [("user", "oi"), ("assistant", "Oi!"), ("user", "o que eu disse?")]
+
+
+async def test_historico_guarda_as_chamadas_de_ferramenta_para_o_modelo_nao_desaprender(novo_agente):
+    modelo = ModeloFalso(chamada("git", projeto="omni-api", operacao="status"), texto("Está limpo."), texto("ok"))
+    agente = novo_agente(modelo)
+
+    await agente.responder("git status no omni")
+    await agente.responder("e agora?")
+
+    papeis = [m["role"] for m in modelo.recebidas[2][1:]]
+    assert papeis == ["user", "assistant", "tool", "assistant", "user"]
+    assert modelo.recebidas[2][2]["tool_calls"][0]["function"]["name"] == "git"
+
+
+async def test_historico_guarda_so_as_ultimas_quatro_conversas(novo_agente):
+    modelo = ModeloFalso(*[texto(f"resposta {i}") for i in range(6)])
+    agente = novo_agente(modelo)
+
+    for i in range(6):
+        await agente.responder(f"fala {i}")
+
+    falas = [m["content"] for m in modelo.recebidas[5] if m["role"] == "user"]
+    assert falas == ["fala 1", "fala 2", "fala 3", "fala 4", "fala 5"]
+
+
+async def test_resultado_longo_de_ferramenta_e_encurtado_no_historico(novo_agente, registro):
+    async def longo(args):
+        return "x" * 5000
+
+    registro.registrar(Ferramenta("longo", "longo", Argumentos, longo))
+    modelo = ModeloFalso(chamada("longo"), texto("ok"), texto("ok"))
+    agente = novo_agente(modelo)
+
+    await agente.responder("longo")
+    await agente.responder("de novo")
+
+    [resultado] = [m["content"] for m in modelo.recebidas[2] if m["role"] == "tool"]
+    assert len(resultado) <= 400
