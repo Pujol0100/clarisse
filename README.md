@@ -5,8 +5,11 @@ modelo de linguagem **local**, executa a ação na máquina e responde falando. 
 a tarefa pede uma IA mais forte, ela passa o pedido para o
 [Claude Code](https://claude.com/claude-code) e fala o resultado quando fica pronto.
 
-A cara dela, por enquanto, é uma bola neural na tela do navegador, que muda de cor
-e de ritmo quando ouve, pensa, faz e fala.
+A cara dela é um enxame de "drones" de luz na tela do navegador: uma esfera que
+muda de cor e de ritmo quando ouve, pensa e faz; uma onda que pulsa com a voz
+quando fala; e, quando a resposta pede, uma figura — sol, nuvem, chuva,
+trovoada, calendário, relógio, jornal, código ou balão de mensagem. Quem escolhe a
+figura é o sistema, pela ferramenta usada e pelo dado, nunca o modelo.
 
 > O código antigo, que dava voz ao Claude Code no Windows, está em
 > [`legado-windows/`](legado-windows/README.md).

@@ -51,9 +51,11 @@ body {
   min-height: 0;
 }
 
-#bola {
-  width: min(62vh, 88vw);
-  height: min(62vh, 88vw);
+#enxame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .estado {
