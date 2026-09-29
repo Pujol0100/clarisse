@@ -22,6 +22,7 @@ class RespostaDoModelo:
 
 
 CONTEXTO = 8192
+_MAXIMO_DA_RESPOSTA = 400
 
 
 class ClienteOllama:
@@ -38,7 +39,7 @@ class ClienteOllama:
             "stream": False,
             "think": False,
             "keep_alive": "30m",
-            "options": {"temperature": 0, "num_ctx": self._contexto},
+            "options": {"temperature": 0, "num_ctx": self._contexto, "num_predict": _MAXIMO_DA_RESPOSTA},
         }
         try:
             resposta = await self._http.post("/api/chat", json=corpo, timeout=120)

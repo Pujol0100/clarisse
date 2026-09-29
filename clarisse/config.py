@@ -21,6 +21,7 @@ class Ajustes(BaseSettings):
     voz_velocidade: str = "+10%"
     claude_modelo: str = "sonnet"
     claude_timeout: int = 600
+    claude_teto_usd: float = 1.0
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")
     abrir_navegador: bool = True

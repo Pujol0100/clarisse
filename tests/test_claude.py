@@ -31,7 +31,7 @@ def montar(cadastros, executor, delegacoes, tmp_path):
     def _montar():
         lista = ferramentas_do_claude(
             cadastros, executor, delegacoes=delegacoes, pasta_neutra=tmp_path / "neutra",
-            modelo="sonnet", timeout=600, agora=lambda: datetime(2026, 9, 28, 14, 5),
+            modelo="sonnet", timeout=600, teto_usd=1.5, agora=lambda: datetime(2026, 9, 28, 14, 5),
         )
         return {f.nome: f for f in lista}
     return _montar
@@ -76,6 +76,7 @@ async def test_pedir_ao_claude_responde_na_hora_e_avisa_quando_termina(montar, d
     assert _valor_da_opcao(argumentos, "--output-format") == "json"
     assert _valor_da_opcao(argumentos, "--allowedTools") == ",".join(FERRAMENTAS_DE_LEITURA)
     assert _valor_da_opcao(argumentos, "--model") == "sonnet"
+    assert _valor_da_opcao(argumentos, "--max-budget-usd") == "1.5"
 
 
 async def test_pedir_ao_claude_sem_projeto_roda_numa_pasta_neutra(montar, delegacoes, executor, tmp_path):
@@ -134,3 +135,16 @@ async def test_criar_compromisso_pede_confirmacao_e_so_pode_criar_evento(montar,
     await f.executar(args)
     argumentos, _ = executor.executados[0]
     assert _valor_da_opcao(argumentos, "--allowedTools") == "mcp__claude_ai_Microsoft_365__outlook_create_event"
+
+
+async def test_tarefa_que_passa_do_teto_de_gasto_vira_aviso(montar, delegacoes, executor, avisos):
+    f = montar()["pedir_ao_claude"]
+    executor.respostas.append(
+        Resultado(1, json.dumps({"type": "result", "subtype": "error_max_budget_usd", "is_error": True}), "")
+    )
+
+    await f.executar(f.argumentos(pedido="x"))
+    await delegacoes.aguardar()
+
+    [(_, texto)] = avisos.recebidos
+    assert "teto de gasto" in texto.lower()

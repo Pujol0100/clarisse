@@ -41,6 +41,7 @@ def montar_registro(ajustes: Ajustes, cadastros: Cadastros, executor, http: http
             pasta_neutra=ajustes.pasta_dados / "claude",
             modelo=ajustes.claude_modelo,
             timeout=ajustes.claude_timeout,
+            teto_usd=ajustes.claude_teto_usd,
         ),
         *ferramentas_de_noticias(http),
     ]

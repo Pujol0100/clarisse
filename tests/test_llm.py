@@ -68,3 +68,15 @@ async def test_ollama_fora_do_ar_vira_erro_do_modelo():
 
     with pytest.raises(ErroDoModelo, match="Ollama"):
         await _cliente(responder).conversar([], [])
+
+
+async def test_limita_o_tamanho_da_resposta():
+    enviados = []
+
+    def responder(pedido):
+        enviados.append(json.loads(pedido.content))
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": "ok"}})
+
+    await _cliente(responder).conversar([], [])
+
+    assert 0 < enviados[0]["options"]["num_predict"] <= 500

@@ -49,7 +49,9 @@ class Delegacoes:
         await asyncio.gather(*self._tarefas)
 
 
-async def rodar_claude(executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float) -> str:
+async def rodar_claude(
+    executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float, teto_usd: float
+) -> str:
     resultado = await executor.executar(
         [
             "claude", "-p", pedido,
@@ -57,6 +59,7 @@ async def rodar_claude(executor, pedido: str, pasta: Path, ferramentas: list[str
             "--setting-sources", "project",
             "--no-session-persistence",
             "--model", modelo,
+            "--max-budget-usd", str(teto_usd),
             "--append-system-prompt", _PARA_VOZ,
             "--allowedTools", ",".join(ferramentas),
         ],
@@ -70,6 +73,8 @@ async def rodar_claude(executor, pedido: str, pasta: Path, ferramentas: list[str
     except json.JSONDecodeError:
         log.warning("saída do claude sem JSON (código %s): %s", resultado.codigo, resultado.erro[:500])
         return "O Claude não conseguiu responder. O motivo está no log."
+    if dados.get("subtype") == "error_max_budget_usd":
+        return f"O Claude parou porque a tarefa passou do teto de gasto de {teto_usd} dólar por pedido."
     if dados.get("is_error") or not dados.get("result"):
         return "O Claude não conseguiu concluir a tarefa."
     return dados["result"].strip()
@@ -82,6 +87,7 @@ def ferramentas_do_claude(
     pasta_neutra: Path,
     modelo: str,
     timeout: float,
+    teto_usd: float,
     agora: Callable[[], datetime] = datetime.now,
 ) -> list[Ferramenta]:
     ArgsNaTela = create_model(
@@ -125,7 +131,7 @@ def ferramentas_do_claude(
             pasta, titulo = cadastros.projetos[chave], chave
         else:
             pasta, titulo = _pasta_neutra(), "Claude"
-        delegacoes.iniciar(titulo, rodar_claude(executor, args.pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout))
+        delegacoes.iniciar(titulo, rodar_claude(executor, args.pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout, teto_usd))
         return "Pedi ao Claude. Aviso quando ele terminar."
 
     async def consultar_agenda(args: ArgsAgenda) -> str:
@@ -133,7 +139,7 @@ def ferramentas_do_claude(
             f"Hoje é {data_por_extenso(agora())}. Liste meus compromissos de {args.periodo} "
             "com horário e título, usando a busca de calendário."
         )
-        return await rodar_claude(executor, pedido, _pasta_neutra(), [_LER_AGENDA], modelo, _TIMEOUT_DA_AGENDA)
+        return await rodar_claude(executor, pedido, _pasta_neutra(), [_LER_AGENDA], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
 
     async def criar_compromisso(args: ArgsCompromisso) -> str:
         pedido = (
@@ -141,7 +147,7 @@ def ferramentas_do_claude(
             f"'{args.titulo}' para {args.quando}, com uma hora de duração se nada for dito. "
             "Confirme a data e a hora que ficaram."
         )
-        return await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA)
+        return await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
 
     def confirmar_compromisso(args: ArgsCompromisso) -> str:
         return f"Vou criar na sua agenda: {args.titulo}, {args.quando}. Confirma?"
