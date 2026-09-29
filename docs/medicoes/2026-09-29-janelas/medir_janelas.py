@@ -23,7 +23,7 @@ from clarisse.montagem import montar_registro  # noqa: E402
 
 SEM = set(filter(None, os.environ.get("SEM", "").split(",")))
 
-# (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor})
+# (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor}); "alvo" junta aplicativo e título
 CASOS = [
     ("traz o vs code pra frente", "trazer_para_frente", {"aplicativo": "code"}),
     ("mostra a janela do chrome", "trazer_para_frente", {"aplicativo": "chrome"}),
@@ -32,11 +32,12 @@ CASOS = [
     ("escreve bom dia equipe no whatsapp", "digitar_texto", {"texto": "bom dia"}),
     ("digita git status no terminal", "digitar_texto", {"texto": "git status"}),
     ("escreve olá mundo no sublime", "digitar_texto", {"texto": "mundo"}),
-    ("salva o arquivo no vs code", "apertar_atalho", {"atalho": "salvar"}),
+    ("salva o arquivo no vs code", "apertar_atalho", {"atalho": "salvar", "alvo": "code"}),
+    ("salva o rascunho clarisse", "apertar_atalho", {"atalho": "salvar", "alvo": "clarisse"}),
     ("aperta enter", "apertar_atalho", {"atalho": "enter"}),
     ("desfaz isso", "apertar_atalho", {"atalho": "desfazer"}),
-    ("fecha essa aba do chrome", "apertar_atalho", {"atalho": "fechar_aba"}),
-    ("abre uma aba nova no navegador", "apertar_atalho", {"atalho": "nova_aba"}),
+    ("fecha essa aba do chrome", "apertar_atalho", {"atalho": "fechar_aba", "alvo": "chrome"}),
+    ("abre uma aba nova no navegador", "apertar_atalho", {"atalho": "nova_aba", "alvo": "navegador"}),
     ("aperta esc", "apertar_atalho", {"atalho": "esc"}),
     # não podem virar ferramenta de janela
     ("vai pro vs code do projeto clarisse", "abrir_projeto_vscode", {"projeto": "clarisse"}),
@@ -79,7 +80,9 @@ async def main():
             chamadas = msg.get("tool_calls") or []
             nome = chamadas[0]["function"]["name"] if chamadas else None
             recebidos = chamadas[0]["function"].get("arguments", {}) if chamadas else {}
-            ok = nome == esperada and all(_sem_acento(v) in _sem_acento(recebidos.get(k, "")) for k, v in args.items())
+            # "alvo": o programa citado pode vir no aplicativo ou no título; os dois levam à janela.
+            recebidos_com_alvo = {**recebidos, "alvo": f"{recebidos.get('aplicativo') or ''} {recebidos.get('titulo') or ''}"}
+            ok = nome == esperada and all(_sem_acento(v) in _sem_acento(recebidos_com_alvo.get(k, "")) for k, v in args.items())
             acertos += ok
             texto = "" if chamadas else msg.get("content", "")[:80]
             print(f"{'OK ' if ok else 'ERR'} {pedido!r} -> {nome} {json.dumps(recebidos, ensure_ascii=False)} {texto}", flush=True)

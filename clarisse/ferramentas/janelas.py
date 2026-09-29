@@ -69,7 +69,10 @@ class ArgsAtalho(Argumentos):
         "salvar", "desfazer", "copiar", "colar", "enter", "esc",
         "trocar_janela", "nova_aba", "fechar_aba", "fechar_janela",
     ]
-    aplicativo: str | None = Field(default=None, max_length=80, description="Janela onde apertar; vazio é a janela da frente")
+    aplicativo: str | None = Field(
+        default=None, max_length=80,
+        description="Programa ou janela que o usuário citou; vazio só quando ele não citou nenhum (vale a janela da frente)",
+    )
     titulo: str | None = Field(default=None, max_length=120, description="Pedaço do título da janela")
 
 
@@ -132,8 +135,8 @@ def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) 
 
     async def apertar_atalho(args: ArgsAtalho) -> str:
         onde = "na janela da frente"
-        if args.aplicativo:
-            janela, resposta = await _trazer(args.aplicativo, args.titulo)
+        if args.aplicativo or args.titulo:
+            janela, resposta = await _trazer(args.aplicativo or args.titulo, args.titulo)
             if janela is None:
                 return resposta
             onde = f"em {janela['title']}"
@@ -144,7 +147,7 @@ def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) 
         return Risco.CONFIRMAR if args.atalho in _PERDEM_TRABALHO else Risco.SEGURO
 
     def confirmar_atalho(args: ArgsAtalho) -> str:
-        onde = args.aplicativo or "a janela da frente"
+        onde = args.aplicativo or args.titulo or "a janela da frente"
         return f"Vou {args.atalho.replace('_', ' ')} em {onde}, e o que não estiver salvo se perde. Confirma?"
 
     return [

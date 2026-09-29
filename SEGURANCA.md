@@ -74,6 +74,9 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   programa já poderia executar comandos sozinho, então o risco novo é pequeno; o
   que se evitou foi o grupo `input`, que abriria a leitura do teclado.
 - **Texto colado fica na área de transferência** e substitui o que estava lá.
+- **Atalho sem programa vai para a janela da frente.** O modelo às vezes não
+  repassa o programa citado ("salva o arquivo no vs code"). A resposta falada diz
+  onde apertou, e fechar aba ou janela pede confirmação mostrando o destino.
 - **Janela errada:** se outra janela tomar a frente nos 0,3 s entre trazer e
   colar, o texto vai para ela. Sem Enter, ele fica escrito e não é enviado.
 - **Injeção por texto externo** (manchete, saída de git) pode tentar induzir o

@@ -172,6 +172,15 @@ async def test_atalho_de_salvar_aperta_ctrl_s_na_janela_pedida(ferramentas, exec
     assert _teclas(executor) == [["ydotool", "key", "29:1", "31:1", "31:0", "29:0"]]
 
 
+
+async def test_atalho_so_com_titulo_vai_para_a_janela_do_titulo(ferramentas, executor):
+    executor.respostas += [_lista(), Resultado(0, "()", ""), Resultado(0, "", "")]
+    f = ferramentas["apertar_atalho"]
+
+    await f.executar(f.argumentos(atalho="salvar", titulo="clarisse"))
+
+    assert _ativou(executor) == ["103"]
+
 async def test_atalho_sem_aplicativo_vai_para_a_janela_da_frente(ferramentas, executor):
     f = ferramentas["apertar_atalho"]
 
