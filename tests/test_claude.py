@@ -186,3 +186,42 @@ async def test_criar_compromisso_manda_o_linux_atualizar_a_agenda(cadastros, exe
     await f.executar(f.argumentos(titulo="Reunião", quando="amanhã às 15h"))
 
     assert atualizacoes == [1]
+
+
+@pytest.fixture
+def navegador(cadastros, executor, delegacoes, tmp_path):
+    config = tmp_path / "mcp-navegador.json"
+    ferramentas = ferramentas_do_claude(
+        cadastros, executor, delegacoes, pasta_neutra=tmp_path / "neutra", modelo="sonnet", timeout=600,
+        teto_usd=1.0, mcp_navegador=config,
+    )
+    return {f.nome: f for f in ferramentas}["fazer_no_navegador"], config
+
+
+async def test_navegador_pede_confirmacao_mostrando_o_pedido(navegador):
+    f, _ = navegador
+    args = f.argumentos(pedido="abre o painel fidc e me diz o total de hoje")
+
+    assert f.risco_de(args) is Risco.CONFIRMAR
+    assert "painel fidc" in f.frase_de_confirmacao(args)
+
+
+async def test_navegador_roda_um_claude_so_com_o_navegador_e_proibido_de_agir(navegador, delegacoes, executor, avisos):
+    f, config = navegador
+    executor.respostas.append(_json_do_claude("O total de hoje é 10 mil."))
+
+    resposta = await f.executar(f.argumentos(pedido="abre o painel fidc e me diz o total de hoje"))
+    await delegacoes.aguardar()
+
+    argumentos, _ = executor.executados[0]
+    assert "aviso" in resposta.lower()
+    assert _valor_da_opcao(argumentos, "--mcp-config") == str(config)
+    assert "--strict-mcp-config" in argumentos
+    assert _valor_da_opcao(argumentos, "--allowedTools") == "mcp__playwright"
+    assert _valor_da_opcao(argumentos, "--tools") == "ToolSearch"
+    assert "painel fidc" in argumentos[2] and "Não envie formulários" in argumentos[2]
+    assert avisos.recebidos == [("navegador", "O total de hoje é 10 mil.")]
+
+
+def test_sem_configuracao_do_navegador_a_ferramenta_nao_existe(montar):
+    assert "fazer_no_navegador" not in montar()

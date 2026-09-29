@@ -25,6 +25,11 @@ _PARA_VOZ = (
 )
 _TIMEOUT_DA_AGENDA = 120
 _FERRAMENTAS_DE_MENSAGEM = ["SendMessage", "ListAgents"]
+_NAVEGADOR = "mcp__playwright"
+_REGRAS_DO_NAVEGADOR = (
+    "Regras: use só o navegador. Não envie formulários, não compre, não apague nem altere nada. "
+    "Se para cumprir o pedido for preciso agir num site, pare e diga o que faria."
+)
 
 
 class Delegacoes:
@@ -63,7 +68,8 @@ def _embutidas(ferramentas: list[str]) -> list[str]:
 
 
 async def rodar_claude(
-    executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float, teto_usd: float
+    executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float, teto_usd: float,
+    mcp_config: Path | None = None,
 ) -> str:
     resultado = await executor.executar(
         [
@@ -76,6 +82,7 @@ async def rodar_claude(
             "--append-system-prompt", _PARA_VOZ,
             "--allowedTools", ",".join(ferramentas),
             "--tools", ",".join(_embutidas(ferramentas)),
+            *(["--mcp-config", str(mcp_config), "--strict-mcp-config"] if mcp_config else []),
         ],
         pasta=pasta,
         timeout=timeout,
@@ -104,6 +111,7 @@ def ferramentas_do_claude(
     teto_usd: float,
     agora: Callable[[], datetime] = datetime.now,
     apos_mudar_agenda: Callable[[], Awaitable[None]] | None = None,
+    mcp_navegador: Path | None = None,
 ) -> list[Ferramenta]:
     ArgsNaTela = create_model(
         "ArgsNaTela",
@@ -198,6 +206,20 @@ def ferramentas_do_claude(
             return f"Mandei a mensagem para a conversa {nome}."
         return f"Não consegui entregar a mensagem para a conversa {nome}: {resultado}"
 
+    class ArgsNavegador(Argumentos):
+        pedido: str = Field(max_length=2000, description="O que fazer no navegador, com as palavras do usuário")
+
+    async def fazer_no_navegador(args: ArgsNavegador) -> str:
+        pedido = f"{args.pedido}\n\n{_REGRAS_DO_NAVEGADOR}"
+        delegacoes.iniciar(
+            "navegador",
+            rodar_claude(executor, pedido, _pasta_neutra(), [_NAVEGADOR], modelo, timeout, teto_usd, mcp_config=mcp_navegador),
+        )
+        return "Abri o navegador para isso. Aviso quando terminar."
+
+    def confirmar_navegador(args: ArgsNavegador) -> str:
+        return f"Vou usar o navegador para: {args.pedido}. Confirma?"
+
     def confirmar_mensagem(args: ArgsMensagem) -> str:
         return f"Vou mandar para a conversa {args.conversa} do Claude: {args.mensagem}. Confirma?"
 
@@ -228,4 +250,10 @@ def ferramentas_do_claude(
             ArgsMensagem, mandar_para_conversa_do_claude,
             risco=Risco.CONFIRMAR, descrever=confirmar_mensagem, figura=MENSAGEM,
         ),
+        *([Ferramenta(
+            "fazer_no_navegador",
+            "Usa o navegador para uma tarefa num site ou sistema web: abrir, ler, conferir um dashboard ou uma página. "
+            "O resultado é falado quando fica pronto.",
+            ArgsNavegador, fazer_no_navegador, risco=Risco.CONFIRMAR, descrever=confirmar_navegador, figura=CODIGO,
+        )] if mcp_navegador else []),
     ]

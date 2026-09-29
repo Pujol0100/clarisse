@@ -1,4 +1,5 @@
 """Junta as peças da Clarisse a partir dos ajustes e cadastros."""
+import json
 import os
 import secrets
 from pathlib import Path
@@ -37,6 +38,14 @@ def gravar_chave(caminho: Path, chave: str) -> None:
         arquivo.write(chave)
 
 
+def _config_do_navegador() -> Path:
+    """O Claude das tarefas no navegador só enxerga este servidor: o Playwright, com janela visível para login."""
+    PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
+    caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
+    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}}}))
+    return caminho
+
+
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
     apos_mudar_agenda=None,
@@ -52,6 +61,7 @@ def montar_registro(
             timeout=ajustes.claude_timeout,
             teto_usd=ajustes.claude_teto_usd,
             apos_mudar_agenda=apos_mudar_agenda,
+            mcp_navegador=_config_do_navegador(),
         ),
         *ferramentas_de_noticias(http),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
