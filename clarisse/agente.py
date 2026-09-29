@@ -27,16 +27,20 @@ _CUTUCADA = {
 }
 
 
-def prompt_do_sistema(projetos: list[str], agora: datetime) -> str:
-    return f"""Você é a Clarisse, assistente de voz que roda no computador do usuário.
+def prompt_do_sistema(projetos: list[str], agora: datetime, cidade: str | None = None) -> str:
+    texto = f"""Você é a Clarisse, assistente de voz que roda no computador do usuário.
 Hoje é {data_por_extenso(agora)}.
 Responda sempre em português do Brasil, em no máximo duas frases curtas, porque a resposta será falada.
 Quando o pedido exigir uma ação ou uma informação do mundo real, chame a ferramenta adequada. Nunca invente o resultado de uma ferramenta e nunca diga que fez algo sem ter chamado a ferramenta.
 Para conversa, contas simples ou conhecimento geral, responda direto, sem ferramenta.
 Tarefas complexas de programação, análise, leitura de sites ou agenda vão para o Claude.
+Qualquer pergunta sobre a agenda, inclusive se um compromisso que você acabou de criar está lá, chama consultar_agenda. Nunca confirme o que está na agenda de memória.
 Quando o usuário mencionar o Claude, chame pedir_ao_claude (ou abrir_claude_na_tela, se ele quiser ver o Claude trabalhando) na mesma hora. Nunca responda que vai pedir ao Claude sem chamar a ferramenta.
 Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usuário disse. O sistema confirma sozinho as ações arriscadas.
 Projetos cadastrados: {", ".join(projetos) or "nenhum"}. A transcrição de voz pode errar o nome; escolha o projeto cadastrado mais parecido."""
+    if cidade:
+        texto += f"\nO usuário mora em {cidade}. Em perguntas de tempo, clima, frio, calor ou chuva sem cidade, chame previsao_do_tempo com cidade {cidade}."
+    return texto
 
 
 @dataclass
@@ -55,6 +59,7 @@ class Agente:
         auditoria: Auditoria,
         projetos: list[str],
         agora: Callable[[], datetime] = datetime.now,
+        cidade: str | None = None,
         max_rodadas: int = 4,
         timeout_da_ferramenta: float = 180,
     ):
@@ -63,6 +68,7 @@ class Agente:
         self._eventos = eventos
         self._auditoria = auditoria
         self._projetos = projetos
+        self._cidade = cidade
         self._agora = agora
         self._max_rodadas = max_rodadas
         self._timeout = timeout_da_ferramenta
@@ -88,7 +94,7 @@ class Agente:
                     return self._concluir([{"role": "user", "content": fala}], 0, "Tudo bem, cancelei.")
 
             mensagens = [
-                {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora())},
+                {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora(), self._cidade)},
                 *self._historico(),
                 {"role": "user", "content": fala},
             ]

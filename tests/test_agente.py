@@ -419,3 +419,13 @@ async def test_ferramenta_travada_estoura_o_tempo_e_o_agente_segue(registro, eve
 
     assert resposta.texto == "Demorou demais."
     assert _mensagens_de_ferramenta(modelo.recebidas[1])[0].startswith("Erro ao executar travada")
+
+
+async def test_cidade_do_usuario_entra_no_prompt_quando_configurada(registro, eventos, auditoria):
+    modelo = ModeloFalso(texto("ok"), texto("ok"))
+
+    await Agente(modelo, registro, eventos, auditoria, projetos=[], cidade="Curitiba").responder("oi")
+    await Agente(modelo, registro, eventos, auditoria, projetos=[]).responder("oi")
+
+    assert "Curitiba" in modelo.recebidas[0][0]["content"]
+    assert "mora em" not in modelo.recebidas[1][0]["content"]

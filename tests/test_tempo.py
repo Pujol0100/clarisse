@@ -92,3 +92,11 @@ async def test_falha_do_servico_vira_mensagem(falha):
     resposta = await f.executar(f.argumentos(cidade="Curitiba"))
 
     assert "não consegui" in resposta.lower()
+
+
+def test_descricao_avisa_o_modelo_da_cidade_padrao():
+    com_padrao = _montar(lambda p: httpx.Response(200), cidade_padrao="Curitiba")
+    sem_padrao = _montar(lambda p: httpx.Response(200), cidade_padrao=None)
+
+    assert "use Curitiba" in com_padrao.descricao
+    assert "Curitiba" not in sem_padrao.descricao

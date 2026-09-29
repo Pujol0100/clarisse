@@ -82,11 +82,17 @@ def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) 
             )
         return " ".join(partes)
 
+    descricao = (
+        "Consulta o tempo agora e a previsão de hoje, amanhã e depois. Use sempre que perguntarem de clima, "
+        "temperatura ou chuva; nunca invente o tempo."
+    )
+    if cidade_padrao:
+        descricao += f" Se o usuário não disser a cidade, use {cidade_padrao}."
+
     return [
         Ferramenta(
             "previsao_do_tempo",
-            "Consulta o tempo agora e a previsão de hoje, amanhã e depois. Use sempre que perguntarem de clima, "
-            "temperatura ou chuva; nunca invente o tempo.",
+            descricao,
             ArgsTempo,
             previsao_do_tempo,
         )

@@ -69,6 +69,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     agente = Agente(
         modelo, registro, eventos, Auditoria(ajustes.pasta_dados / "auditoria.jsonl"),
         projetos=list(cadastros.projetos),
+        cidade=ajustes.cidade,
     )
     transcritor = Transcritor(
         carregar=lambda: carregar_whisper(ajustes.whisper_modelo, ajustes.whisper_dispositivo),
