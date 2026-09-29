@@ -79,6 +79,7 @@ async def test_pedir_ao_claude_responde_na_hora_e_avisa_quando_termina(montar, d
     assert "--no-session-persistence" in argumentos
     assert _valor_da_opcao(argumentos, "--output-format") == "json"
     assert _valor_da_opcao(argumentos, "--allowedTools") == ",".join(FERRAMENTAS_DE_LEITURA)
+    assert _valor_da_opcao(argumentos, "--tools") == ",".join(FERRAMENTAS_DE_LEITURA)
     assert _valor_da_opcao(argumentos, "--model") == "sonnet"
     assert _valor_da_opcao(argumentos, "--max-budget-usd") == "1.5"
 
@@ -126,6 +127,7 @@ async def test_consultar_agenda_usa_so_a_leitura_do_calendario_e_a_data_de_hoje(
     argumentos, _ = executor.executados[0]
     assert resposta == "Às 10h, reunião de time."
     assert _valor_da_opcao(argumentos, "--allowedTools") == "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
+    assert _valor_da_opcao(argumentos, "--tools") == "ToolSearch"
     assert "28 de setembro de 2026" in argumentos[2]
 
 

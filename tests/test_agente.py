@@ -429,3 +429,14 @@ async def test_cidade_do_usuario_entra_no_prompt_quando_configurada(registro, ev
 
     assert "Curitiba" in modelo.recebidas[0][0]["content"]
     assert "mora em" not in modelo.recebidas[1][0]["content"]
+
+
+async def test_garantia_do_claude_nao_dispara_depois_de_uma_acao_confirmada(novo_agente, pedidos_ao_claude, executadas):
+    modelo = ModeloFalso(chamada("git", projeto="omni-api", operacao="pull"), texto(""))
+    agente = novo_agente(modelo)
+    await agente.responder("manda o Claude ver isso e dá um pull no omni")
+
+    await agente.responder("sim")
+
+    assert executadas == [("git", "pull")]
+    assert pedidos_ao_claude == []

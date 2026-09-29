@@ -102,7 +102,6 @@ class Agente:
             return await self._laco(mensagens, len(mensagens) - 1)
 
     async def _laco(self, mensagens: list[dict], inicio: int) -> Resposta:
-        agiu = False
         for _ in range(self._max_rodadas):
             await self._eventos.estado(Estado.PENSANDO)
             try:
@@ -112,10 +111,10 @@ class Agente:
                 return self._concluir(mensagens, inicio, f"Não consegui falar com o modelo local: {erro}.")
             if not resposta.chamadas:
                 fala = mensagens[inicio]["content"]
+                agiu = any(m["role"] == "tool" for m in mensagens[inicio:])
                 if not agiu and _CITA_O_CLAUDE.search(fala) and "pedir_ao_claude" in self._registro.nomes():
                     return await self._delegar_ao_claude(mensagens, inicio, fala)
                 return self._concluir(mensagens, inicio, resposta.texto or _ultimo_resultado(mensagens) or "Pronto.")
-            agiu = True
 
             mensagens.append(resposta.mensagem)
             for chamada in resposta.chamadas:

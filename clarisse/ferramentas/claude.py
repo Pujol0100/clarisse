@@ -50,6 +50,17 @@ class Delegacoes:
         await asyncio.gather(*self._tarefas)
 
 
+def _embutidas(ferramentas: list[str]) -> list[str]:
+    """--allowedTools só pré-aprova; o que o Claude usa sem pedir (como SendMessage) só some com --tools.
+
+    Conectores (mcp__) não são embutidos, mas só carregam pela ToolSearch.
+    """
+    embutidas = [f for f in ferramentas if not f.startswith("mcp__")]
+    if len(embutidas) < len(ferramentas):
+        embutidas.append("ToolSearch")
+    return embutidas
+
+
 async def rodar_claude(
     executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float, teto_usd: float
 ) -> str:
@@ -63,6 +74,7 @@ async def rodar_claude(
             "--max-budget-usd", str(teto_usd),
             "--append-system-prompt", _PARA_VOZ,
             "--allowedTools", ",".join(ferramentas),
+            "--tools", ",".join(_embutidas(ferramentas)),
         ],
         pasta=pasta,
         timeout=timeout,

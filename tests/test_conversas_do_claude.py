@@ -51,6 +51,7 @@ async def test_entrega_a_mensagem_na_conversa_pelo_nome_sem_diferenciar_caixa(ma
     assert enviar[:2] == ["claude", "-p"]
     assert "Clarisse" in enviar[2] and "O tempo já está funcionando, obrigado" in enviar[2]
     assert _valor(enviar, "--allowedTools") == "SendMessage,ListAgents"
+    assert _valor(enviar, "--tools") == "SendMessage,ListAgents"
     assert "Clarisse" in resposta
 
 
