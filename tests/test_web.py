@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -332,3 +333,26 @@ def test_cada_troca_fica_registrada_na_conversa_local(logado, partes, tmp_path):
     assert registro["fala"] == "cria uma tarefa às 15h"
     assert registro["resposta"] == "Vou criar na sua agenda: teste, 15h. Confirma?"
     assert registro["aguardando_confirmacao"] is True
+
+
+def test_tarefas_de_fundo_rodam_enquanto_o_servidor_esta_ligado(tmp_path, pasta_web):
+    situacao = []
+
+    async def tarefa():
+        situacao.append("iniciou")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            situacao.append("encerrou")
+            raise
+
+    app = criar_app(
+        agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(), locutor=LocutorFalso(tmp_path / "a"),
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "a",
+        conversa=Auditoria(tmp_path / "c.jsonl"), tarefas_de_fundo=[tarefa],
+    )
+    with TestClient(app, base_url=ORIGEM) as cliente:
+        cliente.get("/health")
+        assert situacao == ["iniciou"]
+
+    assert situacao == ["iniciou", "encerrou"]

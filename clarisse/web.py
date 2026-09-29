@@ -1,5 +1,6 @@
 """Rotas da Clarisse, WebSocket de eventos e a portaria que protege a porta local."""
 import asyncio
+import contextlib
 import logging
 import re
 import secrets
@@ -118,8 +119,17 @@ def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[
 def criar_app(
     *, agente, eventos: Eventos, transcritor, locutor, chave: str, porta: int, pasta_web: Path, pasta_audio: Path,
     conversa: Auditoria,
+    tarefas_de_fundo: list[Callable[[], Awaitable[None]]] = (),
 ) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    @contextlib.asynccontextmanager
+    async def ciclo_de_vida(app):
+        tarefas = [asyncio.create_task(t()) for t in tarefas_de_fundo]
+        yield
+        for tarefa in tarefas:
+            tarefa.cancel()
+        await asyncio.gather(*tarefas, return_exceptions=True)
+
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=ciclo_de_vida)
     app.add_middleware(Portaria, chave=chave, porta=porta)
     app.mount("/static", StaticFiles(directory=pasta_web), name="static")
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 
+from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, manter_agendas_atualizadas
 from clarisse.agente import Agente
 from clarisse.auditoria import Auditoria
 from clarisse.config import Ajustes, Cadastros
@@ -36,7 +37,10 @@ def gravar_chave(caminho: Path, chave: str) -> None:
         arquivo.write(chave)
 
 
-def montar_registro(ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes) -> Registro:
+def montar_registro(
+    ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
+    apos_mudar_agenda=None,
+) -> Registro:
     registro = Registro()
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor),
@@ -47,6 +51,7 @@ def montar_registro(ajustes: Ajustes, cadastros: Cadastros, executor, http: http
             modelo=ajustes.claude_modelo,
             timeout=ajustes.claude_timeout,
             teto_usd=ajustes.claude_teto_usd,
+            apos_mudar_agenda=apos_mudar_agenda,
         ),
         *ferramentas_de_noticias(http),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
@@ -64,7 +69,15 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     locutor = Locutor(ajustes.pasta_dados / "audio", voz=ajustes.voz, velocidade=ajustes.voz_velocidade)
     delegacoes = Delegacoes(criar_avisador(eventos, locutor))
     http_externo = httpx.AsyncClient()
-    registro = montar_registro(ajustes, cadastros, Executor(), http_externo, delegacoes)
+    executor = Executor()
+
+    async def atualizar_agenda_do_linux():
+        await atualizar_agendas(executor, agendas_do_microsoft365())
+
+    async def manter_agenda_do_linux():
+        await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
+
+    registro = montar_registro(ajustes, cadastros, executor, http_externo, delegacoes, apos_mudar_agenda=atualizar_agenda_do_linux)
     modelo = ClienteOllama(httpx.AsyncClient(base_url=ajustes.ollama_url), ajustes.modelo)
     agente = Agente(
         modelo, registro, eventos, Auditoria(ajustes.pasta_dados / "auditoria.jsonl"),
@@ -79,4 +92,5 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
+        tarefas_de_fundo=[manter_agenda_do_linux],
     )

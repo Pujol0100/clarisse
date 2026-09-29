@@ -89,6 +89,7 @@ def ferramentas_do_claude(
     timeout: float,
     teto_usd: float,
     agora: Callable[[], datetime] = datetime.now,
+    apos_mudar_agenda: Callable[[], Awaitable[None]] | None = None,
 ) -> list[Ferramenta]:
     ArgsNaTela = create_model(
         "ArgsNaTela",
@@ -147,7 +148,10 @@ def ferramentas_do_claude(
             f"'{args.titulo}' para {args.quando}, com uma hora de duração se nada for dito. "
             "Confirme a data e a hora que ficaram."
         )
-        return await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
+        resultado = await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
+        if apos_mudar_agenda:
+            await apos_mudar_agenda()
+        return resultado
 
     def confirmar_compromisso(args: ArgsCompromisso) -> str:
         return f"Vou criar na sua agenda: {args.titulo}, {args.quando}. Confirma?"

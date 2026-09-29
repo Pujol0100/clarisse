@@ -166,3 +166,21 @@ async def test_erro_inesperado_na_tarefa_do_claude_ainda_avisa_o_usuario(avisos)
     [(titulo, texto)] = avisos.recebidos
     assert titulo == "omni-api"
     assert "não conseguiu" in texto.lower()
+
+
+async def test_criar_compromisso_manda_o_linux_atualizar_a_agenda(cadastros, executor, delegacoes, tmp_path):
+    atualizacoes = []
+
+    async def atualizar_agenda():
+        atualizacoes.append(1)
+
+    ferramentas = {f.nome: f for f in ferramentas_do_claude(
+        cadastros, executor, delegacoes, pasta_neutra=tmp_path, modelo="sonnet", timeout=600, teto_usd=1.0,
+        apos_mudar_agenda=atualizar_agenda,
+    )}
+    executor.respostas.append(_json_do_claude("Criado."))
+    f = ferramentas["criar_compromisso"]
+
+    await f.executar(f.argumentos(titulo="Reunião", quando="amanhã às 15h"))
+
+    assert atualizacoes == [1]
