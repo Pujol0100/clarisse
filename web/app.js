@@ -207,7 +207,16 @@ function conectar() {
     const tratar = tratadores[evento.tipo];
     if (tratar) tratar(evento);
   });
-  canal.addEventListener("close", () => {
+  canal.addEventListener("close", async () => {
+    try {
+      const resposta = await fetch("/api/estado");
+      if (resposta.status === 401) {
+        location.reload();
+        return;
+      }
+    } catch {
+      /* servidor desligado: tenta de novo mais tarde */
+    }
     setTimeout(conectar, espera);
     espera = Math.min(espera * 2, 8000);
   });
