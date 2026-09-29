@@ -294,3 +294,29 @@ async def test_avisador_publica_o_aviso_e_fala_com_o_titulo(tmp_path):
     assert {"tipo": "aviso", "titulo": "omni-api", "texto": "O build passou."}.items() <= publicados[0].items()
     assert locutor.textos == ["Do omni-api: O build passou."]
     assert any(e["tipo"] == "falar" for e in publicados)
+
+
+def test_audio_gerado_exige_a_chave(logado, partes):
+    logado.post("/api/mensagem", json={"texto": "oi"})
+    anonimo = TestClient(partes[0], base_url=ORIGEM)
+
+    assert anonimo.get("/audio/" + "a" * 32 + ".mp3").status_code == 401
+
+
+def test_audio_em_pedacos_sem_tamanho_declarado_tambem_e_limitado(logado, partes):
+    _, _, transcritor, _, _ = partes
+
+    def pedacos():
+        for _ in range(11):
+            yield b"0" * (1024 * 1024)
+
+    resposta = logado.post("/api/voz", content=pedacos(), headers={"Content-Type": "audio/webm"})
+
+    assert resposta.status_code == 413
+    assert transcritor.audios == []
+
+
+def test_origem_nula_e_recusada(logado):
+    resposta = logado.post("/api/mensagem", json={"texto": "oi"}, headers={"Origin": "null"})
+
+    assert resposta.status_code == 403

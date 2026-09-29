@@ -68,3 +68,12 @@ def test_ambiente_minimo_tira_segredos(monkeypatch):
     assert not {"OPENAI_API_KEY", "GITHUB_TOKEN", "DB_PASSWORD", "AWS_SECRET_ACCESS_KEY"} & env.keys()
     assert env["HOME"] == os.environ["HOME"]
     assert "PATH" in env
+
+
+async def test_programa_executado_nao_recebe_segredos_do_ambiente(executor, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "segredo-que-nao-pode-vazar")
+
+    resultado = await executor.executar([sys.executable, "-c", "import os; print(sorted(os.environ))"])
+
+    assert "GITHUB_TOKEN" not in resultado.saida
+    assert "HOME" in resultado.saida

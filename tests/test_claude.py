@@ -152,3 +152,17 @@ async def test_tarefa_que_passa_do_teto_de_gasto_vira_aviso(montar, delegacoes, 
 
     [(_, texto)] = avisos.recebidos
     assert "teto de gasto" in texto.lower()
+
+
+async def test_erro_inesperado_na_tarefa_do_claude_ainda_avisa_o_usuario(avisos):
+    delegacoes = Delegacoes(avisos)
+
+    async def quebra():
+        raise RuntimeError("falhou no meio")
+
+    delegacoes.iniciar("omni-api", quebra())
+    await delegacoes.aguardar()
+
+    [(titulo, texto)] = avisos.recebidos
+    assert titulo == "omni-api"
+    assert "não conseguiu" in texto.lower()

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime
 
@@ -393,3 +394,28 @@ async def test_resposta_vazia_depois_da_ferramenta_fala_o_resultado_dela(novo_ag
     resposta = await novo_agente(modelo).responder("git status no omni")
 
     assert resposta.texto == "git status: limpo"
+
+
+async def test_sim_depois_de_outro_pedido_nao_executa_a_acao_antiga(novo_agente, executadas):
+    modelo = ModeloFalso(chamada("git", projeto="omni-api", operacao="pull"), texto("São 14h05."), texto("Sim o quê?"))
+    agente = novo_agente(modelo)
+    await agente.responder("atualiza o omni")
+    await agente.responder("que horas são?")
+
+    await agente.responder("sim")
+
+    assert executadas == []
+
+
+async def test_ferramenta_travada_estoura_o_tempo_e_o_agente_segue(registro, eventos, auditoria):
+    async def travada(args):
+        await asyncio.sleep(30)
+
+    registro.registrar(Ferramenta("travada", "trava", Argumentos, travada))
+    modelo = ModeloFalso(chamada("travada"), texto("Demorou demais."))
+    agente = Agente(modelo, registro, eventos, auditoria, projetos=[], timeout_da_ferramenta=0.1)
+
+    resposta = await agente.responder("trava")
+
+    assert resposta.texto == "Demorou demais."
+    assert _mensagens_de_ferramenta(modelo.recebidas[1])[0].startswith("Erro ao executar travada")
