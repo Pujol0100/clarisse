@@ -15,6 +15,7 @@ from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
 from clarisse.ferramentas.registro import Registro
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
+from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.voz import Locutor, Transcritor, carregar_whisper
 from clarisse.web import criar_app, criar_avisador
@@ -48,6 +49,7 @@ def montar_registro(ajustes: Ajustes, cadastros: Cadastros, executor, http: http
             teto_usd=ajustes.claude_teto_usd,
         ),
         *ferramentas_de_noticias(http),
+        *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
     ]
     for ferramenta in ferramentas:
         registro.registrar(ferramenta)

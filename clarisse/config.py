@@ -22,6 +22,7 @@ class Ajustes(BaseSettings):
     claude_modelo: str = "sonnet"
     claude_timeout: int = 600
     claude_teto_usd: float = 1.0
+    cidade: str | None = None
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")
     abrir_navegador: bool = True
