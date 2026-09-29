@@ -104,7 +104,8 @@ class Agente:
                 elif decisao.acao == "confirmar":
                     self._pendente = (decisao, mensagens, inicio)
                     frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
-                    return self._concluir(mensagens[inicio : inicio + 1], 0, frase, aguardando=True)
+                    espera = _mensagem_de_ferramenta(chamada.nome, "Aguardando a confirmação do usuário.")
+                    return self._concluir([*mensagens[inicio:], espera], 0, frase, aguardando=True)
                 else:
                     mensagens.append(await self._executar(decisao))
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")

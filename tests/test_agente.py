@@ -277,3 +277,17 @@ async def test_resultado_longo_de_ferramenta_e_encurtado_no_historico(novo_agent
 
     [resultado] = [m["content"] for m in modelo.recebidas[2] if m["role"] == "tool"]
     assert len(resultado) <= 400
+
+
+async def test_pergunta_de_confirmacao_fica_no_historico_depois_da_chamada(novo_agente):
+    modelo = ModeloFalso(chamada("git", projeto="omni-api", operacao="pull"), texto("ok"))
+    agente = novo_agente(modelo)
+
+    await agente.responder("atualiza o omni")
+    await agente.responder("não")
+    await agente.responder("e agora?")
+
+    papeis = [m["role"] for m in modelo.recebidas[1][1:]]
+    assert papeis == ["user", "assistant", "tool", "assistant", "user", "assistant", "user"]
+    assert modelo.recebidas[1][2]["tool_calls"][0]["function"]["name"] == "git"
+    assert modelo.recebidas[1][4]["content"] == "Vou dar pull no omni-api. Confirma?"
