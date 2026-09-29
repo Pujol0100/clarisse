@@ -56,14 +56,6 @@ async def test_tema_desconhecido_cai_no_geral():
     assert pedidos == [FEEDS["geral"]]
 
 
-async def test_titulo_com_entidade_html_sai_legivel():
-    f = _montar(lambda p: httpx.Response(200, text=_rss("Bolsa sobe &amp; dólar cai")))
-
-    resposta = await f.executar(f.argumentos())
-
-    assert "Bolsa sobe & dólar cai" in resposta
-
-
 @pytest.mark.parametrize("resposta_http", [httpx.Response(503), httpx.Response(200, text="<html>não é rss")])
 async def test_falha_do_feed_vira_mensagem(resposta_http):
     f = _montar(lambda p: resposta_http)

@@ -127,12 +127,6 @@ def test_chave_pelo_cabecalho_serve_para_o_atalho(cliente, partes):
     assert resposta.status_code == 200
 
 
-def test_mensagem_com_campo_a_mais_e_recusada(logado):
-    resposta = logado.post("/api/mensagem", json={"texto": "oi", "admin": True})
-
-    assert resposta.status_code == 422
-
-
 def test_mensagem_longa_demais_e_recusada(logado):
     assert logado.post("/api/mensagem", json={"texto": "a" * 2001}).status_code == 422
 

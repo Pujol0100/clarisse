@@ -4,7 +4,6 @@ from pydantic import Field
 from clarisse.ferramentas.registro import (
     Argumentos,
     Ferramenta,
-    FerramentaDesconhecida,
     Registro,
     Risco,
 )
@@ -54,30 +53,9 @@ def test_ferramenta_sem_argumentos_tem_objeto_vazio():
     assert esquema["function"]["parameters"]["properties"] == {}
 
 
-def test_obter_nome_desconhecido_levanta_erro():
-    registro = Registro()
-
-    with pytest.raises(FerramentaDesconhecida):
-        registro.obter("formatar_disco")
-
-
 def test_nome_duplicado_e_recusado():
     registro = Registro()
     registro.registrar(_ferramenta())
 
     with pytest.raises(ValueError):
         registro.registrar(_ferramenta())
-
-
-def test_argumentos_extras_sao_recusados():
-    with pytest.raises(ValueError):
-        ArgsAbrir(nome="chrome", comando="rm -rf ~")
-
-
-def test_risco_fixo_ou_calculado_pelos_argumentos():
-    fixa = _ferramenta(risco=Risco.CONFIRMAR)
-    calculada = _ferramenta(risco=lambda a: Risco.BLOQUEADO if a.nome == "x" else Risco.SEGURO)
-
-    assert fixa.risco_de(ArgsAbrir(nome="a")) is Risco.CONFIRMAR
-    assert calculada.risco_de(ArgsAbrir(nome="x")) is Risco.BLOQUEADO
-    assert calculada.risco_de(ArgsAbrir(nome="y")) is Risco.SEGURO

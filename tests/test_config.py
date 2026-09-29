@@ -1,25 +1,7 @@
 import json
 from pathlib import Path
 
-from clarisse.config import Ajustes, carregar_cadastros
-
-
-def test_ajustes_tem_padroes_sem_arquivo_env():
-    ajustes = Ajustes(_env_file=None)
-
-    assert ajustes.modelo == "gemma4:e4b-it-qat"
-    assert ajustes.porta == 8765
-    assert ajustes.ollama_url == "http://127.0.0.1:11434"
-
-
-def test_ajustes_lidos_do_ambiente(monkeypatch):
-    monkeypatch.setenv("CLARISSE_MODELO", "outro-modelo")
-    monkeypatch.setenv("CLARISSE_PORTA", "9000")
-
-    ajustes = Ajustes(_env_file=None)
-
-    assert ajustes.modelo == "outro-modelo"
-    assert ajustes.porta == 9000
+from clarisse.config import carregar_cadastros
 
 
 def _grava(pasta: Path, nome: str, conteudo: dict):

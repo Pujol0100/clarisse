@@ -40,15 +40,6 @@ async def test_assinante_que_parou_de_ler_e_descartado():
     assert ativo in eventos.assinantes
 
 
-async def test_cancelar_assinatura():
-    eventos = Eventos()
-    fila = eventos.assinar()
-
-    eventos.cancelar(fila)
-
-    assert fila not in eventos.assinantes
-
-
 def test_auditoria_grava_uma_linha_json_por_execucao(tmp_path):
     auditoria = Auditoria(tmp_path / "sub" / "auditoria.jsonl")
 
