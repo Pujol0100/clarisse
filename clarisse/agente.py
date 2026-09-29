@@ -135,10 +135,11 @@ class Agente:
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
 
     async def _perguntar(self, mensagens: list[dict]):
-        """Quem anuncia uma ação sem chamar a ferramenta ganha uma segunda chance, fora do histórico."""
+        """Quem anuncia uma ação, ou escreve a chamada como texto, ganha uma segunda chance, fora do histórico."""
         esquemas = self._registro.esquemas()
         resposta = await self._modelo.conversar(mensagens, esquemas)
-        if not resposta.chamadas and _ANUNCIO.search(resposta.texto):
+        escreveu_a_chamada = any(re.search(rf"\b{re.escape(nome)}\s*\(", resposta.texto) for nome in self._registro.nomes())
+        if not resposta.chamadas and (_ANUNCIO.search(resposta.texto) or escreveu_a_chamada):
             resposta = await self._modelo.conversar([*mensagens, resposta.mensagem, _CUTUCADA], esquemas)
         return resposta
 

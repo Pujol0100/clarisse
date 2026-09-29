@@ -210,7 +210,7 @@ def ferramentas_do_claude(
         ),
         Ferramenta(
             "pedir_ao_claude",
-            "Envia um pedido ao Claude, que responde em segundo plano; o resultado é falado quando fica pronto. "
+            "Envia um pedido a uma conversa NOVA do Claude, em segundo plano; o resultado é falado quando fica pronto. "
             "Use para perguntas difíceis, programação, análise e leitura de sites.",
             ArgsPedido, pedir_ao_claude, figura=CODIGO,
         ),
@@ -221,8 +221,10 @@ def ferramentas_do_claude(
         ),
         Ferramenta(
             "mandar_para_conversa_do_claude",
-            "Entrega uma mensagem numa conversa do Claude Code que JÁ ESTÁ ABERTA, pelo nome dela. "
-            "Use quando o usuário quer falar com uma aba, janela ou sessão do Claude existente. Não abre nada novo.",
+            "Escreve uma mensagem numa conversa do Claude Code que JÁ ESTÁ ABERTA, pelo nome dela: a aba do Claude "
+            "dentro do VS Code ou um terminal. Use quando o usuário pedir para escrever, digitar, falar ou mandar algo "
+            "na aba, janela ou conversa do Claude que já está aberta, por exemplo 'vai no VS Code na aba da Clarisse e "
+            "digita obrigado'. Não abre nada novo.",
             ArgsMensagem, mandar_para_conversa_do_claude,
             risco=Risco.CONFIRMAR, descrever=confirmar_mensagem, figura=MENSAGEM,
         ),

@@ -473,3 +473,16 @@ async def test_conversa_sem_ferramenta_nao_tem_figura(novo_agente):
     resposta = await novo_agente(ModeloFalso(texto("Oi!"))).responder("oi")
 
     assert resposta.figura is None
+
+
+async def test_chamada_escrita_como_texto_ganha_segunda_chance(novo_agente, executadas):
+    modelo = ModeloFalso(
+        texto('git(projeto="omni-api", operacao="status")'),
+        chamada("git", projeto="omni-api", operacao="status"),
+        texto("Está limpo."),
+    )
+
+    resposta = await novo_agente(modelo).responder("git status no omni")
+
+    assert executadas == [("git", "status")]
+    assert resposta.texto == "Está limpo."
