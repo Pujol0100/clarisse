@@ -152,13 +152,15 @@ def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) 
         ),
         Ferramenta(
             "digitar_texto",
-            "Escreve um texto numa janela que já está aberta, onde o cursor estiver, como se o usuário digitasse. "
+            "Escreve um texto em qualquer programa aberto (terminal, Sublime, WhatsApp, navegador, editor), "
+            "onde o cursor estiver, como se o usuário digitasse. No terminal só escreve o comando, não executa. "
             "Não aperta Enter. Não serve para conversas do Claude Code: para elas há outra ferramenta.",
             ArgsDigitar, digitar_texto, risco=Risco.CONFIRMAR, descrever=confirmar_digitar,
         ),
         Ferramenta(
             "apertar_atalho",
-            "Aperta um atalho de teclado numa janela aberta, ou na janela da frente se o usuário não disser qual.",
+            "Aperta um atalho de teclado: salvar, desfazer, copiar, colar, enter, esc, trocar de janela, "
+            "abrir ou fechar aba, fechar janela. Se o usuário não disser o programa, vale para a janela da frente.",
             ArgsAtalho, apertar_atalho, risco=risco_do_atalho, descrever=confirmar_atalho,
         ),
     ]
