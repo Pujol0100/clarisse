@@ -11,4 +11,9 @@ if [[ -z "$pids" ]]; then
 fi
 
 kill $pids
-echo "Clarisse desligada."
+for _ in $(seq 1 50); do
+  ss -ltnH "sport = :${porta}" | grep -q . || { echo "Clarisse desligada."; exit 0; }
+  sleep 0.2
+done
+echo "A Clarisse não fechou em 10 segundos." >&2
+exit 1
