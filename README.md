@@ -26,7 +26,7 @@ e de ritmo quando ouve, pensa, faz e fala.
 | "me dá as notícias de economia" | Lê as manchetes do g1 |
 | "vai chover amanhã?", "como está o tempo em São Paulo?" | Previsão pelo Open-Meteo, em °C e km/h; sem cidade, usa a sua (`CLARISSE_CIDADE`) |
 | "o que eu tenho na agenda hoje?" | Pergunta ao Claude, que lê o seu calendário do Microsoft 365 |
-| "marca uma reunião com o João amanhã às três" | Pede confirmação e cria pelo Claude |
+| "marca uma reunião com o João amanhã às três" | Pede confirmação e cria pelo Claude; o calendário do Linux é atualizado na hora |
 | "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
 | "pergunta pro Claude por que o build quebra" | Manda para o Claude em segundo plano e fala a resposta quando chega |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
@@ -105,6 +105,13 @@ clique em qualquer lugar da página e autorize o microfone.
 
 Ajustes (modelo, voz, velocidade, cidade para a previsão do tempo, teto de gasto do
 Claude) ficam em `.env`; veja `.env.example`.
+
+### Calendário do Linux
+
+O calendário do GNOME é uma cópia da agenda do Outlook, e sozinho ele quase não
+atualiza (em 29/09/2026 ficou duas horas parado). Enquanto está ligada, a
+Clarisse pede ao Linux que busque as mudanças a cada 5 minutos
+(`CLARISSE_AGENDA_INTERVALO_MINUTOS`) e logo depois de criar um compromisso.
 
 ## Testes
 
