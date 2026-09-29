@@ -23,6 +23,8 @@ CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 # Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
 PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
+# Palavras que a transcrição erra sem dica: "git" virou "G de" na medição de 29/09/2026.
+VOCABULARIO_FALADO = ["Clarisse", "Claude", "git", "git status", "git pull", "VS Code"]
 
 
 def gravar_chave(caminho: Path, chave: str) -> None:
@@ -68,7 +70,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     )
     transcritor = Transcritor(
         carregar=lambda: carregar_whisper(ajustes.whisper_modelo, ajustes.whisper_dispositivo),
-        dicas=list(cadastros.projetos),
+        dicas=[*cadastros.projetos, *VOCABULARIO_FALADO],
     )
     return criar_app(
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
