@@ -1,39 +1,68 @@
 # Segurança — Clarisse
 
-Metodologia: requisitos AppSec da Smart Compass (skill auditoria-seguranca).
-Atualizado em: 28/09/2026
+Metodologia: requisitos AppSec da Smart Compass (skill auditoria-seguranca), 23 itens.
+Atualizado em: 29/09/2026
 
 A Clarisse é uma aplicação local de um usuário só. Ela não tem banco, cadastro nem
 login de pessoas, mas abre uma porta em `127.0.0.1` que **executa ações na
-máquina**. O risco central é outro programa — em especial uma página aberta no
-navegador — mandar pedidos para essa porta. Os itens abaixo foram lidos com isso
-em mente.
+máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
+
+1. outro programa — em especial uma página aberta no navegador — mandar pedidos
+   para essa porta;
+2. o modelo pedir uma ação errada, por erro de transcrição, de entendimento ou por
+   texto malicioso vindo de fora (uma manchete, a saída de um comando).
 
 | # | Requisito | Situação | Onde / motivo |
 |---|-----------|----------|---------------|
-| 1 | Esconder API Keys | pendente | |
-| 2 | Limpar secrets do Git | pendente | |
-| 3 | Public Key DB (chaves públicas vs. privadas de banco) | não se aplica | sem banco de dados |
-| 4 | Ativar RLS (Row Level Security) | não se aplica | sem banco e sem múltiplos usuários |
-| 5 | Criptografia de dados | pendente | |
-| 6 | Auth server-side | pendente | |
-| 7 | Restringir acessos (authorization / IDOR) | pendente | |
-| 8 | Bloquear Mass Assignment | pendente | |
-| 9 | Proteger Cookies | pendente | |
-| 10 | Hash nas Senhas | não se aplica | a aplicação não guarda senha |
-| 11 | Rate Limit | pendente | |
-| 12 | Bot protection | pendente | |
-| 13 | Queries parametrizadas | pendente | |
-| 14 | Validação de inputs | pendente | |
-| 15 | Vazar conteúdo (data leakage) | pendente | |
-| 16 | Restringir uploads | pendente | |
-| 17 | Trim respostas de API (over-fetching) | pendente | |
-| 18 | Add security headers | pendente | |
-| 19 | Forçar HTTPS | pendente | |
-| 20 | Scan de dependências | pendente | |
-| 21 | Código de origem open source (procedência e risco de supply chain) | pendente | |
+| 1 | Esconder API Keys | feito | A aplicação não usa chave de API: o Ollama é local e o Claude usa o login do próprio CLI. `.gitignore` cobre `.env*` (exceto `.env.example`, que só tem nomes e padrões não sensíveis) e `config/*.json` pessoais |
+| 2 | Limpar secrets do Git | feito | gitleaks no CI (`.github/workflows/ci.yml`). Varredura de 29/09/2026 em todo o histórico: 2 achados, ambos o texto de teste `token: abc123xyz789` do filtro de segredos antigo, registrados em `.gitleaksignore` |
+| 3 | Public Key DB (chaves públicas vs. privadas de banco) | não se aplica | Sem banco de dados |
+| 4 | Ativar RLS (Row Level Security) | não se aplica | Sem banco e sem múltiplos usuários |
+| 5 | Criptografia de dados | feito | A chave de sessão vem de `secrets.token_urlsafe(32)` (`clarisse/montagem.py`) e é comparada em tempo constante (`secrets.compare_digest`, `clarisse/web.py`). Chamadas externas (g1, Microsoft, Anthropic) em HTTPS com verificação de certificado padrão. Nada sensível guardado em repouso além da auditoria local |
+| 6 | Auth server-side | feito | `Portaria` em `clarisse/web.py`: toda rota `/api/*`, `/audio/*` e o WebSocket exigem a chave da sessão (cookie ou cabeçalho `X-Clarisse-Chave`). A chave nasce a cada início e é gravada em `~/.config/clarisse/chave` com permissão 600 para o script do atalho |
+| 7 | Restringir acessos (authorization / IDOR) | feito | Um usuário só. Documentação automática do FastAPI desligada (`docs_url=None`, `openapi_url=None`). Áudio servido só com nome gerado pelo sistema (32 hexadecimais + `.mp3`) |
+| 8 | Bloquear Mass Assignment | feito | Entrada da API e argumentos de ferramenta em modelos Pydantic com `extra="forbid"` (`clarisse/web.py`, `clarisse/ferramentas/registro.py`) |
+| 9 | Proteger Cookies | parcial | Cookie `HttpOnly; SameSite=Strict; Path=/`, sem `Domain`. **Sem `Secure`**: a página é servida em `http://127.0.0.1`, que nunca sai da máquina. CSRF barrado por `SameSite=Strict` mais a conferência do `Origin` |
+| 10 | Hash nas Senhas | não se aplica | A aplicação não guarda senha |
+| 11 | Rate Limit | feito | Um pedido por vez (trava no agente, `clarisse/agente.py`); áudio limitado a 10 MB (`clarisse/web.py`); resposta do modelo local limitada a 400 tokens (`clarisse/llm.py`); cada tarefa do Claude com teto de US$ 1,00 (`--max-budget-usd`) e 10 minutos |
+| 12 | Bot protection | não se aplica | Nada exposto à internet; a porta só aceita Host `127.0.0.1`/`localhost` |
+| 13 | Queries parametrizadas | feito | Sem SQL. Toda execução de programa passa por `clarisse/ferramentas/processos.py`: lista de argumentos, nunca shell, com teste de injeção. Pasta aberta só dentro da home (caminho resolvido e conferido); site só `http`/`https`; notícias só de feeds fixos (sem SSRF) |
+| 14 | Validação de inputs | feito | Pydantic com tamanho máximo em todo texto; enum/faixa em operação git e volume; tipo de conteúdo `audio/*` exigido; tela usa `textContent`, nunca `innerHTML` (`web/app.js`) |
+| 15 | Vazar conteúdo (data leakage) | feito | Erros viram mensagem curta ao usuário; o detalhe vai para o log do terminal. Ambiente mínimo nos programas executados: variáveis com `KEY`, `TOKEN`, `SECRET`, `PASSWORD` não são repassadas. Logs, áudio e auditoria em `dados/`, fora do git |
+| 16 | Restringir uploads | feito | O único envio é o áudio do microfone: `audio/*`, até 10 MB, lido em memória e nunca gravado com nome do cliente |
+| 17 | Trim respostas de API (over-fetching) | feito | Respostas montadas campo a campo em `clarisse/web.py` |
+| 18 | Add security headers | feito | CSP sem `unsafe-inline`/`unsafe-eval` com `frame-ancestors 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (só microfone), `Cache-Control: no-store` — `Portaria` em `clarisse/web.py`. Sem CORS: só a própria origem |
+| 19 | Forçar HTTPS | não se aplica | Servidor só em `127.0.0.1`; o tráfego não sai da máquina. Chamadas externas já são HTTPS |
+| 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
+| 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache, exceto `edge-tts`, **LGPL-3.0**, usada como biblioteca sem modificação — leitura técnica; a decisão final é do jurídico |
+| 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração). Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
+| 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Sem servidor MCP |
+
+## O que o risco central exigiu
+
+- **Host** tem que ser `127.0.0.1:8765` ou `localhost:8765`: bloqueia DNS rebinding.
+- **Origin**, quando vem, tem que ser a própria página: bloqueia site de terceiro.
+- **Chave de sessão** em cookie `SameSite=Strict`: um site de terceiro não consegue
+  enviá-la.
+- **Parar e confirmar** são decididos por palavra, antes do modelo.
+- **O Claude em segundo plano** roda só com ferramentas de leitura
+  (`Read`, `Grep`, `Glob`, `WebSearch`, `WebFetch`) e numa pasta fora de qualquer
+  repositório; o Claude aberto na tela pede as próprias permissões.
+
+## Riscos aceitos
+
+- **Texto da resposta vai para a Microsoft** (voz do edge-tts), e o pedido
+  delegado vai para a Anthropic. Não use a Clarisse para ditar dado sensível de
+  cliente enquanto a voz não for 100% local.
+- **Qualquer programa rodando como o seu usuário** consegue ler a chave em
+  `~/.config/clarisse/chave` — o mesmo programa já poderia executar comandos
+  sozinho, então a chave não protege contra ele.
+- **Injeção por texto externo** (manchete, saída de git) pode tentar induzir o
+  modelo; o dano possível fica limitado às ferramentas seguras, e as que alteram
+  algo pedem confirmação.
 
 ## Código de terceiros copiado
 
 | Componente | Origem | Versão | Licença | Modificado? |
 |---|---|---|---|---|
+| Fonte Atkinson Hyperlegible Next (subconjunto latin, `web/fontes/`) | Google Fonts (Braille Institute) | v7, baixada em 29/09/2026 | SIL Open Font License 1.1 | Não |
