@@ -161,8 +161,8 @@ def ferramentas_do_claude(
         ),
         Ferramenta(
             "pedir_ao_claude",
-            "Delega ao Claude, em segundo plano, uma tarefa complexa ou pergunta difícil: programação, análise, "
-            "leitura de sites e dashboards, conhecimento que exige precisão. O resultado é falado quando ficar pronto.",
+            "Envia um pedido ao Claude, que responde em segundo plano; o resultado é falado quando fica pronto. "
+            "Use para perguntas difíceis, programação, análise e leitura de sites.",
             ArgsPedido, pedir_ao_claude,
         ),
         Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda),

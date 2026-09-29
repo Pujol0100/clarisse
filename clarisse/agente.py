@@ -1,6 +1,7 @@
 """O laço da Clarisse: fala → modelo → segurança → ferramenta → modelo → resposta."""
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,6 +18,13 @@ log = logging.getLogger(__name__)
 
 _CONVERSAS_LEMBRADAS = 4
 _LIMITE_DO_RESULTADO_LEMBRADO = 300
+_ANUNCIO = re.compile(r"\b(vou|irei|vamos)\b", re.IGNORECASE)
+_CITA_O_CLAUDE = re.compile(r"\bclaude\b", re.IGNORECASE)
+_CUTUCADA = {
+    "role": "user",
+    "content": "Você disse que ia fazer isso, mas não chamou nenhuma ferramenta. "
+    "Chame a ferramenta agora, ou diga em uma frase por que não pode.",
+}
 
 
 def prompt_do_sistema(projetos: list[str], agora: datetime) -> str:
@@ -26,6 +34,7 @@ Responda sempre em português do Brasil, em no máximo duas frases curtas, porqu
 Quando o pedido exigir uma ação ou uma informação do mundo real, chame a ferramenta adequada. Nunca invente o resultado de uma ferramenta e nunca diga que fez algo sem ter chamado a ferramenta.
 Para conversa, contas simples ou conhecimento geral, responda direto, sem ferramenta.
 Tarefas complexas de programação, análise, leitura de sites ou agenda vão para o Claude.
+Quando o usuário mencionar o Claude, chame pedir_ao_claude (ou abrir_claude_na_tela, se ele quiser ver o Claude trabalhando) na mesma hora. Nunca responda que vai pedir ao Claude sem chamar a ferramenta.
 Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usuário disse. O sistema confirma sozinho as ações arriscadas.
 Projetos cadastrados: {", ".join(projetos) or "nenhum"}. A transcrição de voz pode errar o nome; escolha o projeto cadastrado mais parecido."""
 
@@ -86,15 +95,20 @@ class Agente:
             return await self._laco(mensagens, len(mensagens) - 1)
 
     async def _laco(self, mensagens: list[dict], inicio: int) -> Resposta:
+        agiu = False
         for _ in range(self._max_rodadas):
             await self._eventos.estado(Estado.PENSANDO)
             try:
-                resposta = await self._modelo.conversar(mensagens, self._registro.esquemas())
+                resposta = await self._perguntar(mensagens)
             except ErroDoModelo as erro:
                 log.warning("modelo local falhou: %s", erro)
                 return self._concluir(mensagens, inicio, f"Não consegui falar com o modelo local: {erro}.")
             if not resposta.chamadas:
+                fala = mensagens[inicio]["content"]
+                if not agiu and _CITA_O_CLAUDE.search(fala) and "pedir_ao_claude" in self._registro.nomes():
+                    return await self._delegar_ao_claude(mensagens, inicio, fala)
                 return self._concluir(mensagens, inicio, resposta.texto or "Pronto.")
+            agiu = True
 
             mensagens.append(resposta.mensagem)
             for chamada in resposta.chamadas:
@@ -109,6 +123,25 @@ class Agente:
                 else:
                     mensagens.append(await self._executar(decisao))
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
+
+    async def _perguntar(self, mensagens: list[dict]):
+        """Quem anuncia uma ação sem chamar a ferramenta ganha uma segunda chance, fora do histórico."""
+        esquemas = self._registro.esquemas()
+        resposta = await self._modelo.conversar(mensagens, esquemas)
+        if not resposta.chamadas and _ANUNCIO.search(resposta.texto):
+            resposta = await self._modelo.conversar([*mensagens, resposta.mensagem, _CUTUCADA], esquemas)
+        return resposta
+
+    async def _delegar_ao_claude(self, mensagens: list[dict], inicio: int, fala: str) -> Resposta:
+        """O usuário citou o Claude e o modelo não chamou nada: a frase dele vai inteira para o Claude."""
+        argumentos = {"pedido": fala}
+        decisao = avaliar(self._registro, "pedir_ao_claude", argumentos)
+        if decisao.acao != "executar":
+            return self._concluir(mensagens, inicio, f"Não consegui passar o pedido ao Claude: {decisao.motivo}.")
+        chamada = {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "pedir_ao_claude", "arguments": argumentos}}]}
+        resultado = await self._executar(decisao)
+        mensagens += [chamada, resultado]
+        return self._concluir(mensagens, inicio, resultado["content"])
 
     async def _executar(self, decisao: Decisao) -> dict:
         nome = decisao.ferramenta.nome

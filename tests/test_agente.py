@@ -291,3 +291,97 @@ async def test_pergunta_de_confirmacao_fica_no_historico_depois_da_chamada(novo_
     assert papeis == ["user", "assistant", "tool", "assistant", "user", "assistant", "user"]
     assert modelo.recebidas[1][2]["tool_calls"][0]["function"]["name"] == "git"
     assert modelo.recebidas[1][4]["content"] == "Vou dar pull no omni-api. Confirma?"
+
+
+class ArgsPedido(Argumentos):
+    pedido: str
+
+
+@pytest.fixture
+def pedidos_ao_claude(registro):
+    recebidos = []
+
+    async def pedir(args):
+        recebidos.append(args.pedido)
+        return "Pedi ao Claude. Aviso quando ele terminar."
+
+    registro.registrar(Ferramenta("pedir_ao_claude", "Claude", ArgsPedido, pedir))
+    return recebidos
+
+
+async def test_anunciar_sem_chamar_ganha_segunda_chance(novo_agente, executadas):
+    modelo = ModeloFalso(
+        texto("Vou rodar o git status no omni-api."),
+        chamada("git", projeto="omni-api", operacao="status"),
+        texto("Está limpo."),
+    )
+
+    resposta = await novo_agente(modelo).responder("git status no omni")
+
+    assert executadas == [("git", "status")]
+    assert resposta.texto == "Está limpo."
+    cutucada = modelo.recebidas[1][-1]
+    assert cutucada["role"] == "user" and "não chamou" in cutucada["content"]
+
+
+async def test_a_cutucada_nao_fica_no_historico(novo_agente):
+    modelo = ModeloFalso(
+        texto("Vou rodar o git status."),
+        chamada("git", projeto="omni-api", operacao="status"),
+        texto("Está limpo."),
+        texto("ok"),
+    )
+    agente = novo_agente(modelo)
+
+    await agente.responder("git status no omni")
+    await agente.responder("e agora?")
+
+    conteudos = [m.get("content") or "" for m in modelo.recebidas[3]]
+    assert not any("não chamou" in c for c in conteudos)
+    assert not any(c.startswith("Vou rodar") for c in conteudos)
+
+
+async def test_segunda_chance_so_uma_vez(novo_agente):
+    modelo = ModeloFalso(texto("Vou fazer."), texto("Vou fazer mesmo."))
+
+    resposta = await novo_agente(modelo).responder("faz aquilo")
+
+    assert len(modelo.recebidas) == 2
+    assert resposta.texto == "Vou fazer mesmo."
+
+
+async def test_resposta_sem_anuncio_nao_e_cutucada(novo_agente):
+    modelo = ModeloFalso(texto("De nada!"))
+
+    await novo_agente(modelo).responder("obrigado")
+
+    assert len(modelo.recebidas) == 1
+
+
+async def test_pedido_que_cita_o_claude_chega_ao_claude_mesmo_se_o_modelo_nao_chamar(novo_agente, pedidos_ao_claude):
+    modelo = ModeloFalso(texto("Vou pedir ao Claude."), texto("Vou pedir ao Claude, pode deixar."))
+
+    resposta = await novo_agente(modelo).responder("manda o Claude explicar REST e GraphQL")
+
+    assert pedidos_ao_claude == ["manda o Claude explicar REST e GraphQL"]
+    assert resposta.texto == "Pedi ao Claude. Aviso quando ele terminar."
+
+
+async def test_pedido_sem_claude_nao_e_desviado_para_o_claude(novo_agente, pedidos_ao_claude):
+    modelo = ModeloFalso(texto("Vou ver."), texto("Vou ver mesmo."))
+
+    await novo_agente(modelo).responder("explica REST e GraphQL")
+
+    assert pedidos_ao_claude == []
+
+
+async def test_garantia_do_claude_nao_duplica_quando_o_modelo_ja_chamou(novo_agente, pedidos_ao_claude):
+    modelo = ModeloFalso(
+        RespostaDoModelo("", [ChamadaDeFerramenta("pedir_ao_claude", {"pedido": "explicar REST"})],
+                         {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "pedir_ao_claude", "arguments": {"pedido": "explicar REST"}}}]}),
+        texto("Pronto, pedi ao Claude."),
+    )
+
+    await novo_agente(modelo).responder("pede pro Claude explicar REST")
+
+    assert pedidos_ao_claude == ["explicar REST"]
