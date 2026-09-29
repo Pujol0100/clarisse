@@ -15,7 +15,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | # | Requisito | Situação | Onde / motivo |
 |---|-----------|----------|---------------|
 | 1 | Esconder API Keys | feito | A aplicação não usa chave de API: o Ollama é local e o Claude usa o login do próprio CLI. `.gitignore` cobre `.env*` (exceto `.env.example`, que só tem nomes e padrões não sensíveis) e `config/*.json` pessoais |
-| 2 | Limpar secrets do Git | feito | gitleaks no CI (`.github/workflows/ci.yml`). Varredura de 29/09/2026 em todo o histórico: 2 achados, ambos o texto de teste `token: abc123xyz789` do filtro de segredos antigo, registrados em `.gitleaksignore` |
+| 2 | Limpar secrets do Git | feito | gitleaks no CI (`.github/workflows/ci.yml`). Varredura de 29/09/2026 em todo o histórico: 2 achados, ambos o mesmo token falso usado como exemplo nos testes do filtro de segredos antigo, registrados em `.gitleaksignore` (junto com a primeira versão deste arquivo, que citava o exemplo) |
 | 3 | Public Key DB (chaves públicas vs. privadas de banco) | não se aplica | Sem banco de dados |
 | 4 | Ativar RLS (Row Level Security) | não se aplica | Sem banco e sem múltiplos usuários |
 | 5 | Criptografia de dados | feito | A chave de sessão vem de `secrets.token_urlsafe(32)` (`clarisse/montagem.py`) e é comparada em tempo constante (`secrets.compare_digest`, `clarisse/web.py`). Chamadas externas (g1, Microsoft, Anthropic) em HTTPS com verificação de certificado padrão. Nada sensível guardado em repouso além da auditoria local |
