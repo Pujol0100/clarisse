@@ -33,6 +33,10 @@ figura é o sistema, pela ferramenta usada e pelo dado, nunca o modelo.
 | "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
 | "pergunta pro Claude por que o build quebra" | Manda para o Claude em segundo plano e fala a resposta quando chega |
 | "manda pra conversa omni do Claude: roda os testes de novo" | Pede confirmação e entrega a mensagem numa conversa do Claude **já aberta** (dê nome à conversa com `/rename`) |
+| "vê no navegador quanto está o dólar hoje" | Pede confirmação e manda um Claude que só enxerga o navegador (Playwright, janela visível); ele lê e navega, mas não envia formulário, não compra e não altera nada |
+| "traz o VS Code pra frente", "coloca o WhatsApp na frente" | Traz para a frente uma janela já aberta, sem abrir outra |
+| "escreve bom dia equipe no WhatsApp" | Pede confirmação, traz a janela e cola o texto onde o cursor estiver; não aperta Enter |
+| "salva", "aperta enter", "desfaz", "fecha essa aba" | Aperta o atalho na janela pedida ou na da frente; fechar aba ou janela pede confirmação |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
 
 Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer
@@ -70,6 +74,9 @@ As escolhas foram medidas, não supostas:
 - Placa de vídeo com pelo menos 6 GB é recomendada; a transcrição roda no processador.
 - Claude Code instalado e logado, para as tarefas delegadas ao Claude.
 - Chrome ou Firefox, para a tela e o microfone.
+- Node.js (`npx`), para as tarefas no navegador.
+- Para mexer nas janelas: a extensão [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
+  do GNOME e o teclado virtual (`scripts/instalar-teclado-virtual.sh`).
 
 ## Instalação
 
@@ -91,7 +98,16 @@ Opcional, uma vez só:
 ```bash
 scripts/instalar-no-menu.sh    # põe a Clarisse no menu de aplicativos
 scripts/instalar-atalho.sh     # Ctrl+Alt+C liga e desliga o microfone, com qualquer janela na frente
+scripts/instalar-teclado-virtual.sh   # ydotool e wl-clipboard, para colar texto e apertar atalhos (pede senha)
 ```
+
+O teclado virtual precisa de permissão no `/dev/uinput`. O script dá essa permissão
+só a quem está usando a máquina, sem pôr o usuário no grupo `input`, que também
+lê tudo o que é digitado no teclado de verdade.
+
+O texto entra **colado**, não digitado letra por letra: o `ydotool` digita como
+teclado americano e, no ABNT2, perderia os acentos e trocaria símbolos. Por isso
+o texto colado fica na área de transferência depois.
 
 ## Uso
 
@@ -138,8 +154,10 @@ Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
 
 - Acordar com a palavra "Clarisse" (em agosto nenhum motor gratuito acertou isso em
   português; fica para uma medição nova).
-- Mandar mensagem no WhatsApp (não existe API oficial para conta pessoal).
-- Clicar em telas de outros programas (limitado no Wayland).
+- Escolher o contato no WhatsApp: ela cola o texto na conversa que estiver aberta
+  (não existe API oficial para conta pessoal).
+- Clicar com o mouse em outros programas: ela traz janelas, cola texto e aperta
+  atalhos, mas não clica.
 - Voz 100% offline.
 
 ## Licença

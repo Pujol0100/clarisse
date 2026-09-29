@@ -1,7 +1,10 @@
+import json
+import re
 import stat
 
 import httpx
 
+from clarisse import montagem
 from clarisse.config import Ajustes
 from clarisse.ferramentas.claude import Delegacoes
 from clarisse.montagem import gravar_chave, montar_registro
@@ -35,3 +38,12 @@ def test_chave_gravada_so_para_o_dono(tmp_path):
 
     assert caminho.read_text() == "outra-sessao"
     assert stat.S_IMODE(caminho.stat().st_mode) == 0o600
+
+
+def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
+    monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
+
+    config = json.loads(montagem._config_do_navegador().read_text())
+
+    pacote = config["mcpServers"]["playwright"]["args"][-1]
+    assert re.fullmatch(r"@playwright/mcp@\d+\.\d+\.\d+", pacote)

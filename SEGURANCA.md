@@ -36,7 +36,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
 | 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache, exceto `edge-tts`, **LGPL-3.0**, usada como biblioteca sem modificação — leitura técnica; a decisão final é do jurídico |
 | 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração), e cada troca da conversa uma linha em `dados/conversa.jsonl`. Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
-| 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Sem servidor MCP |
+| 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Único servidor MCP: o Playwright (`@playwright/mcp`, versão fixa 0.0.83, Apache-2.0), usado só pelo Claude das tarefas no navegador, com `--strict-mcp-config` e `--tools` restrito; a ferramenta pede confirmação e o pedido leva a regra de não enviar, comprar, apagar nem alterar nada |
 
 ## O que o risco central exigiu
 
@@ -54,6 +54,12 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   pede permissão. Com `--tools` ele nem enxerga a ferramenta (testado).
 - **Mensagem para uma conversa aberta** pede confirmação, e quem recebe a trata
   como vinda de outra sessão, não como aprovação do usuário.
+- **Teclado virtual** (`ydotool`): o `/dev/uinput` é liberado por `TAG+="uaccess"`
+  só para quem está na sessão, **sem o grupo `input`**, que daria leitura de tudo o
+  que é digitado no teclado de verdade (`scripts/instalar-teclado-virtual.sh`).
+- **Não existe ferramenta de tecla livre.** Colar texto pede confirmação mostrando o
+  texto e a janela, e não aperta Enter; os atalhos são uma lista fechada
+  (`clarisse/ferramentas/janelas.py`), e fechar aba ou janela pede confirmação.
 
 ## Riscos aceitos
 
@@ -63,6 +69,13 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **Qualquer programa rodando como o seu usuário** consegue ler a chave em
   `~/.config/clarisse/chave` — o mesmo programa já poderia executar comandos
   sozinho, então a chave não protege contra ele.
+- **Qualquer programa da sua sessão consegue simular teclado** pelo
+  `/dev/uinput` depois da instalação, inclusive digitar num terminal. O mesmo
+  programa já poderia executar comandos sozinho, então o risco novo é pequeno; o
+  que se evitou foi o grupo `input`, que abriria a leitura do teclado.
+- **Texto colado fica na área de transferência** e substitui o que estava lá.
+- **Janela errada:** se outra janela tomar a frente nos 0,3 s entre trazer e
+  colar, o texto vai para ela. Sem Enter, ele fica escrito e não é enviado.
 - **Injeção por texto externo** (manchete, saída de git) pode tentar induzir o
   modelo; o dano possível fica limitado às ferramentas seguras, e as que alteram
   algo pedem confirmação.

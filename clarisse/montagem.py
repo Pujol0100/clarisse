@@ -29,6 +29,8 @@ PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
 # Palavras que a transcrição erra sem dica: "git" virou "G de" na medição de 29/09/2026.
 VOCABULARIO_FALADO = ["Clarisse", "Claude", "git", "git status", "git pull", "VS Code"]
+# Versão fixa: com @latest o npx baixaria código novo sem revisão a cada tarefa.
+PLAYWRIGHT_MCP = "@playwright/mcp@0.0.83"
 
 
 def gravar_chave(caminho: Path, chave: str) -> None:
@@ -43,7 +45,7 @@ def _config_do_navegador() -> Path:
     """O Claude das tarefas no navegador só enxerga este servidor: o Playwright, com janela visível para login."""
     PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
-    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}}}))
+    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}))
     return caminho
 
 
