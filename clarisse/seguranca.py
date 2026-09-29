@@ -6,7 +6,13 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from clarisse.ferramentas.registro import Argumentos, Ferramenta, FerramentaDesconhecida, Registro, Risco
+from clarisse.ferramentas.registro import (
+    Argumentos,
+    Ferramenta,
+    FerramentaDesconhecida,
+    Registro,
+    Risco,
+)
 
 
 @dataclass

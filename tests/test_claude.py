@@ -3,7 +3,11 @@ from datetime import datetime
 
 import pytest
 
-from clarisse.ferramentas.claude import FERRAMENTAS_DE_LEITURA, Delegacoes, ferramentas_do_claude
+from clarisse.ferramentas.claude import (
+    FERRAMENTAS_DE_LEITURA,
+    Delegacoes,
+    ferramentas_do_claude,
+)
 from clarisse.ferramentas.processos import Resultado
 from clarisse.ferramentas.registro import Risco
 

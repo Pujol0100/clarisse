@@ -14,9 +14,9 @@ import uvicorn
 RAIZ = Path(__file__).resolve().parent
 os.chdir(RAIZ)
 
-from clarisse.config import Ajustes, carregar_cadastros  # noqa: E402
-from clarisse.llm import CONTEXTO  # noqa: E402
-from clarisse.montagem import montar_app  # noqa: E402
+from clarisse.config import Ajustes, carregar_cadastros
+from clarisse.llm import CONTEXTO
+from clarisse.montagem import montar_app
 
 
 def ok(texto: str) -> None:
