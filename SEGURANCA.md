@@ -26,16 +26,16 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 10 | Hash nas Senhas | não se aplica | A aplicação não guarda senha |
 | 11 | Rate Limit | feito | Um pedido por vez (trava no agente, `clarisse/agente.py`); áudio limitado a 10 MB (`clarisse/web.py`); resposta do modelo local limitada a 400 tokens (`clarisse/llm.py`); cada tarefa do Claude com teto de US$ 1,00 (`--max-budget-usd`) e 10 minutos |
 | 12 | Bot protection | não se aplica | Nada exposto à internet; a porta só aceita Host `127.0.0.1`/`localhost` |
-| 13 | Queries parametrizadas | feito | Sem SQL. Toda execução de programa passa por `clarisse/ferramentas/processos.py`: lista de argumentos, nunca shell, com teste de injeção. Pasta aberta só dentro da home (caminho resolvido e conferido); site só `http`/`https`; notícias só de feeds fixos (sem SSRF) |
+| 13 | Queries parametrizadas | feito | Sem SQL. Toda execução de programa passa por `clarisse/ferramentas/processos.py`: lista de argumentos, nunca shell, com teste de injeção. Pasta aberta só dentro da home (caminho resolvido e conferido); site só `http`/`https`; notícias só de feeds fixos e previsão só nos dois endereços fixos do Open-Meteo, com a cidade como parâmetro (sem SSRF) |
 | 14 | Validação de inputs | feito | Pydantic com tamanho máximo em todo texto; enum/faixa em operação git e volume; tipo de conteúdo `audio/*` exigido; tela usa `textContent`, nunca `innerHTML` (`web/app.js`) |
-| 15 | Vazar conteúdo (data leakage) | feito | Erros viram mensagem curta ao usuário; o detalhe vai para o log do terminal. Ambiente mínimo nos programas executados: variáveis com `KEY`, `TOKEN`, `SECRET`, `PASSWORD` não são repassadas. Logs, áudio e auditoria em `dados/`, fora do git |
+| 15 | Vazar conteúdo (data leakage) | feito | Erros viram mensagem curta ao usuário; o detalhe vai para o log do terminal. Ambiente mínimo nos programas executados: variáveis com `KEY`, `TOKEN`, `SECRET`, `PASSWORD` não são repassadas. Logs, áudio, auditoria e o registro da conversa (`dados/conversa.jsonl`, o que foi dito e respondido) em `dados/`, fora do git |
 | 16 | Restringir uploads | feito | O único envio é o áudio do microfone: `audio/*`, até 10 MB, lido em memória e nunca gravado com nome do cliente |
 | 17 | Trim respostas de API (over-fetching) | feito | Respostas montadas campo a campo em `clarisse/web.py` |
 | 18 | Add security headers | feito | CSP sem `unsafe-inline`/`unsafe-eval` com `frame-ancestors 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (só microfone), `Cache-Control: no-store` — `Portaria` em `clarisse/web.py`. Sem CORS: só a própria origem |
 | 19 | Forçar HTTPS | não se aplica | Servidor só em `127.0.0.1`; o tráfego não sai da máquina. Chamadas externas já são HTTPS |
 | 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
 | 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache, exceto `edge-tts`, **LGPL-3.0**, usada como biblioteca sem modificação — leitura técnica; a decisão final é do jurídico |
-| 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração). Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
+| 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração), e cada troca da conversa uma linha em `dados/conversa.jsonl`. Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
 | 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Sem servidor MCP |
 
 ## O que o risco central exigiu
@@ -51,8 +51,8 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 
 ## Riscos aceitos
 
-- **Texto da resposta vai para a Microsoft** (voz do edge-tts), e o pedido
-  delegado vai para a Anthropic. Não use a Clarisse para ditar dado sensível de
+- **Texto da resposta vai para a Microsoft** (voz do edge-tts), o pedido
+  delegado vai para a Anthropic, e o nome da cidade vai para o Open-Meteo. Não use a Clarisse para ditar dado sensível de
   cliente enquanto a voz não for 100% local.
 - **Qualquer programa rodando como o seu usuário** consegue ler a chave em
   `~/.config/clarisse/chave` — o mesmo programa já poderia executar comandos

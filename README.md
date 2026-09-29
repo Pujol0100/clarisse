@@ -24,6 +24,7 @@ e de ritmo quando ouve, pensa, faz e fala.
 | "abre o projeto omni api no VS Code" | Abre o projeto cadastrado no VS Code |
 | "roda um git status no omni api" | Roda e resume; `git pull` pede confirmação |
 | "me dá as notícias de economia" | Lê as manchetes do g1 |
+| "vai chover amanhã?", "como está o tempo em São Paulo?" | Previsão pelo Open-Meteo, em °C e km/h; sem cidade, usa a sua (`CLARISSE_CIDADE`) |
 | "o que eu tenho na agenda hoje?" | Pergunta ao Claude, que lê o seu calendário do Microsoft 365 |
 | "marca uma reunião com o João amanhã às três" | Pede confirmação e cria pelo Claude |
 | "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
@@ -102,8 +103,8 @@ clique em qualquer lugar da página e autorize o microfone.
 - **Escrever:** o campo de texto faz o mesmo que a voz.
 - **Desligar:** `Ctrl+C` na janela do terminal, ou `scripts/desligar.sh`.
 
-Ajustes (modelo, voz, velocidade, teto de gasto do Claude) ficam em `.env`; veja
-`.env.example`.
+Ajustes (modelo, voz, velocidade, cidade para a previsão do tempo, teto de gasto do
+Claude) ficam em `.env`; veja `.env.example`.
 
 ## Testes
 
@@ -116,7 +117,9 @@ uv run pytest
 - O modelo, a transcrição e a auditoria ficam na máquina.
 - **O texto da resposta vai para a Microsoft** para virar voz (edge-tts).
 - O que é delegado ao Claude vai para a Anthropic.
-- Logs, áudio e auditoria ficam em `dados/`, fora do git.
+- A previsão do tempo consulta o Open-Meteo (gratuito para uso pessoal, sem conta).
+- Logs, áudio, auditoria e o registro da conversa (`dados/conversa.jsonl`) ficam em
+  `dados/`, fora do git.
 
 Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
 
