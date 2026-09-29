@@ -107,7 +107,7 @@ class Agente:
                 fala = mensagens[inicio]["content"]
                 if not agiu and _CITA_O_CLAUDE.search(fala) and "pedir_ao_claude" in self._registro.nomes():
                     return await self._delegar_ao_claude(mensagens, inicio, fala)
-                return self._concluir(mensagens, inicio, resposta.texto or "Pronto.")
+                return self._concluir(mensagens, inicio, resposta.texto or _ultimo_resultado(mensagens) or "Pronto.")
             agiu = True
 
             mensagens.append(resposta.mensagem)
@@ -180,6 +180,10 @@ def _encurtar(mensagem: dict) -> dict:
     if mensagem["role"] == "tool" and len(conteudo) > _LIMITE_DO_RESULTADO_LEMBRADO:
         return {**mensagem, "content": conteudo[:_LIMITE_DO_RESULTADO_LEMBRADO] + "…"}
     return dict(mensagem)
+
+
+def _ultimo_resultado(mensagens: list[dict]) -> str:
+    return next((m["content"] for m in reversed(mensagens) if m["role"] == "tool"), "")
 
 
 def _mensagem_de_ferramenta(nome: str, conteudo: str) -> dict:

@@ -385,3 +385,11 @@ async def test_garantia_do_claude_nao_duplica_quando_o_modelo_ja_chamou(novo_age
     await novo_agente(modelo).responder("pede pro Claude explicar REST")
 
     assert pedidos_ao_claude == ["explicar REST"]
+
+
+async def test_resposta_vazia_depois_da_ferramenta_fala_o_resultado_dela(novo_agente):
+    modelo = ModeloFalso(chamada("git", projeto="omni-api", operacao="status"), texto(""))
+
+    resposta = await novo_agente(modelo).responder("git status no omni")
+
+    assert resposta.texto == "git status: limpo"

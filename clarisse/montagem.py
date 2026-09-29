@@ -21,6 +21,8 @@ from clarisse.web import criar_app, criar_avisador
 
 CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
+# Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
+PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
 
 
 def gravar_chave(caminho: Path, chave: str) -> None:
@@ -38,7 +40,7 @@ def montar_registro(ajustes: Ajustes, cadastros: Cadastros, executor, http: http
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,
-            pasta_neutra=ajustes.pasta_dados / "claude",
+            pasta_neutra=PASTA_NEUTRA_DO_CLAUDE,
             modelo=ajustes.claude_modelo,
             timeout=ajustes.claude_timeout,
             teto_usd=ajustes.claude_teto_usd,
