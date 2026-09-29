@@ -12,6 +12,7 @@ from clarisse.auditoria import Auditoria
 from clarisse.config import Ajustes, Cadastros
 from clarisse.eventos import Eventos
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
+from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
@@ -54,6 +55,7 @@ def montar_registro(
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor),
         *ferramentas_de_projetos(cadastros, executor),
+        *ferramentas_de_janelas(cadastros, executor),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,
             pasta_neutra=PASTA_NEUTRA_DO_CLAUDE,

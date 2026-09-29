@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Instala o teclado virtual da Clarisse (ydotool).
+# Instala o teclado virtual da Clarisse (ydotool) e o wl-clipboard, que ela usa para colar texto.
 #
 # O pacote sugere pôr o usuário no grupo "input", mas esse grupo também lê tudo o que é
 # digitado no teclado de verdade. Aqui a liberação é só do /dev/uinput (o teclado virtual)
 # e só para quem está usando a máquina (TAG uaccess), sem grupo e sem sair da sessão.
 set -euo pipefail
 
-echo "1/4 Instalando o ydotool (vai pedir a sua senha)..."
-sudo apt-get install -y ydotool
+echo "1/4 Instalando o ydotool e o wl-clipboard (vai pedir a sua senha)..."
+sudo apt-get install -y ydotool wl-clipboard
 
 echo "2/4 Liberando só o teclado virtual para quem está na máquina..."
 echo 'KERNEL=="uinput", TAG+="uaccess", OPTIONS+="static_node=uinput"' \
