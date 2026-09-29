@@ -77,4 +77,5 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     return criar_app(
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
+        conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
     )

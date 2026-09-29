@@ -1,8 +1,11 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from clarisse.agente import Resposta
+from clarisse.auditoria import Auditoria
 from clarisse.eventos import Eventos
 from clarisse.web import criar_app, criar_avisador
 
@@ -60,6 +63,7 @@ def partes(tmp_path, pasta_web):
     app = criar_app(
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"),
     )
     return app, agente, transcritor, locutor, eventos
 
@@ -136,6 +140,7 @@ def test_falha_da_voz_nao_perde_o_texto(tmp_path, pasta_web):
         agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(),
         locutor=LocutorFalso(tmp_path / "audio", falhar=True),
         chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"),
     )
     cliente = TestClient(app, base_url=ORIGEM)
     cliente.get("/")
@@ -314,3 +319,16 @@ def test_origem_nula_e_recusada(logado):
     resposta = logado.post("/api/mensagem", json={"texto": "oi"}, headers={"Origin": "null"})
 
     assert resposta.status_code == 403
+
+
+def test_cada_troca_fica_registrada_na_conversa_local(logado, partes, tmp_path):
+    _, agente, _, _, _ = partes
+    agente.proxima = Resposta("Vou criar na sua agenda: teste, 15h. Confirma?", aguardando_confirmacao=True)
+
+    logado.post("/api/mensagem", json={"texto": "cria uma tarefa às 15h"})
+
+    [linha] = (tmp_path / "conversa.jsonl").read_text(encoding="utf-8").splitlines()
+    registro = json.loads(linha)
+    assert registro["fala"] == "cria uma tarefa às 15h"
+    assert registro["resposta"] == "Vou criar na sua agenda: teste, 15h. Confirma?"
+    assert registro["aguardando_confirmacao"] is True

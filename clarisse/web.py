@@ -15,6 +15,7 @@ from starlette.requests import cookie_parser
 from starlette.responses import PlainTextResponse
 from starlette.websockets import WebSocketClose
 
+from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
 
 log = logging.getLogger(__name__)
@@ -114,7 +115,10 @@ def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[
     return avisar
 
 
-def criar_app(*, agente, eventos: Eventos, transcritor, locutor, chave: str, porta: int, pasta_web: Path, pasta_audio: Path) -> FastAPI:
+def criar_app(
+    *, agente, eventos: Eventos, transcritor, locutor, chave: str, porta: int, pasta_web: Path, pasta_audio: Path,
+    conversa: Auditoria,
+) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(Portaria, chave=chave, porta=porta)
     app.mount("/static", StaticFiles(directory=pasta_web), name="static")
@@ -122,6 +126,10 @@ def criar_app(*, agente, eventos: Eventos, transcritor, locutor, chave: str, por
     async def processar(texto: str) -> dict:
         await eventos.publicar({"tipo": "fala_do_usuario", "texto": texto})
         resposta = await agente.responder(texto)
+        conversa.registrar(
+            fala=texto, resposta=resposta.texto,
+            aguardando_confirmacao=resposta.aguardando_confirmacao, parar=resposta.parar,
+        )
         if resposta.parar:
             await eventos.publicar({"tipo": "parar"})
             await eventos.estado(Estado.PARADA)
