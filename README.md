@@ -69,7 +69,7 @@ As escolhas foram medidas, não supostas:
 ## Instalação
 
 ```bash
-git clone https://github.com/Pujol0100/voz-ao-claude.git clarisse
+git clone https://github.com/Pujol0100/clarisse.git
 cd clarisse
 uv sync
 ollama pull gemma4:e4b-it-qat
