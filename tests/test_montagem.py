@@ -21,6 +21,7 @@ def test_registro_tem_todas_as_ferramentas_do_desenho(cadastros, executor, tmp_p
         "abrir_pasta", "abrir_site", "ajustar_volume",
         "abrir_projeto_vscode", "git",
         "abrir_claude_na_tela", "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
+        "mandar_para_conversa_do_claude",
         "noticias_do_dia", "previsao_do_tempo",
     }
 

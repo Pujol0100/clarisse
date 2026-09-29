@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import Field, create_model
 
-from clarisse.config import Cadastros
+from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.sistema import data_por_extenso
@@ -23,6 +23,7 @@ _PARA_VOZ = (
     "em no máximo quatro frases curtas, sem markdown, sem listas e sem caminhos de arquivo."
 )
 _TIMEOUT_DA_AGENDA = 120
+_FERRAMENTAS_DE_MENSAGEM = ["SendMessage", "ListAgents"]
 
 
 class Delegacoes:
@@ -156,11 +157,42 @@ def ferramentas_do_claude(
     def confirmar_compromisso(args: ArgsCompromisso) -> str:
         return f"Vou criar na sua agenda: {args.titulo}, {args.quando}. Confirma?"
 
+    class ArgsMensagem(Argumentos):
+        conversa: str = Field(max_length=80, description="Nome da conversa do Claude, como o usuário falou")
+        mensagem: str = Field(max_length=2000, description="O texto a entregar, com as palavras do usuário")
+
+    async def mandar_para_conversa_do_claude(args: ArgsMensagem) -> str:
+        listagem = await executor.executar(["claude", "agents", "--json"], timeout=30)
+        try:
+            nomes = [s["name"] for s in json.loads(listagem.saida)]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            log.warning("claude agents não listou as conversas: %s", listagem.erro[:300])
+            return "Não consegui ver as conversas do Claude abertas agora."
+        alvo = normalizar(args.conversa)
+        exatos = [n for n in nomes if normalizar(n) == alvo]
+        parecidos = exatos or [n for n in nomes if alvo in normalizar(n)]
+        if not parecidos:
+            return f"Não achei conversa do Claude chamada {args.conversa}. As abertas são: {', '.join(nomes) or 'nenhuma'}."
+        if len(parecidos) > 1:
+            return f"Mais de uma conversa combina com {args.conversa}: {', '.join(parecidos)}. Qual delas?"
+        nome = parecidos[0]
+        pedido = (
+            f"Use a ferramenta SendMessage para enviar exatamente esta mensagem para a sessão local chamada {nome}: "
+            f"{json.dumps(args.mensagem, ensure_ascii=False)}. Não faça mais nada. Depois responda só ENVIADO ou o erro."
+        )
+        resultado = await rodar_claude(executor, pedido, _pasta_neutra(), _FERRAMENTAS_DE_MENSAGEM, modelo, 120, teto_usd)
+        if resultado.strip().upper().startswith("ENVIADO"):
+            return f"Mandei a mensagem para a conversa {nome}."
+        return f"Não consegui entregar a mensagem para a conversa {nome}: {resultado}"
+
+    def confirmar_mensagem(args: ArgsMensagem) -> str:
+        return f"Vou mandar para a conversa {args.conversa} do Claude: {args.mensagem}. Confirma?"
+
     return [
         Ferramenta(
             "abrir_claude_na_tela",
-            "Abre o VS Code no projeto e inicia o Claude Code visível, já com o pedido do usuário. "
-            "Use quando o usuário quer ver o Claude trabalhando.",
+            "Abre o VS Code no projeto e inicia uma conversa NOVA do Claude Code, visível, já com o pedido do usuário. "
+            "Use quando o usuário quer ver o Claude trabalhando numa conversa nova.",
             ArgsNaTela, abrir_claude_na_tela,
         ),
         Ferramenta(
@@ -173,5 +205,12 @@ def ferramentas_do_claude(
         Ferramenta(
             "criar_compromisso", "Cria um compromisso ou lembrete na agenda.", ArgsCompromisso, criar_compromisso,
             risco=Risco.CONFIRMAR, descrever=confirmar_compromisso,
+        ),
+        Ferramenta(
+            "mandar_para_conversa_do_claude",
+            "Entrega uma mensagem numa conversa do Claude Code que JÁ ESTÁ ABERTA, pelo nome dela. "
+            "Use quando o usuário quer falar com uma aba, janela ou sessão do Claude existente. Não abre nada novo.",
+            ArgsMensagem, mandar_para_conversa_do_claude,
+            risco=Risco.CONFIRMAR, descrever=confirmar_mensagem,
         ),
     ]
