@@ -48,6 +48,12 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **O Claude em segundo plano** roda só com ferramentas de leitura
   (`Read`, `Grep`, `Glob`, `WebSearch`, `WebFetch`) e numa pasta fora de qualquer
   repositório; o Claude aberto na tela pede as próprias permissões.
+- **Cada chamada ao Claude recebe `--tools` com exatamente as ferramentas
+  embutidas de que precisa.** `--allowedTools` só pré-aprova: em 29/09/2026 um
+  Claude "de leitura" mandou mensagem para outra sessão pelo `SendMessage`, que não
+  pede permissão. Com `--tools` ele nem enxerga a ferramenta (testado).
+- **Mensagem para uma conversa aberta** pede confirmação, e quem recebe a trata
+  como vinda de outra sessão, não como aprovação do usuário.
 
 ## Riscos aceitos
 

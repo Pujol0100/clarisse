@@ -29,6 +29,7 @@ e de ritmo quando ouve, pensa, faz e fala.
 | "marca uma reunião com o João amanhã às três" | Pede confirmação e cria pelo Claude; o calendário do Linux é atualizado na hora |
 | "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
 | "pergunta pro Claude por que o build quebra" | Manda para o Claude em segundo plano e fala a resposta quando chega |
+| "manda pra conversa omni do Claude: roda os testes de novo" | Pede confirmação e entrega a mensagem numa conversa do Claude **já aberta** (dê nome à conversa com `/rename`) |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
 
 Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer
