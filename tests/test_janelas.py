@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from clarisse.config import Aplicativo
 from clarisse.ferramentas.janelas import ferramentas_de_janelas, ler_janelas
 from clarisse.ferramentas.processos import Resultado
 from clarisse.ferramentas.registro import Risco
@@ -12,6 +13,7 @@ JANELAS = [
     {"wm_class": "com.microsoft.VSCode", "title": "Máquina trava… - clarisse - Visual Studio Code", "id": 103, "focus": False},
     {"wm_class": "org.gnome.Ptyxis", "title": "vinicao@N000275: ~", "id": 104, "focus": True},
     {"wm_class": "google-chrome", "title": "Dokploy - Google Chrome", "id": 105, "focus": False},
+    {"wm_class": "org.gnome.Calculator", "title": "Calculadora", "id": 106, "focus": False},
 ]
 
 
@@ -37,7 +39,7 @@ def _teclas(executor):
 
 
 def test_le_a_lista_de_janelas_como_o_gdbus_devolve():
-    assert [j["id"] for j in ler_janelas(_lista().saida)] == [101, 102, 103, 104, 105]
+    assert [j["id"] for j in ler_janelas(_lista().saida)] == [101, 102, 103, 104, 105, 106]
     assert ler_janelas(_lista().saida)[2]["title"].startswith("Máquina trava")
 
 
@@ -77,6 +79,16 @@ async def test_app_do_chrome_nao_passa_na_frente_do_proprio_chrome(ferramentas, 
 
     assert _ativou(executor) == ["105"]
 
+
+
+async def test_acha_pelo_titulo_o_aplicativo_cadastrado_cuja_janela_tem_outro_nome(ferramentas, executor, cadastros):
+    cadastros.aplicativos["calculadora"] = Aplicativo(abrir=["gnome-calculator"], processo="gnome-calculator", apelidos=[])
+    executor.respostas += [_lista(), Resultado(0, "()", "")]
+    f = ferramentas["trazer_para_frente"]
+
+    await f.executar(f.argumentos(aplicativo="calculadora"))
+
+    assert _ativou(executor) == ["106"]
 
 async def test_janela_que_nao_existe_nao_ativa_nada_e_diz_quais_estao_abertas(ferramentas, executor):
     executor.respostas += [_lista()]

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from clarisse.config import Aplicativo
 from clarisse.ferramentas.processos import Resultado
 from clarisse.ferramentas.registro import Risco
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
@@ -49,6 +50,14 @@ async def test_fechar_aplicativo_pede_confirmacao_e_fecha_pelo_processo(ferramen
     await fechar.executar(args)
     assert executor.executados == [(["pkill", "-x", "chrome"], None)]
 
+
+
+async def test_fechar_aplicativo_de_nome_longo_usa_os_15_caracteres_que_o_linux_guarda(ferramentas, executor, cadastros):
+    cadastros.aplicativos["calculadora"] = Aplicativo(abrir=["gnome-calculator"], processo="gnome-calculator", apelidos=[])
+
+    await _rodar(ferramentas, "fechar_aplicativo", nome="calculadora")
+
+    assert executor.executados == [(["pkill", "-x", "gnome-calculato"], None)]
 
 async def test_abre_pasta_pelo_apelido(ferramentas, executor):
     await _rodar(ferramentas, "abrir_pasta", pasta="Downloads")

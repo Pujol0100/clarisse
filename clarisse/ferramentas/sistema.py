@@ -87,7 +87,8 @@ def ferramentas_do_sistema(
         chave = cadastros.achar_aplicativo(args.nome)
         if chave is None:
             return f"Não conheço o aplicativo {args.nome}. Os cadastrados são: {cadastrados}."
-        resultado = await executor.executar(["pkill", "-x", cadastros.aplicativos[chave].processo])
+        # O Linux guarda só 15 caracteres do nome do processo, e o pkill -x compara com eles.
+        resultado = await executor.executar(["pkill", "-x", cadastros.aplicativos[chave].processo[:15]])
         if resultado.codigo == 1:
             return f"O {chave} não estava aberto."
         return f"Fechei o {chave}."

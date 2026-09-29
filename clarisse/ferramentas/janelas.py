@@ -76,13 +76,16 @@ class ArgsAtalho(Argumentos):
 def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) -> list[Ferramenta]:
 
     def _candidatas(janelas: list[dict], aplicativo: str, titulo: str | None) -> list[dict]:
+        alvo = normalizar(aplicativo)
         chave = cadastros.achar_aplicativo(aplicativo)
-        if chave:
-            processo = cadastros.aplicativos[chave].processo.lower()
-            achadas = [j for j in janelas if processo in j["wm_class"].lower()]
-        else:
-            alvo = normalizar(aplicativo)
-            achadas = [j for j in janelas if alvo in normalizar(j["title"]) or alvo in normalizar(j["wm_class"])]
+        processo = cadastros.aplicativos[chave].processo.lower() if chave else None
+
+        def combina(janela: dict) -> bool:
+            if processo and processo in janela["wm_class"].lower():
+                return True
+            return alvo in normalizar(janela["title"]) or alvo in normalizar(janela["wm_class"])
+
+        achadas = [j for j in janelas if combina(j)]
         if titulo:
             achadas = [j for j in achadas if normalizar(titulo) in normalizar(j["title"])]
         # Apps instalados pelo Chrome têm wm_class longa (chrome-<id>-Default); o próprio programa vem antes.
