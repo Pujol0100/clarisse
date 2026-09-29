@@ -5,6 +5,7 @@ import httpx
 from pydantic import Field
 
 from clarisse.config import normalizar
+from clarisse.figuras import JORNAL
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 
 FEEDS = {
@@ -44,5 +45,6 @@ def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
             "Busca as manchetes de hoje no g1. Use sempre que o usuário pedir notícias; nunca invente notícias.",
             ArgsNoticias,
             noticias_do_dia,
+            figura=JORNAL,
         )
     ]

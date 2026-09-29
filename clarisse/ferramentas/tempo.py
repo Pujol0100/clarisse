@@ -1,11 +1,13 @@
 """Previsão do tempo pelo Open-Meteo (sem chave), em graus Celsius e km/h, no fuso de Brasília."""
 import math
 from datetime import date
+from typing import Literal
 
 import httpx
 from pydantic import Field
 
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
+from clarisse.figuras import Retorno, figura_do_tempo
 
 _BUSCA = "https://geocoding-api.open-meteo.com/v1/search"
 _PREVISAO = "https://api.open-meteo.com/v1/forecast"
@@ -34,10 +36,13 @@ def _condicao(codigo: int) -> str:
 
 class ArgsTempo(Argumentos):
     cidade: str | None = Field(None, max_length=80, description="Cidade, se o usuário disser uma")
+    dia: Literal["agora", "hoje", "amanhã", "depois de amanhã"] | None = Field(
+        None, description="De quando o usuário perguntou: agora, hoje, amanhã ou depois de amanhã"
+    )
 
 
 def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) -> list[Ferramenta]:
-    async def previsao_do_tempo(args: ArgsTempo) -> str:
+    async def previsao_do_tempo(args: ArgsTempo) -> Retorno | str:
         cidade = args.cidade or cidade_padrao
         if not cidade:
             return "Diga de qual cidade você quer a previsão."
@@ -80,7 +85,9 @@ def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) 
                 f"{_graus(dias['temperature_2m_max'][i])}, {_condicao(dias['weather_code'][i])}, "
                 f"{dias['precipitation_probability_max'][i]}% de chance de chuva."
             )
-        return " ".join(partes)
+        indice = {"hoje": 0, "amanhã": 1, "depois de amanhã": 2}.get(args.dia or "agora")
+        codigo = agora["weather_code"] if indice is None else dias["weather_code"][indice]
+        return Retorno(" ".join(partes), figura=figura_do_tempo(codigo))
 
     descricao = (
         "Consulta o tempo agora e a previsão de hoje, amanhã e depois. Use sempre que perguntarem de clima, "

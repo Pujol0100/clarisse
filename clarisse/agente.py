@@ -9,6 +9,7 @@ from datetime import datetime
 
 from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
+from clarisse.figuras import Retorno
 from clarisse.ferramentas.registro import Registro
 from clarisse.ferramentas.sistema import data_por_extenso
 from clarisse.llm import ErroDoModelo
@@ -49,6 +50,7 @@ class Resposta:
     texto: str
     parar: bool = False
     aguardando_confirmacao: bool = False
+    figura: str | None = None
 
 
 class Agente:
@@ -76,10 +78,12 @@ class Agente:
         self._conversas: list[list[dict]] = []
         self._pendente: tuple[Decisao, list[dict], int] | None = None
         self._trava = asyncio.Lock()
+        self._figura: str | None = None
 
     async def responder(self, fala: str) -> Resposta:
         async with self._trava:
             fala = fala.strip()
+            self._figura = None
             if pede_para_parar(fala):
                 self._pendente = None
                 return Resposta("Parei.", parar=True)
@@ -157,6 +161,11 @@ class Agente:
         try:
             resultado = await asyncio.wait_for(decisao.ferramenta.executar(decisao.args), self._timeout)
             situacao = "concluida"
+            if isinstance(resultado, Retorno):
+                self._figura = resultado.figura or decisao.ferramenta.figura
+                resultado = resultado.texto
+            else:
+                self._figura = decisao.ferramenta.figura or self._figura
         except Exception as erro:
             log.exception("ferramenta %s falhou", nome)
             resultado = f"Erro ao executar {nome}: {erro}"
@@ -177,7 +186,7 @@ class Agente:
     def _concluir(self, mensagens: list[dict], inicio: int, texto: str, aguardando: bool = False) -> Resposta:
         conversa = [_encurtar(m) for m in mensagens[inicio:]] + [{"role": "assistant", "content": texto}]
         self._conversas = [*self._conversas, conversa][-_CONVERSAS_LEMBRADAS:]
-        return Resposta(texto, aguardando_confirmacao=aguardando)
+        return Resposta(texto, aguardando_confirmacao=aguardando, figura=self._figura)
 
 
 def _encurtar(mensagem: dict) -> dict:

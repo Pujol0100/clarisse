@@ -440,3 +440,36 @@ async def test_garantia_do_claude_nao_dispara_depois_de_uma_acao_confirmada(novo
 
     assert executadas == [("git", "pull")]
     assert pedidos_ao_claude == []
+
+
+async def test_resposta_traz_a_figura_da_ferramenta_executada(novo_agente, registro):
+    async def hora(args):
+        return "São 14h05."
+
+    registro.registrar(Ferramenta("hora", "hora", Argumentos, hora, figura="relogio"))
+    modelo = ModeloFalso(chamada("hora"), texto("São 14h05."))
+
+    resposta = await novo_agente(modelo).responder("que horas são?")
+
+    assert resposta.figura == "relogio"
+
+
+async def test_figura_calculada_pela_ferramenta_ganha_da_fixa_e_o_texto_vai_ao_modelo(novo_agente, registro):
+    from clarisse.figuras import Retorno
+
+    async def tempo(args):
+        return Retorno("Chuva forte amanhã.", figura="chuva")
+
+    registro.registrar(Ferramenta("tempo", "tempo", Argumentos, tempo, figura="sol"))
+    modelo = ModeloFalso(chamada("tempo"), texto("Vai chover."))
+
+    resposta = await novo_agente(modelo).responder("vai chover?")
+
+    assert resposta.figura == "chuva"
+    assert _mensagens_de_ferramenta(modelo.recebidas[1]) == ["Chuva forte amanhã."]
+
+
+async def test_conversa_sem_ferramenta_nao_tem_figura(novo_agente):
+    resposta = await novo_agente(ModeloFalso(texto("Oi!"))).responder("oi")
+
+    assert resposta.figura is None

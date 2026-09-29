@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import Field, create_model
 
 from clarisse.config import Cadastros
+from clarisse.figuras import CODIGO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 
 _LIMITE_DA_SAIDA = 1500
@@ -56,10 +57,11 @@ def ferramentas_de_projetos(cadastros: Cadastros, executor) -> list[Ferramenta]:
         return f"Vou atualizar o projeto {args.projeto} com git pull. Confirma?"
 
     return [
-        Ferramenta("abrir_projeto_vscode", "Abre um projeto no VS Code.", ArgsProjeto, abrir_projeto_vscode),
+        Ferramenta("abrir_projeto_vscode", "Abre um projeto no VS Code.", ArgsProjeto, abrir_projeto_vscode, figura=CODIGO),
         Ferramenta(
             "git", "Executa uma operação git num projeto: status, log ou pull.", ArgsGit, git,
             risco=lambda a: Risco.CONFIRMAR if a.operacao == "pull" else Risco.SEGURO,
             descrever=confirmar_pull,
+            figura=CODIGO,
         ),
     ]

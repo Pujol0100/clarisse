@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import Field, create_model
 
 from clarisse.config import Cadastros, normalizar
+from clarisse.figuras import CALENDARIO, CODIGO, MENSAGEM
 from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.sistema import data_por_extenso
@@ -205,24 +206,24 @@ def ferramentas_do_claude(
             "abrir_claude_na_tela",
             "Abre o VS Code no projeto e inicia uma conversa NOVA do Claude Code, visível, já com o pedido do usuário. "
             "Use quando o usuário quer ver o Claude trabalhando numa conversa nova.",
-            ArgsNaTela, abrir_claude_na_tela,
+            ArgsNaTela, abrir_claude_na_tela, figura=CODIGO,
         ),
         Ferramenta(
             "pedir_ao_claude",
             "Envia um pedido ao Claude, que responde em segundo plano; o resultado é falado quando fica pronto. "
             "Use para perguntas difíceis, programação, análise e leitura de sites.",
-            ArgsPedido, pedir_ao_claude,
+            ArgsPedido, pedir_ao_claude, figura=CODIGO,
         ),
-        Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda),
+        Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda, figura=CALENDARIO),
         Ferramenta(
             "criar_compromisso", "Cria um compromisso ou lembrete na agenda.", ArgsCompromisso, criar_compromisso,
-            risco=Risco.CONFIRMAR, descrever=confirmar_compromisso,
+            risco=Risco.CONFIRMAR, descrever=confirmar_compromisso, figura=CALENDARIO,
         ),
         Ferramenta(
             "mandar_para_conversa_do_claude",
             "Entrega uma mensagem numa conversa do Claude Code que JÁ ESTÁ ABERTA, pelo nome dela. "
             "Use quando o usuário quer falar com uma aba, janela ou sessão do Claude existente. Não abre nada novo.",
             ArgsMensagem, mandar_para_conversa_do_claude,
-            risco=Risco.CONFIRMAR, descrever=confirmar_mensagem,
+            risco=Risco.CONFIRMAR, descrever=confirmar_mensagem, figura=MENSAGEM,
         ),
     ]

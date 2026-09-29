@@ -356,3 +356,32 @@ def test_tarefas_de_fundo_rodam_enquanto_o_servidor_esta_ligado(tmp_path, pasta_
         assert situacao == ["iniciou"]
 
     assert situacao == ["iniciou", "encerrou"]
+
+
+def _eventos_publicados(fila):
+    publicados = []
+    while not fila.empty():
+        publicados.append(fila.get_nowait())
+    return publicados
+
+
+def test_fala_leva_a_figura_da_resposta_para_a_tela(logado, partes):
+    _, agente, _, _, eventos = partes
+    agente.proxima = Resposta("Amanhã chove em Campinas.", figura="chuva")
+    fila = eventos.assinar()
+
+    corpo = logado.post("/api/mensagem", json={"texto": "vai chover amanhã?"}).json()
+
+    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert falar["figura"] == "chuva"
+    assert corpo["figura"] == "chuva"
+
+
+async def test_aviso_do_claude_aparece_como_balao_de_mensagem(tmp_path):
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("omni-api", "O build passou.")
+
+    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert falar["figura"] == "mensagem"

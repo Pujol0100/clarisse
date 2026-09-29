@@ -9,6 +9,7 @@ import psutil
 from pydantic import Field
 
 from clarisse.config import Cadastros
+from clarisse.figuras import RELOGIO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 
 _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
@@ -129,7 +130,7 @@ def ferramentas_do_sistema(
         return f"Volume em {args.nivel} por cento."
 
     return [
-        Ferramenta("hora_e_data", "Informa a hora e a data atuais.", Argumentos, hora_e_data),
+        Ferramenta("hora_e_data", "Informa a hora e a data atuais.", Argumentos, hora_e_data, figura=RELOGIO),
         Ferramenta("abrir_aplicativo", "Abre um aplicativo instalado.", ArgsNome, abrir_aplicativo),
         Ferramenta(
             "fechar_aplicativo", "Fecha um aplicativo aberto.", ArgsNome, fechar_aplicativo,

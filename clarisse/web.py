@@ -18,6 +18,7 @@ from starlette.websockets import WebSocketClose
 
 from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
+from clarisse.figuras import MENSAGEM
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class Mensagem(BaseModel):
     texto: str = Field(min_length=1, max_length=2000)
 
 
-async def _falar(eventos: Eventos, locutor, texto: str) -> str | None:
+async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = None) -> str | None:
     try:
         caminho = await locutor.sintetizar(texto)
     except Exception:
@@ -104,14 +105,14 @@ async def _falar(eventos: Eventos, locutor, texto: str) -> str | None:
         return None
     url = f"/audio/{caminho.name}"
     await eventos.estado(Estado.FALANDO)
-    await eventos.publicar({"tipo": "falar", "audio": url})
+    await eventos.publicar({"tipo": "falar", "audio": url, "figura": figura})
     return url
 
 
 def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[None]]:
     async def avisar(titulo: str, texto: str) -> None:
         await eventos.publicar({"tipo": "aviso", "titulo": titulo, "texto": texto})
-        await _falar(eventos, locutor, f"Do {titulo}: {texto}")
+        await _falar(eventos, locutor, f"Do {titulo}: {texto}", figura=MENSAGEM)
 
     return avisar
 
@@ -147,12 +148,13 @@ def criar_app(
         await eventos.publicar(
             {"tipo": "resposta", "texto": resposta.texto, "aguardando_confirmacao": resposta.aguardando_confirmacao}
         )
-        audio = await _falar(eventos, locutor, resposta.texto)
+        audio = await _falar(eventos, locutor, resposta.texto, figura=resposta.figura)
         return {
             "texto": resposta.texto,
             "audio": audio,
             "aguardando_confirmacao": resposta.aguardando_confirmacao,
             "parar": False,
+            "figura": resposta.figura,
         }
 
     @app.get("/", response_class=HTMLResponse)

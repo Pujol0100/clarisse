@@ -28,6 +28,7 @@ class Ferramenta:
     executar: Callable[[Argumentos], Awaitable[str]]
     risco: Risco | Callable[[Argumentos], Risco] = Risco.SEGURO
     descrever: Callable[[Argumentos], str] | None = None
+    figura: str | None = None
 
     def risco_de(self, args: Argumentos) -> Risco:
         return self.risco(args) if callable(self.risco) else self.risco

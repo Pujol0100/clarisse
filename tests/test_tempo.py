@@ -32,7 +32,7 @@ async def test_previsao_em_portugues_com_celsius_e_km_por_hora():
     pedidos = []
     f = _montar(_responder_normal(pedidos))
 
-    resposta = await f.executar(f.argumentos(cidade="Curitiba"))
+    resposta = (await f.executar(f.argumentos(cidade="Curitiba"))).texto
 
     assert "Curitiba agora: 24 °C, sensação de 26 °C, nublado, vento de 5 km/h" in resposta
     assert "Hoje: mínima de 15 °C e máxima de 30 °C, trovoada, 91% de chance de chuva" in resposta
@@ -100,3 +100,19 @@ def test_descricao_avisa_o_modelo_da_cidade_padrao():
 
     assert "use Curitiba" in com_padrao.descricao
     assert "Curitiba" not in sem_padrao.descricao
+
+
+@pytest.mark.parametrize("dia,figura", [(None, "nuvem"), ("agora", "nuvem"), ("hoje", "trovoada"), ("amanhã", "chuva"), ("depois de amanhã", "sol")])
+async def test_figura_segue_o_dia_perguntado(dia, figura):
+    f = _montar(_responder_normal([]))
+
+    resposta = await f.executar(f.argumentos(cidade="Curitiba", dia=dia))
+
+    assert resposta.figura == figura
+
+
+def test_dia_fora_da_lista_e_invalido():
+    f = _montar(_responder_normal([]))
+
+    with pytest.raises(ValueError):
+        f.argumentos(dia="semana que vem")
