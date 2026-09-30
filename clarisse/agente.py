@@ -30,7 +30,7 @@ _CUTUCADA = {
 }
 
 
-def prompt_do_sistema(projetos: list[str], agora: datetime, cidade: str | None = None) -> str:
+def prompt_do_sistema(projetos: list[str], agora: datetime, cidade: str | None = None, sistemas: list[str] | None = None) -> str:
     texto = f"""Você é a Clarisse, assistente de voz que roda no computador do usuário.
 Hoje é {data_por_extenso(agora)}.
 Responda sempre em português do Brasil, em no máximo duas frases curtas, porque a resposta será falada.
@@ -44,6 +44,8 @@ Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usu
 Pedidos curtos como "aperta enter", "desfaz", "salva", "volta pro terminal" ou "abre o vs code" já estão completos: chame a ferramenta na hora e deixe vazios os campos que o usuário não disse. Nunca responda com uma pergunta quando existe uma ferramenta para o pedido.
 Se nenhuma ferramenta faz exatamente o que o usuário pediu, diga que não consegue fazer isso e o que consegue fazer no lugar. Nunca faça outra coisa parecida dizendo que fez o pedido.
 Projetos cadastrados: {", ".join(projetos) or "nenhum"}. A transcrição de voz pode errar o nome; escolha o projeto cadastrado mais parecido."""
+    if sistemas:
+        texto += f"\nSistemas da empresa na internet: {', '.join(sistemas)}. 'Abre o X' sem falar em VS Code chama abrir."
     if cidade:
         texto += f"\nO usuário mora em {cidade}. Em perguntas de tempo, clima, frio, calor ou chuva sem cidade, chame previsao_do_tempo com cidade {cidade}."
     return texto
@@ -67,6 +69,7 @@ class Agente:
         projetos: list[str],
         agora: Callable[[], datetime] = datetime.now,
         cidade: str | None = None,
+        sistemas: Callable[[], list[str]] = list,
         max_rodadas: int = 4,
         timeout_da_ferramenta: float = 180,
     ):
@@ -76,6 +79,7 @@ class Agente:
         self._auditoria = auditoria
         self._projetos = projetos
         self._cidade = cidade
+        self._sistemas = sistemas
         self._agora = agora
         self._max_rodadas = max_rodadas
         self._timeout = timeout_da_ferramenta
@@ -103,7 +107,7 @@ class Agente:
                     return self._concluir([{"role": "user", "content": fala}], 0, "Tudo bem, cancelei.")
 
             mensagens = [
-                {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora(), self._cidade)},
+                {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora(), self._cidade, self._sistemas())},
                 *self._historico(),
                 {"role": "user", "content": fala},
             ]

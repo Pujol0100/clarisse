@@ -508,3 +508,28 @@ async def test_chamada_escrita_como_texto_ganha_segunda_chance(novo_agente, exec
 
     assert executadas == [("git", "status")]
     assert resposta.texto == "Está limpo."
+
+
+async def test_prompt_lista_os_sistemas_da_empresa_lidos_a_cada_conversa(registro, eventos, auditoria):
+    sistemas = [["omni", "kanban"]]
+    modelo = ModeloFalso(texto("Oi!"), texto("Oi de novo!"))
+    agente = Agente(
+        modelo, registro, eventos, auditoria, projetos=["omni-api"],
+        agora=lambda: datetime(2026, 9, 28, 14, 5), sistemas=lambda: sistemas[0],
+    )
+
+    await agente.responder("oi")
+    sistemas[0] = ["omni", "kanban", "favo"]
+    await agente.responder("oi de novo")
+
+    primeiro, segundo = (r[0]["content"] for r in modelo.recebidas)
+    assert "Sistemas da empresa na internet: omni, kanban." in primeiro
+    assert "favo" in segundo
+
+
+async def test_sem_sistemas_o_prompt_nao_fala_deles(novo_agente):
+    modelo = ModeloFalso(texto("Oi!"))
+
+    await novo_agente(modelo).responder("oi")
+
+    assert "Sistemas da empresa" not in modelo.recebidas[0][0]["content"]

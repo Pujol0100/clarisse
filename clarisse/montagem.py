@@ -113,6 +113,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         modelo, registro, eventos, Auditoria(ajustes.pasta_dados / "auditoria.jsonl"),
         projetos=list(cadastros.projetos),
         cidade=ajustes.cidade,
+        sistemas=lambda: [site.nome for site in carregar_sites(ajustes.pasta_config)],
     )
     transcritor = Transcritor(
         carregar=lambda: carregar_whisper(ajustes.whisper_modelo, ajustes.whisper_dispositivo),

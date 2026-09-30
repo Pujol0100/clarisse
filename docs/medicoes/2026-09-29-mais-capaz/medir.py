@@ -25,32 +25,26 @@ SEM = set(filter(None, os.environ.get("SEM", "").split(",")))
 
 # (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor}); "participantes" junta a lista
 CASOS = [
-    ("cria uma reunião amanhã às 10 com o Bruno Santos", "criar_compromisso", {"participantes": "bruno"}),
-    ("marca um alinhamento sexta às 15h com o Kaiki e a Ana Souza", "criar_compromisso", {"participantes": "ana"}),
-    ("criar um evento hoje às 18 horas e colocar o Bruno Santos na reunião", "criar_compromisso", {"participantes": "bruno"}),
-    ("me lembra de pagar o boleto sexta às nove", "criar_compromisso", {"titulo": "boleto"}),
-    ("marca dentista quinta às 14h", "criar_compromisso", {"titulo": "dentista"}),
-    ("o que eu tenho na agenda amanhã?", "consultar_agenda", {}),
-    ("abre o arquivo do relatório de setembro", "abrir_arquivo", {"nome": "relat"}),
-    ("abre a planilha de boletos", "abrir_arquivo", {"nome": "boletos"}),
-    ("abre o pdf do contrato da smart", "abrir_arquivo", {"nome": "contrato"}),
-    ("abre o readme do smart anchor", "abrir_arquivo", {"nome": "readme"}),
+    ("abre o omni", "abrir", {"nome": "omni"}),
+    ("abre o kanban", "abrir", {"nome": "kanban"}),
+    ("abre o chrome", "abrir", {"nome": "chrome"}),
+    ("abre o vs code", "abrir", {"nome": "code"}),
+    ("abre o smart anchor", "abrir", {"nome": "anchor"}),
+    ("abre o omni local", "abrir", {"nome": "omni", "onde": "local"}),
+    ("abre o site do sc360", "abrir", {"nome": "sc360", "onde": "site"}),
+    ("roda o smart anchor", "abrir", {"nome": "anchor"}),
+    ("consegue abrir o smart-anchor local", "abrir", {"nome": "anchor", "onde": "local"}),
+    ("abre o dokploy do omni", "abrir", {"nome": "dokploy"}),
+    ("abre o painel de inadimplência", "abrir", {"nome": "inadimpl"}),
+    ("abre o github", "abrir_site", {"endereco": "github"}),
     ("abre a pasta de downloads", "abrir_pasta", {}),
-    ("roda o smart anchor", "rodar_aplicacao", {"projeto": "anchor"}),
-    ("consegue abrir o smart-anchor local", "rodar_aplicacao", {"projeto": "anchor"}),
-    ("você consegue rodar o smart-anchor no Google Chrome?", "rodar_aplicacao", {"projeto": "anchor"}),
-    ("sobe o omni app pra eu testar", "rodar_aplicacao", {"projeto": "omni"}),
-    ("inicia o sc360 local", "rodar_aplicacao", {"projeto": "sc360"}),
-    ("abre o projeto smart anchor no vs code", "abrir_projeto_vscode", {}),
-    ("O que você me fala sobre a Smart Compass?", "pedir_ao_claude", {"pedido": "smart compass"}),
-    ("quem fundou a Anthropic?", "pedir_ao_claude", {"pedido": "anthropic"}),
-    ("qual a cotação do dólar hoje?", "pedir_ao_claude", {"pedido": "dólar"}),
-    ("quem ganhou o jogo do Palmeiras ontem?", "pedir_ao_claude", {"pedido": "palmeiras"}),
-    ("o que é uma API?", None, {}),
-    ("quanto é quinze por cento de duzentos?", None, {}),
-    ("me conta uma curiosidade rápida", None, {}),
+    ("abre a planilha de boletos", "abrir_arquivo", {"nome": "boletos"}),
+    ("abre o projeto omni api no vs code", "abrir_projeto_vscode", {}),
+    ("traz o vs code pra frente", "trazer_para_frente", {}),
+    ("fecha o chrome", "fechar_aplicativo", {}),
+    ("que horas são?", "hora_e_data", {}),
     ("oi clarisse, tudo bem?", None, {}),
-    ("obrigado, era só isso", None, {}),
+    ("o que é uma API?", None, {}),
 ]
 
 
@@ -66,8 +60,16 @@ async def main():
         pass
 
     registro = montar_registro(ajustes, cadastros, None, httpx.AsyncClient(), Delegacoes(_avisar))
-    sistema = prompt_do_sistema(list(cadastros.projetos), datetime.now(), ajustes.cidade)
+    from clarisse.sites import carregar_sites
+    sistema = prompt_do_sistema(
+        list(cadastros.projetos), datetime.now(), ajustes.cidade, [x.nome for x in carregar_sites(RAIZ / "config")]
+    ) + os.environ.get("EXTRA", "")
+
     ferramentas = [e for e in registro.esquemas() if e["function"]["name"] not in SEM]
+    if os.environ.get("VSCODE"):
+        for e in ferramentas:
+            if e["function"]["name"] == "abrir_projeto_vscode":
+                e["function"]["description"] = "Abre um projeto no editor VS Code. Só quando o usuário falar em VS Code, code ou editor."
     acertos = 0
     async with httpx.AsyncClient(timeout=300) as http:
         for pedido, esperada, args in CASOS:
