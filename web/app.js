@@ -30,6 +30,7 @@ function mudarEstado(estado) {
   elementos.corpo.dataset.estado = estado;
   elementos.estado.textContent = NOMES_DOS_ESTADOS[estado] || estado;
   Enxame.estado(estado);
+  Rosto.estado(estado);
 }
 
 function mostrarVoce(texto) {
@@ -78,9 +79,18 @@ function nivelDoSom() {
   return Math.min(1, Math.sqrt(soma / amostras.length) * 4);
 }
 
+/* Figura na tela: os drones saem do rosto e formam a figura no meio; o rosto vai para o canto. */
+let figuraSemFala = null;
+
+function mostrarFigura(figura) {
+  clearTimeout(figuraSemFala);
+  Enxame.mostrar(figura);
+  Rosto.canto(Boolean(figura));
+}
+
 async function tocar(url, figura) {
   pararDeFalar(false);
-  Enxame.mostrar(figura);
+  mostrarFigura(figura);
   const audio = new Audio(url);
   audioTocando = audio;
   if (contextoDeAudio) {
@@ -99,7 +109,7 @@ async function tocar(url, figura) {
 function terminarFala(audio) {
   if (audioTocando !== audio) return;
   audioTocando = null;
-  Enxame.mostrar(null);
+  mostrarFigura(null);
   mudarEstado("idle");
   fetch("/api/fim-da-fala", { method: "POST" });
 }
@@ -109,7 +119,7 @@ function pararDeFalar(avisarServidor = true) {
   const audio = audioTocando;
   audioTocando = null;
   audio.pause();
-  Enxame.mostrar(null);
+  mostrarFigura(null);
   if (avisarServidor) {
     mudarEstado("idle");
     fetch("/api/fim-da-fala", { method: "POST" });
@@ -194,7 +204,11 @@ const tratadores = {
   resposta: (e) => mostrarClarisse(e.texto, e.aguardando_confirmacao),
   aviso: (e) => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`),
   falar: (e) => tocar(e.audio, e.figura),
-  figura: (e) => Enxame.mostrar(e.figura),
+  figura: (e) => {
+    // Figura mandada pelo Claude das etapas, sem fala junto: fica alguns segundos e sai.
+    mostrarFigura(e.figura);
+    figuraSemFala = setTimeout(() => { if (!audioTocando) mostrarFigura(null); }, 8000);
+  },
   parar: () => pararDeFalar(),
   escutar: () => alternarMicrofone(),
   erro: (e) => mostrarClarisse(e.texto),
@@ -244,9 +258,17 @@ document.addEventListener("keydown", (e) => {
   alternarMicrofone();
 });
 
-/* ---------- enxame ---------- */
+/* ---------- rosto e enxame ---------- */
 
+function moverABoca() {
+  Rosto.abertura(estadoAtual === "speaking" ? nivelDoSom() : 0);
+  requestAnimationFrame(moverABoca);
+}
+
+Rosto.iniciar(document.getElementById("rosto"));
 Enxame.nivel = nivelDoSom;
+Enxame.origem = () => Rosto.centro();
 Enxame.iniciar(document.getElementById("enxame"));
+requestAnimationFrame(moverABoca);
 mudarEstado("idle");
 conectar();

@@ -5,29 +5,23 @@
   font-display: swap;
 }
 
+/* Cores da Smart Compass: preto, branco e dourado; vermelho só para o estado de erro. */
 :root {
-  --nanquim: #0e1a2b;
-  --nanquim-claro: #16263d;
-  --linha: #2a3d58;
-  --texto: #e8eef6;
-  --texto-suave: #9fb2cc;
+  --fundo: #0a0a0a;
+  --superficie: #141416;
+  --superficie-2: #1c1c20;
+  --linha: #2a2a30;
+  --texto: #ffffff;
+  --texto-suave: #a3a3aa;
+  --dourado: #c9a84c;
+  --dourado-claro: #e5c875;
+  --erro: #e5484d;
 
-  --parada: #7fa7d9;
-  --ouvindo: #3fd6c6;
-  --pensando: #a58cff;
-  --executando: #ffb547;
-  --falando: #ffe29a;
-  --erro: #ff7a6b;
-
-  --cor-do-estado: var(--parada);
+  --cor-do-estado: var(--dourado-claro);
   --fonte: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
 }
 
-body[data-estado="listening"] { --cor-do-estado: var(--ouvindo); }
-body[data-estado="thinking"]  { --cor-do-estado: var(--pensando); }
-body[data-estado="executing"] { --cor-do-estado: var(--executando); }
-body[data-estado="speaking"]  { --cor-do-estado: var(--falando); }
-body[data-estado="error"]     { --cor-do-estado: var(--erro); }
+body[data-estado="error"] { --cor-do-estado: var(--erro); }
 
 * { box-sizing: border-box; }
 
@@ -37,7 +31,7 @@ body {
   margin: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
-  background: radial-gradient(ellipse at 50% 38%, #15294a 0%, var(--nanquim) 62%);
+  background: var(--fundo);
   color: var(--texto);
   font-family: var(--fonte);
   font-size: 1.25rem;
@@ -51,7 +45,8 @@ body {
   min-height: 0;
 }
 
-#enxame {
+#enxame,
+#rosto {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -66,6 +61,10 @@ body {
   font-weight: 700;
   color: var(--cor-do-estado);
   transition: color 400ms ease;
+  z-index: 1;
+  padding: 0.1rem 1rem;
+  border-radius: 4px;
+  background: var(--fundo);
 }
 
 .conversa {
@@ -93,7 +92,7 @@ body {
 
 .aviso-som {
   margin: 0;
-  color: var(--executando);
+  color: var(--dourado-claro);
 }
 
 .controles {
@@ -115,11 +114,11 @@ body {
 .botao {
   font: inherit;
   font-weight: 700;
-  border: 2px solid transparent;
-  border-radius: 999px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   padding: 0.7rem 1.6rem;
   cursor: pointer;
-  color: var(--nanquim);
+  color: var(--fundo);
 }
 
 .botao:focus-visible,
@@ -130,13 +129,13 @@ input:focus-visible {
 
 .botao-falar {
   min-width: 8.5rem;
-  background: var(--cor-do-estado);
+  background: var(--dourado);
   transition: background-color 400ms ease;
 }
 
-.botao-falar[aria-pressed="true"] { background: var(--ouvindo); }
+.botao-falar[aria-pressed="true"] { background: var(--dourado-claro); }
 
-.botao-sim { background: var(--ouvindo); }
+.botao-sim { background: var(--dourado); }
 
 .botao-nao {
   background: transparent;
@@ -148,9 +147,9 @@ input:focus-visible {
   width: 100%;
   font: inherit;
   color: var(--texto);
-  background: var(--nanquim-claro);
-  border: 2px solid var(--linha);
-  border-radius: 999px;
+  background: var(--superficie-2);
+  border: 1px solid var(--linha);
+  border-radius: 4px;
   padding: 0.7rem 1.2rem;
 }
 

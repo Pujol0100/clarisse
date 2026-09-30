@@ -1,6 +1,7 @@
 "use strict";
 
-/* Enxame de "drones" de luz: esfera quando parada, onda quando fala, figuras quando a resposta pede. */
+/* Enxame de "drones" de luz: formam as figuras que a resposta pede. Com o rosto na tela, saem dele
+   e só aparecem durante a figura; sem rosto, fazem a esfera quando parada e a onda quando fala. */
 
 const Enxame = (() => {
   const MOVIMENTO_REDUZIDO = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -10,9 +11,10 @@ const Enxame = (() => {
     idle: "#7fa7d9", listening: "#3fd6c6", thinking: "#a58cff",
     executing: "#ffb547", speaking: "#ffe29a", error: "#ff7a6b",
   };
+  // Dourado e branco da marca.
   const CORES_DAS_FIGURAS = {
-    sol: "#ffb547", nuvem: "#9fb8d6", chuva: "#6fb6ff", trovoada: "#c7b8ff",
-    calendario: "#3fd6c6", relogio: "#a58cff", jornal: "#e8eef6", codigo: "#7fe0a8", mensagem: "#ffe29a",
+    sol: "#e5c875", nuvem: "#ffffff", chuva: "#ffffff", trovoada: "#e5c875",
+    calendario: "#c9a84c", relogio: "#e5c875", jornal: "#ffffff", codigo: "#c9a84c", mensagem: "#e5c875",
   };
   const GIRO_DOS_ESTADOS = { idle: 0.25, listening: 0.4, thinking: 0.9, executing: 1.3, speaking: 0.4, error: 0.15 };
 
@@ -125,6 +127,8 @@ const Enxame = (() => {
   });
 
   let nivel = () => 0;
+  // Centro do rosto em pixels da página. Com rosto, os drones só existem para formar figuras e saem dele.
+  let origem = null;
   let estado = "idle";
   let figuraForcada = null;
   let figura = "esfera";
@@ -164,7 +168,12 @@ const Enxame = (() => {
 
   function formar(nova) {
     if (nova === figura) return;
+    const saiDoRosto = figura === "nada" && origem;
     figura = nova;
+    if (saiDoRosto) {
+      const [ox, oy] = pontoDeOrigem();
+      drones.forEach((d) => { d.x = ox + (Math.random() - 0.5) * 0.05; d.y = oy + (Math.random() - 0.5) * 0.05; d.vx = d.vy = 0; });
+    }
     const agora = performance.now();
     drones.forEach((d) => { d.papel = null; d.partida = agora + Math.random() * (MOVIMENTO_REDUZIDO ? 0 : 450); });
     especiais = [];
@@ -236,9 +245,20 @@ const Enxame = (() => {
     tela.height = Math.round(tela.clientHeight * escala);
   }
 
+  function pontoDeOrigem() {
+    const o = origem(), caixa = tela.getBoundingClientRect(), f = tela.width / caixa.width;
+    const escala = Math.min(tela.width, tela.height) * 0.36;
+    return [((o.x - caixa.left) * f - tela.width / 2) / escala, ((o.y - caixa.top) * f - tela.height * 0.46) / escala];
+  }
+
   function quadro(tempo) {
     const som = estado === "listening" || estado === "speaking" ? nivel() : 0;
-    formar(figuraForcada || (estado === "speaking" ? "onda" : "esfera"));
+    formar(figuraForcada || (origem ? "nada" : estado === "speaking" ? "onda" : "esfera"));
+    if (figura === "nada") {
+      pincel.clearRect(0, 0, tela.width, tela.height);
+      requestAnimationFrame(quadro);
+      return;
+    }
     corAlvo = hexParaRgb(figuraForcada ? CORES_DAS_FIGURAS[figuraForcada] || "#e8eef6" : CORES_DOS_ESTADOS[estado] || "#7fa7d9");
     corAtual = corAtual.map((c, i) => c + (corAlvo[i] - c) * 0.05);
     const cor = corAtual.map(Math.round);
@@ -304,6 +324,7 @@ const Enxame = (() => {
     estado(novo) { estado = novo; },
     mostrar(nova) { figuraForcada = DESENHOS[nova] ? nova : null; },
     set nivel(funcao) { nivel = funcao; },
+    set origem(funcao) { origem = funcao; },
     get figura() { return figura; },
   };
 })();
