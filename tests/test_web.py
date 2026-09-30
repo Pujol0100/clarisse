@@ -385,3 +385,67 @@ async def test_aviso_do_claude_aparece_como_balao_de_mensagem(tmp_path):
 
     [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
     assert falar["figura"] == "mensagem"
+
+
+class ExternasFalsas:
+    def __init__(self):
+        self.pedidos = []
+
+    def esquemas(self):
+        return [{"nome": "hora_e_data", "descricao": "Informa a hora.", "parametros": {"type": "object", "properties": {}}}]
+
+    async def executar(self, nome, argumentos):
+        self.pedidos.append((nome, argumentos))
+        return "São 10h."
+
+
+@pytest.fixture
+def com_externas(tmp_path, pasta_web):
+    externas = ExternasFalsas()
+    app = criar_app(
+        agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(), locutor=LocutorFalso(tmp_path / "audio"),
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"), externas=externas,
+    )
+    with TestClient(app, base_url=ORIGEM) as c:
+        yield c, externas
+
+
+def test_servidor_mcp_lista_as_ferramentas_com_a_chave(com_externas):
+    cliente, _ = com_externas
+
+    resposta = cliente.get("/api/ferramentas", headers={"X-Clarisse-Chave": CHAVE})
+
+    assert resposta.status_code == 200
+    assert resposta.json()["ferramentas"][0]["nome"] == "hora_e_data"
+
+
+def test_servidor_mcp_executa_pela_clarisse(com_externas):
+    cliente, externas = com_externas
+
+    resposta = cliente.post("/api/ferramenta", json={"nome": "hora_e_data", "argumentos": {}}, headers={"X-Clarisse-Chave": CHAVE})
+
+    assert resposta.json() == {"resultado": "São 10h."}
+    assert externas.pedidos == [("hora_e_data", {})]
+
+
+@pytest.mark.parametrize("rota,metodo", [("/api/ferramentas", "get"), ("/api/ferramenta", "post")])
+def test_rotas_do_servidor_mcp_exigem_a_chave(com_externas, rota, metodo):
+    cliente, externas = com_externas
+
+    resposta = getattr(cliente, metodo)(rota, **({"json": {"nome": "hora_e_data", "argumentos": {}}} if metodo == "post" else {}))
+
+    assert resposta.status_code in (401, 403)
+    assert externas.pedidos == []
+
+
+def test_campo_a_mais_no_pedido_e_recusado(com_externas):
+    cliente, externas = com_externas
+
+    resposta = cliente.post(
+        "/api/ferramenta", json={"nome": "hora_e_data", "argumentos": {}, "confirmado": True},
+        headers={"X-Clarisse-Chave": CHAVE},
+    )
+
+    assert resposta.status_code == 422
+    assert externas.pedidos == []

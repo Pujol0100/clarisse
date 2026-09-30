@@ -89,6 +89,12 @@ class Portaria:
         await PlainTextResponse(str(codigo), status_code=codigo)(scope, receive, send)
 
 
+class PedidoDeFerramenta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    nome: str = Field(min_length=1, max_length=80)
+    argumentos: dict = Field(default_factory=dict)
+
+
 class Mensagem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -121,6 +127,7 @@ def criar_app(
     *, agente, eventos: Eventos, transcritor, locutor, chave: str, porta: int, pasta_web: Path, pasta_audio: Path,
     conversa: Auditoria,
     tarefas_de_fundo: list[Callable[[], Awaitable[None]]] = (),
+    externas=None,
 ) -> FastAPI:
     @contextlib.asynccontextmanager
     async def ciclo_de_vida(app):
@@ -170,6 +177,20 @@ def criar_app(
     @app.get("/api/estado")
     async def estado():
         return {"estado": eventos.estado_atual.value}
+
+    @app.get("/api/ferramentas")
+    async def ferramentas():
+        """Para o servidor MCP da Clarisse: o que o Claude pode pedir."""
+        if externas is None:
+            raise HTTPException(404)
+        return {"ferramentas": externas.esquemas()}
+
+    @app.post("/api/ferramenta")
+    async def ferramenta(corpo: PedidoDeFerramenta):
+        """Para o servidor MCP da Clarisse: executa com a mesma avaliação e confirmação da voz."""
+        if externas is None:
+            raise HTTPException(404)
+        return {"resultado": await externas.executar(corpo.nome, corpo.argumentos)}
 
     @app.post("/api/mensagem")
     async def mensagem(corpo: Mensagem):
