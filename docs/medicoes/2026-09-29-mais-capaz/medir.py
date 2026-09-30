@@ -36,6 +36,12 @@ CASOS = [
     ("abre o pdf do contrato da smart", "abrir_arquivo", {"nome": "contrato"}),
     ("abre o readme do smart anchor", "abrir_arquivo", {"nome": "readme"}),
     ("abre a pasta de downloads", "abrir_pasta", {}),
+    ("roda o smart anchor", "rodar_aplicacao", {"projeto": "anchor"}),
+    ("consegue abrir o smart-anchor local", "rodar_aplicacao", {"projeto": "anchor"}),
+    ("você consegue rodar o smart-anchor no Google Chrome?", "rodar_aplicacao", {"projeto": "anchor"}),
+    ("sobe o omni app pra eu testar", "rodar_aplicacao", {"projeto": "omni"}),
+    ("inicia o sc360 local", "rodar_aplicacao", {"projeto": "sc360"}),
+    ("abre o projeto smart anchor no vs code", "abrir_projeto_vscode", {}),
     ("oi clarisse, tudo bem?", None, {}),
     ("obrigado, era só isso", None, {}),
 ]

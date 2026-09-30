@@ -137,6 +137,15 @@ def ferramentas_de_aplicacoes(
         partes = partes_do_projeto(projeto)
         if not partes:
             return projeto, [], [], f"Não sei rodar o {projeto.name}: ele não tem script de desenvolvimento (npm run dev ou start:dev)."
+        sem_dependencias = [
+            _nome_da_parte(projeto, p) for p in partes
+            if not (p.pasta / "node_modules").is_dir() and not (projeto / "node_modules").is_dir()
+        ]
+        if sem_dependencias:
+            return projeto, partes, [], (
+                f"O {projeto.name} não tem as dependências instaladas nesta máquina. "
+                f"Falta rodar npm install em: {', '.join(sem_dependencias)}."
+            )
         usados = [(parte, endereco) for parte in partes for endereco in bancos_do_env(parte.pasta)]
         producao = [bancos[e].nome for _, e in usados if e in bancos and bancos[e].producao]
         if producao:

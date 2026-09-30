@@ -12,9 +12,11 @@ BANCOS = {
 }
 
 
-def _pacote(pasta, scripts):
+def _pacote(pasta, scripts, instalado=True):
     pasta.mkdir(parents=True, exist_ok=True)
     (pasta / "package.json").write_text(json.dumps({"scripts": scripts}))
+    if instalado:
+        (pasta / "node_modules").mkdir(exist_ok=True)
 
 
 def _smart_anchor(raiz, banco="10.0.0.5:65432"):
@@ -243,3 +245,29 @@ async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
     assert executor.iniciados == [
         (["ptyxis", "--new-window", "-d", str(tmp_path / "omni-api"), "--", "npm", "run", "start:dev"], None),
     ]
+
+
+
+async def test_sem_dependencias_instaladas_nao_abre_terminal_e_diz_o_que_falta(montar, executor, tmp_path):
+    projeto = tmp_path / "smart-anchor"
+    _pacote(projeto / "backend", {"dev": "nest start --watch"}, instalado=False)
+    _pacote(projeto / "frontend", {"dev": "next dev -p 3100"})
+    f = montar()
+    args = f.argumentos(projeto="smart-anchor")
+
+    resposta = await f.executar(args)
+
+    assert f.risco_de(args) is Risco.SEGURO
+    assert executor.iniciados == []
+    assert "npm install" in resposta and "backend" in resposta
+
+
+async def test_dependencias_na_raiz_do_projeto_valem_para_as_partes(montar, executor, tmp_path):
+    projeto = tmp_path / "monorepo"
+    _pacote(projeto / "web", {"dev": "vite"}, instalado=False)
+    (projeto / "node_modules").mkdir()
+    f = montar()
+
+    await f.executar(f.argumentos(projeto="monorepo"))
+
+    assert len(executor.iniciados) == 1
