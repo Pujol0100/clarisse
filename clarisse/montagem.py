@@ -32,6 +32,7 @@ CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
 RAIZ = Path(__file__).resolve().parent.parent
 # Ferramentas que chamariam outro Claude: o Claude das etapas não pode pedi-las.
 FORA_DO_CLAUDE = {"pedir_ao_claude", "fazer_em_etapas"}
+CONFIRMAR_PARA_O_CLAUDE = {"apertar_atalho"}
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 # Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
 PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
@@ -151,5 +152,5 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
         tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa],
-        externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE),
+        externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )

@@ -200,3 +200,10 @@ def test_so_atalhos_que_perdem_coisa_pedem_confirmacao(ferramentas, atalho, risc
 def test_atalho_fora_da_lista_e_invalido(ferramentas):
     with pytest.raises(ValueError):
         ferramentas["apertar_atalho"].argumentos(atalho="ctrl+alt+del")
+
+
+def test_frase_do_atalho_so_avisa_perda_quando_fecha(ferramentas):
+    f = ferramentas["apertar_atalho"]
+
+    assert "se perde" not in f.frase_de_confirmacao(f.argumentos(atalho="enter", aplicativo="chrome"))
+    assert "se perde" in f.frase_de_confirmacao(f.argumentos(atalho="fechar_aba", aplicativo="chrome"))

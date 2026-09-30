@@ -160,3 +160,16 @@ async def test_ferramenta_de_fora_e_recusada_mesmo_se_pedida(agente, executadas)
 
     assert "recus" in resultado.lower()
     assert executadas == []
+
+
+async def test_ferramenta_marcada_pede_confirmacao_quando_quem_pede_e_o_claude(agente, executadas, anuncios):
+    from clarisse.externas import FerramentasExternas
+
+    externas = FerramentasExternas(agente._registro, agente, fora=set(), sempre_confirmar={"agenda"})
+    pedido = asyncio.create_task(externas.executar("agenda", {"texto": "amanhã"}))
+    await asyncio.sleep(0.05)
+
+    assert anuncios.falados and anuncios.falados[0].startswith("O Claude quer:")
+    assert executadas == []
+    await agente.responder("sim")
+    assert await pedido == "Amanhã: reunião às 10h."

@@ -148,7 +148,8 @@ def ferramentas_de_janelas(cadastros: Cadastros, executor, espera: float = 0.3) 
 
     def confirmar_atalho(args: ArgsAtalho) -> str:
         onde = args.aplicativo or args.titulo or "a janela da frente"
-        return f"Vou {args.atalho.replace('_', ' ')} em {onde}, e o que não estiver salvo se perde. Confirma?"
+        perda = ", e o que não estiver salvo se perde" if args.atalho in _PERDEM_TRABALHO else ""
+        return f"Vou apertar {args.atalho.replace('_', ' ')} em {onde}{perda}. Confirma?"
 
     return [
         Ferramenta(

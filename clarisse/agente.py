@@ -178,12 +178,12 @@ class Agente:
         mensagens += [chamada, resultado]
         return self._concluir(mensagens, inicio, resultado["content"])
 
-    async def executar_externo(self, nome: str, argumentos: dict) -> str:
+    async def executar_externo(self, nome: str, argumentos: dict, sempre_confirmar: bool = False) -> str:
         """Ferramenta pedida pelo Claude: mesma avaliação, e o que altera algo é confirmado pela voz."""
         decisao = avaliar(self._registro, nome, argumentos)
         if decisao.acao == "recusar":
             return f"Recusado: {decisao.motivo}."
-        if decisao.acao == "confirmar":
+        if decisao.acao == "confirmar" or sempre_confirmar:
             frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
             if not (self._confirmacoes and await self._confirmacoes.pedir(f"O Claude quer: {frase}")):
                 return "O usuário não confirmou; não fiz isso."
