@@ -138,3 +138,25 @@ async def test_argumento_invalido_e_recusado(agente, executadas):
 
     assert "recus" in resultado.lower()
     assert executadas == []
+
+
+def test_lista_para_o_claude_deixa_de_fora_as_ferramentas_que_chamam_outro_claude(agente):
+    from clarisse.externas import FerramentasExternas
+
+    externas = FerramentasExternas(agente._registro, agente, fora={"colar"})
+
+    [unica] = externas.esquemas()
+    assert unica["nome"] == "agenda"
+    assert unica["descricao"] == "lê a agenda"
+    assert unica["parametros"]["properties"]["texto"]["type"] == "string"
+
+
+async def test_ferramenta_de_fora_e_recusada_mesmo_se_pedida(agente, executadas):
+    from clarisse.externas import FerramentasExternas
+
+    externas = FerramentasExternas(agente._registro, agente, fora={"agenda"})
+
+    resultado = await externas.executar("agenda", {"texto": "x"})
+
+    assert "recus" in resultado.lower()
+    assert executadas == []
