@@ -117,3 +117,4 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | Componente | Origem | Versão | Licença | Modificado? |
 |---|---|---|---|---|
 | Fonte Atkinson Hyperlegible Next (subconjunto latin, `web/fontes/`) | Google Fonts (Braille Institute) | v7, baixada em 29/09/2026 | SIL Open Font License 1.1 | Não |
+| Modelo canônico de rosto (`web/malha-rosto.js`, 468 pontos e 898 triângulos) | Google MediaPipe, `mediapipe/modules/face_geometry/data/canonical_face_model.obj` | branch master, baixado em 30/09/2026 | Apache 2.0 (texto em `web/licencas/mediapipe-LICENSE.txt`) | Sim: convertido para JSON com 2 casas; `web/rosto.js` afina queixo e mandíbula, enche os lábios e aumenta os olhos em tempo de execução |
