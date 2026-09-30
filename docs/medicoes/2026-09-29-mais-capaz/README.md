@@ -87,3 +87,19 @@ porque estão na lista de projetos), "painel de inadimplência" (vira painel-fid
 
 Pelo agente completo: "abre o omni" → "O omni tem o site no ar e o projeto nesta
 máquina. Quer abrir o site ou rodar o projeto local?"; "o site" → abriu.
+
+## Fase 2 — tarefas em etapas (30/09/2026)
+
+- Gemma escolhendo `fazer_em_etapas` em pedidos compostos: **0/6** (sempre chama a
+  ferramenta da primeira etapa). Pedidos de uma etapa: 8/8, nenhum foi ao Claude.
+  Por isso o desvio é por regra: "e depois", "em seguida", "depois disso", "e quando
+  subir/terminar/abrir/estiver/ele/ela".
+- Testes reais com a Clarisse ligada, ouvindo os eventos da página:
+  - "Diga que horas são e depois como está o tempo em Campinas": 13 s, duas
+    ferramentas pela Clarisse, figuras relógio e nuvem, resposta falada.
+  - "Abra a calculadora e depois feche ela": pergunta "O Claude quer: Vou fechar o
+    calculadora… Confirma?"; com "sim" fechou (16 s); com "não" ficou aberta e o
+    Claude explicou que o usuário não confirmou.
+  - Pelo `/api/mensagem` (como a voz): "vê que horas são e depois me diz como está o
+    tempo em Campinas" → "Pedi ao Claude para fazer isso em etapas", depois o aviso
+    com as duas respostas.

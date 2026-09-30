@@ -41,6 +41,7 @@ figura é o sistema, pela ferramenta usada e pelo dado, nunca o modelo.
 | "abre a planilha de boletos", "abre o readme do smart anchor" | Procura o arquivo na pasta pessoal (nome e pasta; "planilha", "pdf", "documento" viram tipo) e abre; com vários, lista os 3 mais recentes |
 | "roda o smart anchor", "sobe o omni app" | Acha o projeto, abre um terminal por parte (`npm run dev` ou `start:dev`), instala as dependências antes se faltarem (`npm ci`) e abre o site quando responder; a confirmação diz qual banco o `.env` usa |
 | "o que é a Smart Compass?", "qual a cotação do dólar?" | Pede ao Claude, que pesquisa na internet, e fala a resposta |
+| "abre o kanban e depois me diz o tempo" (pedido com "e depois", "em seguida"…) | Vai inteiro para um Claude que usa as ferramentas da própria Clarisse, etapa por etapa; o que altera algo é perguntado pela voz ("O Claude quer: … Confirma?") |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
 
 Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer

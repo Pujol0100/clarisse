@@ -36,7 +36,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
 | 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache, exceto `edge-tts`, **LGPL-3.0**, usada como biblioteca sem modificação — leitura técnica; a decisão final é do jurídico |
 | 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração), e cada troca da conversa uma linha em `dados/conversa.jsonl`. Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
-| 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Único servidor MCP: o Playwright (`@playwright/mcp`, versão fixa 0.0.83, Apache-2.0), usado só pelo Claude das tarefas no navegador, com `--strict-mcp-config` e `--tools` restrito; a ferramenta pede confirmação e o pedido leva a regra de não enviar, comprar, apagar nem alterar nada |
+| 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Dois servidores MCP, cada um só para o seu Claude, com `--strict-mcp-config` e `--tools` restrito: o Playwright (`@playwright/mcp`, versão fixa 0.0.83, Apache-2.0) nas tarefas no navegador, que pedem confirmação e proíbem enviar, comprar, apagar ou alterar; e o da própria Clarisse (`clarisse/mcp_servidor.py`, SDK `mcp` 2.2.0, MIT) nas tarefas em etapas, que só repassa chamadas para a avaliação e a confirmação da Clarisse |
 
 ## O que o risco central exigiu
 
@@ -66,6 +66,15 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   visível, e a confirmação avisa.
 - **Abrir arquivo** só dentro da pasta pessoal, sem pastas ocultas, e recusa o que
   executa programa ao abrir (`.sh`, `.desktop`, `.AppImage`, arquivo executável).
+- **Claude das tarefas em etapas** (`fazer_em_etapas`): roda com `--strict-mcp-config`
+  e só enxerga o servidor MCP da Clarisse (`clarisse/mcp_servidor.py`) mais busca na
+  web. O servidor **não executa nada**: repassa cada chamada às rotas
+  `/api/ferramentas` e `/api/ferramenta`, protegidas pela chave da sessão, onde valem a
+  mesma avaliação (`clarisse/seguranca.py`), a auditoria e a confirmação. O que pede
+  confirmação é perguntado pela voz ("O Claude quer: …"); só "sim" libera, qualquer
+  outra resposta, "para" ou 60 s de silêncio cancelam. O Claude não pode pedir
+  `pedir_ao_claude` nem `fazer_em_etapas` (sem Claude chamando Claude), e
+  `apertar_atalho`, seguro para o modelo local, pede confirmação quando vem do Claude.
 - **Não existe ferramenta de tecla livre.** Colar texto pede confirmação mostrando o
   texto e a janela, e não aperta Enter; os atalhos são uma lista fechada
   (`clarisse/ferramentas/janelas.py`), e fechar aba ou janela pede confirmação.
@@ -86,6 +95,10 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **Banco não reconhecido é só avisado.** Um `.env` que aponte para produção por
   uma variável fora da convenção, ou um banco de produção que não está em
   `config/bancos.json`, passa com "um banco que eu não conheço" na confirmação.
+- **Injeção pela web no Claude das etapas:** uma página lida pelo Claude pode tentar
+  induzi-lo a agir. Ele só alcança as ferramentas da Clarisse, e as que alteram algo
+  (e os atalhos) dependem do "sim" falado; as de leitura e abrir site/programa rodam
+  sem pergunta.
 - **Perguntas sobre o mundo vão para a Anthropic** e o Claude pesquisa na web.
 - **Instalar dependências executa código de terceiros** (scripts de instalação dos
   pacotes npm), como quando o usuário roda `npm ci` à mão. Autorizado pelo usuário em

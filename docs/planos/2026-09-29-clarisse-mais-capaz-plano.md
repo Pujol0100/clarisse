@@ -106,6 +106,13 @@ agenda, de 12 a 24 s cada (antes 6 a 10 s, com falha em 2 de 3).
 
 ## Fase 2 — o Claude como cérebro das tarefas de várias etapas
 
+**Feito em 30/09/2026.** Servidor MCP que repassa à Clarisse (não executa nada);
+confirmação falada com botões na página; figuras dos drones por evento. O Gemma não
+escolhia `fazer_em_etapas` (0/6): pedido com "e depois", "em seguida", "depois
+disso" ou "e quando subir/terminar" vai direto, sem passar pelo modelo. Testes
+reais: hora + tempo (13 s, figuras relógio e nuvem), calculadora com "sim" (fechou)
+e com "não" (ficou aberta), e o pedido encadeado de ponta a ponta pela Clarisse.
+
 - **Servidor MCP da Clarisse** (processo local): expõe as mesmas ferramentas,
   com os mesmos testes. Nova dependência: `mcp` (SDK oficial em Python, licença
   MIT).
