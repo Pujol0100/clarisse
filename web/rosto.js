@@ -236,7 +236,7 @@ const Rosto = (() => {
     olhar = olhar.map((o, i) => o + (alvo[i] - o) * 0.06);
     const meta = CORES[estado] || CORES.idle;
     cor = cor.map((c, i) => Math.round(c + (meta[i] - c) * 0.06));
-    const destino = noCanto ? { x: 0.1, y: 0.16, tamanho: 0.3 } : { x: 0.5, y: 0.47, tamanho: 1 };
+    const destino = noCanto ? { x: 0.17, y: 0.22, tamanho: 0.3 } : { x: 0.5, y: 0.47, tamanho: 1 };
     const suave = MOVIMENTO_REDUZIDO ? 1 : 0.07;
     lugar = { x: lugar.x + (destino.x - lugar.x) * suave, y: lugar.y + (destino.y - lugar.y) * suave, tamanho: lugar.tamanho + (destino.tamanho - lugar.tamanho) * suave };
 
