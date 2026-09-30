@@ -145,6 +145,7 @@ async def test_agenda_espera_os_conectores_antes_de_o_claude_comecar(montar, exe
 
     assert executor.ambientes[0].get("MCP_CONNECTION_NONBLOCKING") == "false"
 
+
 async def test_criar_compromisso_pede_confirmacao_e_so_pode_criar_evento(montar, executor):
     f = montar()["criar_compromisso"]
     args = f.argumentos(titulo="Reunião com João", quando="amanhã às 15h")
@@ -155,6 +156,28 @@ async def test_criar_compromisso_pede_confirmacao_e_so_pode_criar_evento(montar,
     await f.executar(args)
     argumentos, _ = executor.executados[0]
     assert _valor_da_opcao(argumentos, "--allowedTools") == "mcp__claude_ai_Microsoft_365__outlook_create_event"
+
+
+async def test_compromisso_com_participantes_confirma_os_nomes_e_busca_as_pessoas(montar, executor):
+    f = montar()["criar_compromisso"]
+    args = f.argumentos(titulo="Alinhamento", quando="amanhã às 15h", participantes=["Bruno Santos", "Kaiki"])
+    executor.respostas.append(_json_do_claude("Criado."))
+
+    assert "convidando Bruno Santos e Kaiki" in f.frase_de_confirmacao(args)
+    await f.executar(args)
+    argumentos, _ = executor.executados[0]
+    assert set(_valor_da_opcao(argumentos, "--allowedTools").split(",")) == {
+        "mcp__claude_ai_Microsoft_365__outlook_create_event",
+        "mcp__claude_ai_Microsoft_365__search_people",
+    }
+    pedido = argumentos[2]
+    assert "Bruno Santos" in pedido and "Kaiki" in pedido
+    assert "não crie" in pedido.lower()
+
+
+def test_no_maximo_dez_participantes(montar):
+    with pytest.raises(ValueError):
+        montar()["criar_compromisso"].argumentos(titulo="x", quando="amanhã", participantes=[f"p{i}" for i in range(11)])
 
 
 async def test_tarefa_que_passa_do_teto_de_gasto_vira_aviso(montar, delegacoes, executor, avisos):

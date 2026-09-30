@@ -5,6 +5,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, create_model
 
@@ -19,6 +20,7 @@ log = logging.getLogger(__name__)
 FERRAMENTAS_DE_LEITURA = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
 _LER_AGENDA = "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
 _CRIAR_EVENTO = "mcp__claude_ai_Microsoft_365__outlook_create_event"
+_BUSCAR_PESSOAS = "mcp__claude_ai_Microsoft_365__search_people"
 _PARA_VOZ = (
     "Sua resposta será lida em voz alta por uma assistente. Responda em português do Brasil, "
     "em no máximo quatro frases curtas, sem markdown, sem listas e sem caminhos de arquivo."
@@ -137,6 +139,10 @@ def ferramentas_do_claude(
     class ArgsCompromisso(Argumentos):
         titulo: str = Field(max_length=200, description="Título do compromisso")
         quando: str = Field(max_length=100, description="Data e hora como o usuário falou")
+        participantes: list[Annotated[str, Field(max_length=80)]] = Field(
+            default_factory=list, max_length=10,
+            description="Pessoas a convidar, pelo nome como o usuário falou; vazio se ele não citou ninguém",
+        )
 
     def _pasta_neutra() -> Path:
         pasta_neutra.mkdir(parents=True, exist_ok=True)
@@ -175,13 +181,26 @@ def ferramentas_do_claude(
             f"'{args.titulo}' para {args.quando}, com uma hora de duração se nada for dito. "
             "Confirme a data e a hora que ficaram."
         )
-        resultado = await rodar_claude(executor, pedido, _pasta_neutra(), [_CRIAR_EVENTO], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
+        ferramentas = [_CRIAR_EVENTO]
+        if args.participantes:
+            pedido += (
+                f" Convide: {', '.join(args.participantes)}. Ache o e-mail de cada um pela busca de pessoas. "
+                "Se algum nome casar com mais de uma pessoa ou com nenhuma, não crie o compromisso: "
+                "diga quem você achou para cada nome."
+            )
+            ferramentas.append(_BUSCAR_PESSOAS)
+        resultado = await rodar_claude(executor, pedido, _pasta_neutra(), ferramentas, modelo, _TIMEOUT_DA_AGENDA, teto_usd)
         if apos_mudar_agenda:
             await apos_mudar_agenda()
         return resultado
 
     def confirmar_compromisso(args: ArgsCompromisso) -> str:
-        return f"Vou criar na sua agenda: {args.titulo}, {args.quando}. Confirma?"
+        convite = ""
+        if args.participantes:
+            nomes = args.participantes
+            lista = nomes[0] if len(nomes) == 1 else f"{', '.join(nomes[:-1])} e {nomes[-1]}"
+            convite = f", convidando {lista}"
+        return f"Vou criar na sua agenda: {args.titulo}, {args.quando}{convite}. Confirma?"
 
     class ArgsMensagem(Argumentos):
         conversa: str = Field(max_length=80, description="Nome da conversa do Claude, como o usuário falou")
