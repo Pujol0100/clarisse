@@ -196,3 +196,28 @@ async def test_nao_abre_arquivo_marcado_como_executavel(ferramentas, executor, t
 
     assert executor.iniciados == []
     assert "não abro" in resposta.lower()
+
+
+async def test_nome_da_pasta_tambem_conta(ferramentas, executor, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    alvo = _arquivo(tmp_path / "Documentos" / "smart-anchor", "README.md")
+    _arquivo(tmp_path / "Documentos" / "omni-api", "README.md")
+
+    await _rodar(ferramentas, "abrir_arquivo", nome="readme do smart anchor")
+
+    assert executor.iniciados == [(["xdg-open", str(alvo)], None)]
+
+
+@pytest.mark.parametrize("pedido,certo,errado", [
+    ("planilha de boletos", "boletos.xlsx", "boletos.ts"),
+    ("pdf do contrato", "contrato.pdf", "contrato.docx"),
+    ("documento do contrato", "contrato.docx", "contrato.ts"),
+])
+async def test_tipo_falado_vira_filtro_de_extensao(ferramentas, executor, tmp_path, monkeypatch, pedido, certo, errado):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    alvo = _arquivo(tmp_path / "Documentos", certo)
+    _arquivo(tmp_path / "Documentos", errado)
+
+    await _rodar(ferramentas, "abrir_arquivo", nome=pedido)
+
+    assert executor.iniciados == [(["xdg-open", str(alvo)], None)]

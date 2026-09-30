@@ -31,6 +31,11 @@ CASOS = [
     ("me lembra de pagar o boleto sexta às nove", "criar_compromisso", {"titulo": "boleto"}),
     ("marca dentista quinta às 14h", "criar_compromisso", {"titulo": "dentista"}),
     ("o que eu tenho na agenda amanhã?", "consultar_agenda", {}),
+    ("abre o arquivo do relatório de setembro", "abrir_arquivo", {"nome": "relat"}),
+    ("abre a planilha de boletos", "abrir_arquivo", {"nome": "boletos"}),
+    ("abre o pdf do contrato da smart", "abrir_arquivo", {"nome": "contrato"}),
+    ("abre o readme do smart anchor", "abrir_arquivo", {"nome": "readme"}),
+    ("abre a pasta de downloads", "abrir_pasta", {}),
     ("oi clarisse, tudo bem?", None, {}),
     ("obrigado, era só isso", None, {}),
 ]

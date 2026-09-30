@@ -21,6 +21,16 @@ _ESQUEMAS_PERIGOSOS = ("javascript:", "data:", "file:", "vbscript:", "mailto:")
 _PASTAS_PULADAS = {"node_modules", "__pycache__", "venv", "site-packages", "dist", "build", "graphify-out"}
 # Abrir estes pode executar um programa em vez de mostrar o arquivo.
 _EXTENSOES_QUE_EXECUTAM = {".sh", ".bash", ".desktop", ".appimage", ".run", ".bin", ".exe", ".jar", ".deb", ".rpm"}
+# Tipo falado vira filtro de extensão: nenhum arquivo tem "planilha" no nome.
+_TIPOS = {
+    "planilha": {".xlsx", ".xls", ".xlsm", ".csv", ".ods"},
+    "pdf": {".pdf"},
+    "documento": {".docx", ".doc", ".odt", ".pdf"},
+    "apresentacao": {".pptx", ".ppt", ".odp"},
+    "imagem": {".png", ".jpg", ".jpeg", ".webp", ".gif"},
+    "foto": {".png", ".jpg", ".jpeg", ".webp", ".heic"},
+}
+_PALAVRAS_SEM_PESO = {"arquivo", "abre", "abrir"}
 
 
 def data_por_extenso(momento: datetime) -> str:
@@ -66,19 +76,30 @@ class ArgsArquivo(Argumentos):
     nome: str = Field(max_length=200, description="Nome ou pedaço do nome do arquivo, como o usuário falou")
 
 
-def _palavras(texto: str) -> list[str]:
+def _palavras_e_tipos(texto: str) -> tuple[list[str], set[str]]:
     normalizado = normalizar(texto)
-    return [p for p in normalizado.split("-") if len(p) >= 3] or [normalizado]
+    palavras, extensoes = [], set()
+    for palavra in normalizado.split("-"):
+        if palavra in _TIPOS:
+            extensoes |= _TIPOS[palavra]
+        elif len(palavra) >= 3 and palavra not in _PALAVRAS_SEM_PESO:
+            palavras.append(palavra)
+    return palavras or [normalizado], extensoes
 
 
 def _procurar_arquivos(nome: str) -> list[Path]:
-    palavras = _palavras(nome)
+    palavras, extensoes = _palavras_e_tipos(nome)
+    casa = Path.home()
     achados = []
-    for raiz, pastas, arquivos in os.walk(Path.home()):
+    for raiz, pastas, arquivos in os.walk(casa):
         pastas[:] = [p for p in pastas if not p.startswith(".") and p not in _PASTAS_PULADAS]
         for arquivo in arquivos:
-            if not arquivo.startswith(".") and all(p in normalizar(arquivo) for p in palavras):
-                achados.append(Path(raiz) / arquivo)
+            caminho = Path(raiz) / arquivo
+            if arquivo.startswith(".") or (extensoes and caminho.suffix.lower() not in extensoes):
+                continue
+            onde = normalizar(str(caminho.relative_to(casa)))
+            if all(p in onde for p in palavras):
+                achados.append(caminho)
     return sorted(achados, key=lambda c: c.stat().st_mtime, reverse=True)
 
 
@@ -189,7 +210,9 @@ def ferramentas_do_sistema(
         Ferramenta("listar_programas_abertos", "Lista os programas abertos no computador.", Argumentos, listar_programas_abertos),
         Ferramenta("abrir_pasta", "Abre uma pasta no gerenciador de arquivos.", ArgsPasta, abrir_pasta),
         Ferramenta(
-            "abrir_arquivo", "Procura um arquivo pelo nome na pasta pessoal e abre no programa padrão.",
+            "abrir_arquivo",
+            "Abre qualquer arquivo do usuário (planilha, PDF, documento, imagem, texto) pelo nome ou pela pasta "
+            "onde está, no programa padrão.",
             ArgsArquivo, abrir_arquivo,
         ),
         Ferramenta("abrir_site", "Abre um site no navegador.", ArgsSite, abrir_site),
