@@ -26,6 +26,11 @@ _PARA_VOZ = (
     "em no máximo quatro frases curtas, sem markdown, sem listas e sem caminhos de arquivo."
 )
 _TIMEOUT_DA_AGENDA = 120
+# Sem isto o Claude responde sobre a Smart Compass só com o que sabe das configurações (29/09/2026).
+_PESQUISE = (
+    "Se a pergunta for sobre o mundo (uma empresa, uma pessoa, preços, cotações, notícias ou fatos de hoje), "
+    "pesquise na internet antes de responder, em vez de responder só com o que você já sabe."
+)
 # Sem isto o Claude começa a responder antes de os conectores do claude.ai conectarem e,
 # às vezes, diz que não tem calendário (medido em 29/09/2026: 2 de 3 consultas). Com "false"
 # ele espera, no máximo 5 s, e segue.
@@ -165,7 +170,8 @@ def ferramentas_do_claude(
             pasta, titulo = cadastros.projetos[chave], chave
         else:
             pasta, titulo = _pasta_neutra(), "Claude"
-        delegacoes.iniciar(titulo, rodar_claude(executor, args.pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout, teto_usd))
+        pedido = f"{args.pedido}\n\n{_PESQUISE}"
+        delegacoes.iniciar(titulo, rodar_claude(executor, pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout, teto_usd))
         return "Pedi ao Claude. Aviso quando ele terminar."
 
     async def consultar_agenda(args: ArgsAgenda) -> str:

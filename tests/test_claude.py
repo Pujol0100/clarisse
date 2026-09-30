@@ -73,7 +73,8 @@ async def test_pedir_ao_claude_responde_na_hora_e_avisa_quando_termina(montar, d
 
     assert avisos.recebidos == [("omni-api", "O build quebra por falta da variável X.")]
     argumentos, pasta = executor.executados[0]
-    assert argumentos[:3] == ["claude", "-p", "por que o build quebra?"]
+    assert argumentos[:2] == ["claude", "-p"]
+    assert argumentos[2].startswith("por que o build quebra?")
     assert pasta == cadastros.projetos["omni-api"]
     assert _valor_da_opcao(argumentos, "--setting-sources") == "project"
     assert "--no-session-persistence" in argumentos
@@ -262,3 +263,15 @@ async def test_navegador_roda_um_claude_so_com_o_navegador_e_proibido_de_agir(na
 
 def test_sem_configuracao_do_navegador_a_ferramenta_nao_existe(montar):
     assert "fazer_no_navegador" not in montar()
+
+
+async def test_pedido_ao_claude_manda_pesquisar_na_internet_perguntas_sobre_o_mundo(montar, executor, delegacoes):
+    f = montar()["pedir_ao_claude"]
+    executor.respostas.append(_json_do_claude("A Smart Compass é..."))
+
+    await f.executar(f.argumentos(pedido="O que é a Smart Compass?"))
+    await delegacoes.aguardar()
+
+    argumentos, _ = executor.executados[0]
+    assert argumentos[2].startswith("O que é a Smart Compass?")
+    assert "pesquise na internet" in argumentos[2].lower()
