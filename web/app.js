@@ -149,6 +149,7 @@ function receberTrecho(e) {
   }
   const audio = new Audio(e.audio);
   audio.preload = "auto";
+  audio.muted = !tenhoAVoz;
   falaAtual.trechos[e.parte] = { audio, legenda: e.legenda };
   if (!falaAtual.tocando) tocarProximo();
 }
@@ -249,6 +250,22 @@ async function enviarGravacao(fluxo) {
   await chamar("/api/voz", { method: "POST", headers: { "Content-Type": "audio/webm" }, body: audio });
 }
 
+/* ---------- uma voz só ----------
+   Com várias abas abertas, todas mostram a conversa, mas só a que o servidor escolheu toca o som;
+   as outras tocam mudas, para a legenda e o chat andarem juntos. A aba que a pessoa usa pede a voz. */
+
+let tenhoAVoz = true;
+let canalAberto = null;
+
+function receberAVoz(sua) {
+  tenhoAVoz = sua;
+  if (falaAtual) falaAtual.trechos.forEach((t) => { if (t) t.audio.muted = !sua; });
+}
+
+function pedirAVoz() {
+  if (!tenhoAVoz && canalAberto && canalAberto.readyState === WebSocket.OPEN) canalAberto.send("voz");
+}
+
 /* ---------- servidor ---------- */
 
 async function chamar(caminho, opcoes) {
@@ -289,7 +306,9 @@ const tratadores = {
     figuraSemFala = setTimeout(() => { if (!falaAtual) mostrarFigura(null); }, 8000);
   },
   parar: () => pararDeFalar(),
-  escutar: () => alternarMicrofone(),
+  // O atalho de teclado chega a todas as abas; só a que tem a voz grava, senão o pedido iria duas vezes.
+  escutar: () => { if (tenhoAVoz) alternarMicrofone(); },
+  voz: (e) => receberAVoz(e.sua),
   erro: (e) => {
     // Voz falhou no meio: o texto que esperava aparece, e a fala termina onde parou.
     if (e.fala) {
@@ -304,7 +323,11 @@ let espera = 500;
 
 function conectar() {
   const canal = new WebSocket(`ws://${location.host}/ws`);
-  canal.addEventListener("open", () => { espera = 500; });
+  canalAberto = canal;
+  canal.addEventListener("open", () => {
+    espera = 500;
+    if (document.hasFocus()) canal.send("voz");
+  });
   canal.addEventListener("message", (m) => {
     const evento = JSON.parse(m.data);
     const tratar = tratadores[evento.tipo];
@@ -326,6 +349,10 @@ function conectar() {
 }
 
 /* ---------- controles ---------- */
+
+window.addEventListener("focus", pedirAVoz);
+document.addEventListener("pointerdown", pedirAVoz);
+document.addEventListener("keydown", pedirAVoz);
 
 elementos.falar.addEventListener("click", alternarMicrofone);
 elementos.formulario.addEventListener("submit", (e) => {

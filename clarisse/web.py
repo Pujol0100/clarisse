@@ -267,6 +267,7 @@ def criar_app(
     async def ws(websocket: WebSocket):
         await websocket.accept()
         fila = eventos.assinar()
+        eventos.entrar_na_voz(fila)
 
         async def enviar():
             await websocket.send_json({"tipo": "estado", "estado": eventos.estado_atual.value})
@@ -275,7 +276,8 @@ def criar_app(
 
         async def receber():
             while True:
-                await websocket.receive_text()
+                if await websocket.receive_text() == "voz":
+                    eventos.pedir_a_voz(fila)
 
         tarefas = [asyncio.create_task(enviar()), asyncio.create_task(receber())]
         try:

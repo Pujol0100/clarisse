@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import ExitStack
 
 import pytest
 from fastapi.testclient import TestClient
@@ -265,11 +266,52 @@ def test_websocket_de_host_estranho_e_recusado(cliente):
 def test_websocket_recebe_o_estado_atual_e_os_eventos(logado):
     with logado.websocket_connect("/ws", headers=_cabecalhos_ws()) as ws:
         primeiro = ws.receive_json()
+        voz = ws.receive_json()
         logado.post("/api/escutar")
         evento = ws.receive_json()
 
     assert primeiro == {"tipo": "estado", "estado": "idle"}
+    assert voz == {"tipo": "voz", "sua": True}
     assert evento["tipo"] == "escutar"
+
+
+def _conectar(pilha, cliente):
+    ws = pilha.enter_context(cliente.websocket_connect("/ws", headers=_cabecalhos_ws()))
+    assert ws.receive_json()["tipo"] == "estado"
+    return ws
+
+
+def test_com_duas_paginas_abertas_so_a_primeira_fala(logado):
+    with ExitStack() as pilha:
+        primeira = _conectar(pilha, logado)
+        segunda = _conectar(pilha, logado)
+
+        assert primeira.receive_json() == {"tipo": "voz", "sua": True}
+        assert segunda.receive_json() == {"tipo": "voz", "sua": False}
+
+
+def test_pagina_que_pede_a_voz_passa_a_falar_e_a_outra_se_cala(logado):
+    with ExitStack() as pilha:
+        primeira = _conectar(pilha, logado)
+        segunda = _conectar(pilha, logado)
+        primeira.receive_json()
+        segunda.receive_json()
+
+        segunda.send_text("voz")
+
+        assert segunda.receive_json() == {"tipo": "voz", "sua": True}
+        assert primeira.receive_json() == {"tipo": "voz", "sua": False}
+
+
+def test_quando_a_pagina_que_fala_fecha_a_outra_assume_a_voz(logado):
+    with ExitStack() as da_segunda:
+        with ExitStack() as da_primeira:
+            primeira = _conectar(da_primeira, logado)
+            segunda = _conectar(da_segunda, logado)
+            primeira.receive_json()
+            segunda.receive_json()
+
+        assert segunda.receive_json() == {"tipo": "voz", "sua": True}
 
 
 def test_fim_da_fala_volta_ao_estado_parado(logado, partes):
