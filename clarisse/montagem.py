@@ -17,6 +17,7 @@ from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
+from clarisse.ferramentas.leitura import ferramentas_de_leitura
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
@@ -87,6 +88,7 @@ def montar_registro(
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
+        *ferramentas_de_leitura(executor),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
             raizes=raizes,
