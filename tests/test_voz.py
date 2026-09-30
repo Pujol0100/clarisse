@@ -76,3 +76,9 @@ async def test_locutor_apaga_os_audios_mais_antigos(tmp_path):
 )
 def test_texto_para_fala(entrada, saida):
     assert texto_para_fala(entrada) == saida
+
+
+def test_link_em_markdown_vira_so_o_texto_dele():
+    falado = texto_para_fala("Só achei no site.\n\nFontes: [Smart Compass](https://www.smartcompass.com.br/)")
+
+    assert falado == "Só achei no site. Fontes: Smart Compass"

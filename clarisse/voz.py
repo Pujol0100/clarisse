@@ -6,11 +6,13 @@ import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+_LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _URL = re.compile(r"https?://\S+")
 _MARCAS_DE_LISTA = re.compile(r"^\s*(?:#+|[-*•]|\d+[.)])\s*")
 
 
 def texto_para_fala(texto: str) -> str:
+    texto = _LINK_MARKDOWN.sub(r"\1", texto)
     texto = _URL.sub("o link", texto)
     texto = re.sub(r"[*_`]", "", texto)
     frases = []
