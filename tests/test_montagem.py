@@ -1,6 +1,7 @@
 import json
 import re
 import stat
+from pathlib import Path
 
 import httpx
 
@@ -26,7 +27,7 @@ def test_registro_tem_todas_as_ferramentas_do_desenho(cadastros, executor, tmp_p
         "abrir_claude_na_tela", "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
         "mandar_para_conversa_do_claude", "fazer_no_navegador",
         "noticias_do_dia", "previsao_do_tempo",
-        "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir",
+        "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir", "fazer_em_etapas",
     }
 
 
@@ -47,3 +48,16 @@ def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
 
     pacote = config["mcpServers"]["playwright"]["args"][-1]
     assert re.fullmatch(r"@playwright/mcp@\d+\.\d+\.\d+", pacote)
+
+
+def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
+
+    servidor = json.loads(montagem._config_da_clarisse(porta=8765).read_text())["mcpServers"]["clarisse"]
+
+    assert servidor["command"] == sys.executable
+    assert servidor["args"] == ["-m", "clarisse.mcp_servidor"]
+    assert servidor["env"]["CLARISSE_PORTA"] == "8765"
+    assert (Path(servidor["env"]["PYTHONPATH"]) / "clarisse" / "mcp_servidor.py").is_file()

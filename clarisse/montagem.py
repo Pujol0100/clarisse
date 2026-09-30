@@ -2,6 +2,7 @@
 import json
 import os
 import secrets
+import sys
 from pathlib import Path
 
 import httpx
@@ -10,7 +11,9 @@ from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, ma
 from clarisse.agente import Agente
 from clarisse.auditoria import Auditoria
 from clarisse.config import Ajustes, Cadastros
+from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Eventos
+from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
@@ -23,9 +26,12 @@ from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.voz import Locutor, Transcritor, carregar_whisper
-from clarisse.web import criar_app, criar_avisador
+from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
 CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
+RAIZ = Path(__file__).resolve().parent.parent
+# Ferramentas que chamariam outro Claude: o Claude das etapas não pode pedi-las.
+FORA_DO_CLAUDE = {"pedir_ao_claude", "fazer_em_etapas"}
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 # Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
 PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
@@ -48,6 +54,19 @@ def _config_do_navegador() -> Path:
     PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
     caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}))
+    return caminho
+
+
+def _config_da_clarisse(porta: int) -> Path:
+    """O Claude das tarefas em etapas só enxerga este servidor: as ferramentas da própria Clarisse."""
+    PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
+    caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-clarisse.json"
+    servidor = {
+        "command": sys.executable,
+        "args": ["-m", "clarisse.mcp_servidor"],
+        "env": {"PYTHONPATH": str(RAIZ), "CLARISSE_PORTA": str(porta)},
+    }
+    caminho.write_text(json.dumps({"mcpServers": {"clarisse": servidor}}))
     return caminho
 
 
@@ -83,6 +102,7 @@ def montar_registro(
             teto_usd=ajustes.claude_teto_usd,
             apos_mudar_agenda=apos_mudar_agenda,
             mcp_navegador=_config_do_navegador(),
+            mcp_clarisse=_config_da_clarisse(ajustes.porta),
         ),
         *ferramentas_de_noticias(http),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
@@ -120,6 +140,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         projetos=list(cadastros.projetos),
         cidade=ajustes.cidade,
         sistemas=lambda: [site.nome for site in carregar_sites(ajustes.pasta_config)],
+        confirmacoes=Confirmacoes(criar_anunciador(eventos, locutor)),
     )
     transcritor = Transcritor(
         carregar=lambda: carregar_whisper(ajustes.whisper_modelo, ajustes.whisper_dispositivo),
@@ -130,4 +151,5 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
         tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa],
+        externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE),
     )

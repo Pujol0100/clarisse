@@ -275,3 +275,37 @@ async def test_pedido_ao_claude_manda_pesquisar_na_internet_perguntas_sobre_o_mu
     argumentos, _ = executor.executados[0]
     assert argumentos[2].startswith("O que é a Smart Compass?")
     assert "pesquise na internet" in argumentos[2].lower()
+
+
+@pytest.fixture
+def em_etapas(cadastros, executor, delegacoes, tmp_path):
+    config = tmp_path / "mcp-clarisse.json"
+    ferramentas = ferramentas_do_claude(
+        cadastros, executor, delegacoes, pasta_neutra=tmp_path / "neutra", modelo="sonnet", timeout=600,
+        teto_usd=1.0, mcp_clarisse=config,
+    )
+    return {f.nome: f for f in ferramentas}["fazer_em_etapas"], config
+
+
+async def test_em_etapas_roda_um_claude_so_com_as_ferramentas_da_clarisse(em_etapas, delegacoes, executor, avisos):
+    f, config = em_etapas
+    executor.respostas.append(_json_do_claude("Abri o projeto e o arquivo."))
+    args = f.argumentos(pedido="abre o projeto omni api e depois o arquivo do boleto")
+
+    resposta = await f.executar(args)
+    await delegacoes.aguardar()
+
+    assert f.risco_de(args) is Risco.SEGURO
+    assert "aviso" in resposta.lower()
+    argumentos, _ = executor.executados[0]
+    assert _valor_da_opcao(argumentos, "--mcp-config") == str(config)
+    assert "--strict-mcp-config" in argumentos
+    assert set(_valor_da_opcao(argumentos, "--allowedTools").split(",")) == {"mcp__clarisse", "WebSearch", "WebFetch"}
+    assert set(_valor_da_opcao(argumentos, "--tools").split(",")) == {"WebSearch", "WebFetch", "ToolSearch"}
+    assert argumentos[2].startswith("abre o projeto omni api e depois o arquivo do boleto")
+    assert "confirmad" in argumentos[2]
+    assert avisos.recebidos == [("Claude", "Abri o projeto e o arquivo.")]
+
+
+def test_sem_o_servidor_da_clarisse_nao_ha_em_etapas(montar):
+    assert "fazer_em_etapas" not in montar()

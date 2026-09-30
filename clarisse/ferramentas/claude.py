@@ -37,6 +37,13 @@ _PESQUISE = (
 _ESPERAR_CONECTORES = {"MCP_CONNECTION_NONBLOCKING": "false"}
 _FERRAMENTAS_DE_MENSAGEM = ["SendMessage", "ListAgents"]
 _NAVEGADOR = "mcp__playwright"
+_CLARISSE = "mcp__clarisse"
+_REGRAS_EM_ETAPAS = (
+    "Você controla o computador do usuário só pelas ferramentas da Clarisse (servidor clarisse). "
+    "Faça o pedido em etapas, uma ferramenta por vez, conferindo o resultado de cada uma. "
+    "Ações que alteram algo são confirmadas pela voz do usuário; se ele não confirmar, pare e diga o que ficou pendente. "
+    "No fim, diga em até quatro frases o que fez."
+)
 _REGRAS_DO_NAVEGADOR = (
     "Regras: use só o navegador. Não envie formulários, não compre, não apague nem altere nada. "
     "Se para cumprir o pedido for preciso agir num site, pare e diga o que faria."
@@ -124,6 +131,7 @@ def ferramentas_do_claude(
     agora: Callable[[], datetime] = datetime.now,
     apos_mudar_agenda: Callable[[], Awaitable[None]] | None = None,
     mcp_navegador: Path | None = None,
+    mcp_clarisse: Path | None = None,
 ) -> list[Ferramenta]:
     ArgsNaTela = create_model(
         "ArgsNaTela",
@@ -247,6 +255,18 @@ def ferramentas_do_claude(
         )
         return "Abri o navegador para isso. Aviso quando terminar."
 
+    class ArgsEtapas(Argumentos):
+        pedido: str = Field(max_length=2000, description="O pedido inteiro, com as palavras do usuário")
+
+    async def fazer_em_etapas(args: ArgsEtapas) -> str:
+        pedido = f"{args.pedido}\n\n{_REGRAS_EM_ETAPAS}"
+        ferramentas = [_CLARISSE, "WebSearch", "WebFetch"]
+        delegacoes.iniciar(
+            "Claude",
+            rodar_claude(executor, pedido, _pasta_neutra(), ferramentas, modelo, timeout, teto_usd, mcp_config=mcp_clarisse),
+        )
+        return "Pedi ao Claude para fazer isso em etapas. Aviso quando terminar."
+
     def confirmar_navegador(args: ArgsNavegador) -> str:
         return f"Vou usar o navegador para: {args.pedido}. Confirma?"
 
@@ -287,4 +307,10 @@ def ferramentas_do_claude(
             "O resultado é falado quando fica pronto.",
             ArgsNavegador, fazer_no_navegador, risco=Risco.CONFIRMAR, descrever=confirmar_navegador, figura=CODIGO,
         )] if mcp_navegador else []),
+        *([Ferramenta(
+            "fazer_em_etapas",
+            "Para pedidos com várias etapas no computador ('abre o projeto e depois o arquivo', 'abre o site e confere "
+            "tal coisa'). O Claude faz em sequência com as ferramentas da Clarisse e o resultado é falado no fim.",
+            ArgsEtapas, fazer_em_etapas, figura=CODIGO,
+        )] if mcp_clarisse else []),
     ]

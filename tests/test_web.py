@@ -449,3 +449,16 @@ def test_campo_a_mais_no_pedido_e_recusado(com_externas):
 
     assert resposta.status_code == 422
     assert externas.pedidos == []
+
+
+async def test_pergunta_do_claude_aparece_com_os_botoes_e_e_falada_uma_vez(tmp_path):
+    from clarisse.web import criar_anunciador
+
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_anunciador(eventos, locutor)("O Claude quer: Vou colar oi. Confirma?")
+
+    publicados = [fila.get_nowait() for _ in range(fila.qsize())]
+    assert {"tipo": "resposta", "texto": "O Claude quer: Vou colar oi. Confirma?", "aguardando_confirmacao": True}.items() <= publicados[0].items()
+    assert locutor.textos == ["O Claude quer: Vou colar oi. Confirma?"]

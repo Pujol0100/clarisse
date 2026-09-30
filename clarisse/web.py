@@ -115,6 +115,15 @@ async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = Non
     return url
 
 
+def criar_anunciador(eventos: Eventos, locutor) -> Callable[[str], Awaitable[None]]:
+    """Pergunta de confirmação vinda do Claude: aparece com os botões e é falada."""
+    async def anunciar(frase: str) -> None:
+        await eventos.publicar({"tipo": "resposta", "texto": frase, "aguardando_confirmacao": True})
+        await _falar(eventos, locutor, frase, figura=MENSAGEM)
+
+    return anunciar
+
+
 def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[None]]:
     async def avisar(titulo: str, texto: str) -> None:
         await eventos.publicar({"tipo": "aviso", "titulo": titulo, "texto": texto})

@@ -194,6 +194,7 @@ const tratadores = {
   resposta: (e) => mostrarClarisse(e.texto, e.aguardando_confirmacao),
   aviso: (e) => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`),
   falar: (e) => tocar(e.audio, e.figura),
+  figura: (e) => Enxame.mostrar(e.figura),
   parar: () => pararDeFalar(),
   escutar: () => alternarMicrofone(),
   erro: (e) => mostrarClarisse(e.texto),
