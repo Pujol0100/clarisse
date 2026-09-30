@@ -20,9 +20,11 @@ from clarisse.config import normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 
 _ARQUIVOS_ENV = (".env", ".env.local", ".env.development")
-_ESQUEMAS_DE_BANCO = ("postgres", "postgresql", "mysql", "mariadb", "mongodb", "mongodb+srv", "redis", "rediss")
-# Variáveis que se declaram de produção não são lidas pelo servidor de desenvolvimento.
-_DECLARA_PRODUCAO = re.compile(r"^DBP_|PROD", re.IGNORECASE)
+# Só as variáveis que o servidor de desenvolvimento usa por convenção. O .env costuma ter
+# também as de scripts (sincronização, migração) apontando para produção, que o dev não lê.
+_URLS_DO_BANCO = ("DATABASE_URL", "MONGO_URI", "MONGODB_URI", "MONGO_URL", "REDIS_URL")
+_PREFIXOS_HOST_PORTA = ("DB", "POSTGRES", "PG", "MYSQL")
+_LOCAIS = {"localhost", "127.0.0.1", "::1"}
 _PORTA_NO_SCRIPT = re.compile(r"(?:-p|--port)[ =](\d+)")
 _PORTA_PADRAO = {"next": 3000, "vite": 5173, "react-scripts": 3000, "nuxt": 3000}
 
@@ -64,15 +66,15 @@ def bancos_do_env(pasta: Path) -> list[str]:
         if (pasta / nome).is_file():
             valores.update(dotenv_values(pasta / nome))
     enderecos = []
-    for chave, valor in valores.items():
-        if not valor or _DECLARA_PRODUCAO.search(chave):
-            continue
-        url = urlparse(valor)
-        if url.scheme in _ESQUEMAS_DE_BANCO and url.hostname:
+    for chave in _URLS_DO_BANCO:
+        url = urlparse(valores.get(chave) or "")
+        if url.hostname:
             enderecos.append(f"{url.hostname}:{url.port or ''}".rstrip(":"))
-        elif chave.endswith("_HOST") and "DB" in chave.upper():
-            porta = valores.get(chave.removesuffix("_HOST") + "_PORT") or ""
-            enderecos.append(f"{valor}:{porta}".rstrip(":"))
+    for prefixo in _PREFIXOS_HOST_PORTA:
+        host = valores.get(f"{prefixo}_HOST") or valores.get(f"{prefixo}HOST")
+        if host:
+            porta = valores.get(f"{prefixo}_PORT") or valores.get(f"{prefixo}PORT") or ""
+            enderecos.append(f"{host}:{porta}".rstrip(":"))
     return list(dict.fromkeys(enderecos))
 
 
@@ -145,6 +147,8 @@ def ferramentas_de_aplicacoes(
             quem = _nome_da_parte(projeto, parte)
             if endereco in bancos:
                 frase += f" O {quem} usa o banco {bancos[endereco].nome}."
+            elif endereco.partition(":")[0] in _LOCAIS:
+                frase += f" O {quem} usa um banco local desta máquina."
             else:
                 host, _, porta = endereco.partition(":")
                 frase += f" O {quem} usa um banco que eu não conheço, no endereço {host}" + (f" porta {porta}." if porta else ".")

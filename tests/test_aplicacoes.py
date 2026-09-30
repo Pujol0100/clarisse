@@ -25,6 +25,10 @@ def _smart_anchor(raiz, banco="10.0.0.5:65432"):
     (projeto / "backend" / ".env").write_text(
         f'DATABASE_URL="postgresql://postgres:senha-secreta@{host}:{porta}/postgres?schema=app"\n'
         'DATABASE_URL_PROD="postgresql://postgres:outra@10.0.0.5:45432/postgres"\n'
+        # Variáveis de scripts de sincronização: apontam para produção, mas o servidor de dev não as usa.
+        'SYNC_URL_ORIGEM="postgresql://postgres:outra@10.0.0.5:45432/postgres"\n'
+        "PD_DB_HOST=10.0.0.5\n"
+        "PD_DB_PORT=45432\n"
     )
     return projeto
 
@@ -206,3 +210,25 @@ async def test_esperar_site_desiste_no_limite():
     cliente = httpx.AsyncClient(transport=httpx.MockTransport(responder))
 
     assert await esperar_site("http://localhost:3100", cliente, limite=0.05, intervalo=0.01) is False
+
+
+
+def test_banco_no_estilo_db_host_e_db_port(montar, tmp_path):
+    _pacote(tmp_path / "omni-app", {"dev": "vite"})
+    (tmp_path / "omni-app" / ".env").write_text("DB_HOST=10.0.0.5\nDB_PORT=65432\nDB_PASSWORD=segredo\n")
+    f = montar()
+
+    frase = f.frase_de_confirmacao(f.argumentos(projeto="omni-app"))
+
+    assert "desenvolvimento do smart-anchor" in frase
+    assert "segredo" not in frase
+
+
+def test_banco_local_da_maquina_e_dito_como_local(montar, tmp_path):
+    _pacote(tmp_path / "sc360", {"dev": "next dev"})
+    (tmp_path / "sc360" / ".env").write_text('DATABASE_URL="postgresql://u:p@localhost:5440/sc360"\n')
+    f = montar()
+
+    frase = f.frase_de_confirmacao(f.argumentos(projeto="sc360"))
+
+    assert "local desta máquina" in frase
