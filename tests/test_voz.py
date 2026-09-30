@@ -82,3 +82,16 @@ def test_link_em_markdown_vira_so_o_texto_dele():
     falado = texto_para_fala("Só achei no site.\n\nFontes: [Smart Compass](https://www.smartcompass.com.br/)")
 
     assert falado == "Só achei no site. Fontes: Smart Compass"
+
+
+def test_bloco_de_codigo_vira_aviso_em_vez_de_ser_soletrado():
+    falado = texto_para_fala("Rode isto:\n\n```bash\nuv run pytest -q\nls -la\n```\n\nDepois me avise.")
+
+    assert falado == "Rode isto: Trecho de código. Depois me avise."
+
+
+def test_tabela_e_lida_sem_as_barras():
+    falado = texto_para_fala("| Nome | Valor |\n|---|---|\n| Kanban | no ar |")
+
+    assert "|" not in falado and "---" not in falado
+    assert "Kanban" in falado and "no ar" in falado

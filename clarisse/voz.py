@@ -9,15 +9,27 @@ from pathlib import Path
 _LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _URL = re.compile(r"https?://\S+")
 _MARCAS_DE_LISTA = re.compile(r"^\s*(?:#+|[-*•]|\d+[.)])\s*")
+# Comando soletrado em voz alta não ajuda ninguém: o bloco vira um aviso.
+_BLOCO_DE_CODIGO = re.compile(r"```.*?```", re.DOTALL)
+_SEPARADOR_DE_TABELA = re.compile(r"^\s*\|?[\s:|-]*-{3,}[\s:|-]*$")
+
+
+def _linha_de_tabela(linha: str) -> str:
+    if not linha.strip().startswith("|"):
+        return linha
+    return ", ".join(celula.strip() for celula in linha.strip().strip("|").split("|") if celula.strip())
 
 
 def texto_para_fala(texto: str) -> str:
+    texto = _BLOCO_DE_CODIGO.sub("\nTrecho de código.\n", texto)
     texto = _LINK_MARKDOWN.sub(r"\1", texto)
     texto = _URL.sub("o link", texto)
     texto = re.sub(r"[*_`]", "", texto)
     frases = []
     for linha in texto.splitlines():
-        linha = _MARCAS_DE_LISTA.sub("", linha).strip()
+        if _SEPARADOR_DE_TABELA.match(linha):
+            continue
+        linha = _MARCAS_DE_LISTA.sub("", _linha_de_tabela(linha)).strip()
         if linha:
             frases.append(linha if linha[-1] in ".!?:;," else linha + ".")
     falado = " ".join(frases)
