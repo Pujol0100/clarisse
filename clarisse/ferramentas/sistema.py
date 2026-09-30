@@ -13,6 +13,7 @@ from pydantic import Field
 from clarisse.config import Cadastros, normalizar
 from clarisse.figuras import RELOGIO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
+from clarisse.ferramentas.aplicacoes import achar_projetos
 from clarisse.sites import Site, achar_sites
 
 _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
@@ -122,6 +123,7 @@ def ferramentas_do_sistema(
     agora: Callable[[], datetime] = datetime.now,
     processos: Callable[[], list[str]] = _nomes_dos_processos,
     sites: Callable[[], list[Site]] = list,
+    raizes: list[Path] = (),
 ) -> list[Ferramenta]:
     cadastrados = ", ".join(cadastros.aplicativos) or "nenhum"
 
@@ -131,6 +133,12 @@ def ferramentas_do_sistema(
     async def abrir_aplicativo(args: ArgsNome) -> str:
         chave = cadastros.achar_aplicativo(args.nome)
         if chave is None:
+            # O modelo às vezes chama esta ferramenta para sistema da empresa ou projeto.
+            if len(achados := achar_sites(args.nome, sites())) == 1:
+                await executor.iniciar(["xdg-open", achados[0].endereco])
+                return f"Abri o {achados[0].nome} no navegador."
+            if projetos := achar_projetos(args.nome, list(raizes)):
+                return f"O {projetos[0].name} é um projeto desta máquina. Quer que eu rode ele local ou abra no VS Code?"
             return f"Não conheço o aplicativo {args.nome}. Os cadastrados são: {cadastrados}."
         await executor.iniciar(cadastros.aplicativos[chave].abrir)
         return f"Abri o {chave}."

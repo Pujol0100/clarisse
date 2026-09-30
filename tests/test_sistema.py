@@ -241,3 +241,23 @@ async def test_endereco_com_ponto_continua_indo_direto(cadastros, executor):
     await f["abrir_site"].executar(f["abrir_site"].argumentos(endereco="github.com"))
 
     assert executor.iniciados == [(["xdg-open", "https://github.com"], None)]
+
+
+async def test_abrir_aplicativo_com_nome_de_sistema_abre_o_site(cadastros, executor):
+    from clarisse.sites import Site
+
+    f = {x.nome: x for x in ferramentas_do_sistema(cadastros, executor, sites=lambda: [Site("kanban", "https://kanban.empresa/")])}
+
+    await f["abrir_aplicativo"].executar(f["abrir_aplicativo"].argumentos(nome="kanban"))
+
+    assert executor.iniciados == [(["xdg-open", "https://kanban.empresa/"], None)]
+
+
+async def test_abrir_aplicativo_com_nome_de_projeto_pergunta_sem_rodar(cadastros, executor, tmp_path):
+    (tmp_path / "omni-app").mkdir()
+    f = {x.nome: x for x in ferramentas_do_sistema(cadastros, executor, raizes=[tmp_path])}
+
+    resposta = await f["abrir_aplicativo"].executar(f["abrir_aplicativo"].argumentos(nome="omni app"))
+
+    assert executor.iniciados == []
+    assert "local" in resposta and resposta.rstrip().endswith("?")

@@ -61,13 +61,15 @@ def montar_registro(
     def sites_da_empresa():
         return carregar_sites(ajustes.pasta_config)
 
+    raizes = sorted({pasta.parent for pasta in cadastros.projetos.values()})
+
     ferramentas = [
-        *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa),
+        *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
-            raizes=sorted({pasta.parent for pasta in cadastros.projetos.values()}),
+            raizes=raizes,
             bancos=carregar_bancos(ajustes.pasta_config / "bancos.json"),
             esperar_site=lambda endereco, limite: esperar_site(endereco, http_local, limite=limite),
             cadastros=cadastros,
