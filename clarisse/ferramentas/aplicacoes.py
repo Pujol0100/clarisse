@@ -3,13 +3,16 @@
 Antes de rodar, lê do .env só o endereço e a porta dos bancos (nunca a senha) e compara com a
 lista pessoal de bancos conhecidos: banco de produção recusa, mesmo com "sim".
 """
+import asyncio
 import json
 import re
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+import httpx
 from dotenv import dotenv_values
 from pydantic import Field
 
@@ -78,6 +81,24 @@ def achar_projetos(nome: str, raizes: list[Path]) -> list[Path]:
     candidatas = [p for raiz in raizes if raiz.is_dir() for p in sorted(raiz.iterdir()) if p.is_dir()]
     exatas = [p for p in candidatas if normalizar(p.name) == alvo]
     return exatas or [p for p in candidatas if alvo in normalizar(p.name)]
+
+
+async def esperar_site(endereco: str, cliente: httpx.AsyncClient, limite: float = 120, intervalo: float = 2) -> bool:
+    """Qualquer resposta, até página de erro, quer dizer que o servidor subiu."""
+    fim = time.monotonic() + limite
+    while time.monotonic() < fim:
+        try:
+            await cliente.get(endereco, timeout=5)
+            return True
+        except httpx.TransportError:
+            await asyncio.sleep(intervalo)
+    return False
+
+
+def carregar_bancos(caminho: Path) -> dict[str, Banco]:
+    if not caminho.is_file():
+        return {}
+    return {endereco: Banco(**dados) for endereco, dados in json.loads(caminho.read_text()).items()}
 
 
 class ArgsRodar(Argumentos):

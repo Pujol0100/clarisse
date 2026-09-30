@@ -26,7 +26,7 @@ def test_registro_tem_todas_as_ferramentas_do_desenho(cadastros, executor, tmp_p
         "abrir_claude_na_tela", "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
         "mandar_para_conversa_do_claude", "fazer_no_navegador",
         "noticias_do_dia", "previsao_do_tempo",
-        "trazer_para_frente", "digitar_texto", "apertar_atalho",
+        "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao",
     }
 
 

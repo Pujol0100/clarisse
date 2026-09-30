@@ -11,6 +11,7 @@ from clarisse.agente import Agente
 from clarisse.auditoria import Auditoria
 from clarisse.config import Ajustes, Cadastros
 from clarisse.eventos import Eventos
+from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
@@ -54,10 +55,17 @@ def montar_registro(
     apos_mudar_agenda=None,
 ) -> Registro:
     registro = Registro()
+    http_local = httpx.AsyncClient()
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
+        *ferramentas_de_aplicacoes(
+            executor, delegacoes,
+            raizes=sorted({pasta.parent for pasta in cadastros.projetos.values()}),
+            bancos=carregar_bancos(ajustes.pasta_config / "bancos.json"),
+            esperar_site=lambda endereco: esperar_site(endereco, http_local),
+        ),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,
             pasta_neutra=PASTA_NEUTRA_DO_CLAUDE,

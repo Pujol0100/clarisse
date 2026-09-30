@@ -174,3 +174,35 @@ async def test_projeto_que_nao_existe(montar, executor, tmp_path):
 
     assert executor.iniciados == []
     assert "não achei" in resposta.lower()
+
+
+async def test_esperar_site_tenta_ate_o_servidor_responder():
+    import httpx
+
+    from clarisse.ferramentas.aplicacoes import esperar_site
+
+    tentativas = []
+
+    def responder(pedido):
+        tentativas.append(pedido.url)
+        if len(tentativas) < 3:
+            raise httpx.ConnectError("ainda subindo")
+        return httpx.Response(404)
+
+    cliente = httpx.AsyncClient(transport=httpx.MockTransport(responder))
+
+    assert await esperar_site("http://localhost:3100", cliente, limite=5, intervalo=0) is True
+    assert len(tentativas) == 3
+
+
+async def test_esperar_site_desiste_no_limite():
+    import httpx
+
+    from clarisse.ferramentas.aplicacoes import esperar_site
+
+    def responder(pedido):
+        raise httpx.ConnectError("nunca sobe")
+
+    cliente = httpx.AsyncClient(transport=httpx.MockTransport(responder))
+
+    assert await esperar_site("http://localhost:3100", cliente, limite=0.05, intervalo=0.01) is False
