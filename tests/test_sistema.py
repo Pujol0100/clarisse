@@ -221,3 +221,23 @@ async def test_tipo_falado_vira_filtro_de_extensao(ferramentas, executor, tmp_pa
     await _rodar(ferramentas, "abrir_arquivo", nome=pedido)
 
     assert executor.iniciados == [(["xdg-open", str(alvo)], None)]
+
+
+async def test_nome_de_sistema_da_empresa_abre_o_endereco_dele_e_nao_um_ponto_com(cadastros, executor):
+    from clarisse.sites import Site
+
+    f = {x.nome: x for x in ferramentas_do_sistema(cadastros, executor, sites=lambda: [Site("sc360", "https://sc360.empresa.com/")])}
+
+    await f["abrir_site"].executar(f["abrir_site"].argumentos(endereco="sc360"))
+
+    assert executor.iniciados == [(["xdg-open", "https://sc360.empresa.com/"], None)]
+
+
+async def test_endereco_com_ponto_continua_indo_direto(cadastros, executor):
+    from clarisse.sites import Site
+
+    f = {x.nome: x for x in ferramentas_do_sistema(cadastros, executor, sites=lambda: [Site("github", "https://errado/")])}
+
+    await f["abrir_site"].executar(f["abrir_site"].argumentos(endereco="github.com"))
+
+    assert executor.iniciados == [(["xdg-open", "https://github.com"], None)]

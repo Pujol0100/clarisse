@@ -25,11 +25,11 @@ SEM = set(filter(None, os.environ.get("SEM", "").split(",")))
 
 # (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor}); "participantes" junta a lista
 CASOS = [
-    ("abre o omni", "abrir", {"nome": "omni"}),
-    ("abre o kanban", "abrir", {"nome": "kanban"}),
+    ("abre o omni", "abrir", {"nome": "omni", "onde": None}),
+    ("abre o kanban", "abrir", {"nome": "kanban", "onde": None}),
     ("abre o chrome", "abrir", {"nome": "chrome"}),
     ("abre o vs code", "abrir", {"nome": "code"}),
-    ("abre o smart anchor", "abrir", {"nome": "anchor"}),
+    ("abre o smart anchor", "abrir", {"nome": "anchor", "onde": None}),
     ("abre o omni local", "abrir", {"nome": "omni", "onde": "local"}),
     ("abre o site do sc360", "abrir", {"nome": "sc360", "onde": "site"}),
     ("roda o smart anchor", "abrir", {"nome": "anchor"}),
@@ -85,7 +85,10 @@ async def main():
             # "alvo": o programa citado pode vir no aplicativo ou no título; os dois levam à janela.
             recebidos = {**recebidos, "participantes": " ".join(recebidos.get("participantes") or [])}
             recebidos_com_alvo = {**recebidos, "alvo": f"{recebidos.get('aplicativo') or ''} {recebidos.get('titulo') or ''}"}
-            ok = nome == esperada and all(_sem_acento(v) in _sem_acento(recebidos_com_alvo.get(k, "")) for k, v in args.items())
+            ok = nome == esperada and all(
+                not recebidos.get(k) if v is None else _sem_acento(v) in _sem_acento(recebidos_com_alvo.get(k, ""))
+                for k, v in args.items()
+            )
             acertos += ok
             texto = "" if chamadas else msg.get("content", "")[:80]
             print(f"{'OK ' if ok else 'ERR'} {pedido!r} -> {nome} {json.dumps(recebidos, ensure_ascii=False)} {texto}", flush=True)

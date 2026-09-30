@@ -13,6 +13,7 @@ from pydantic import Field
 from clarisse.config import Cadastros, normalizar
 from clarisse.figuras import RELOGIO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
+from clarisse.sites import Site, achar_sites
 
 _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 _MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
@@ -120,6 +121,7 @@ def ferramentas_do_sistema(
     executor,
     agora: Callable[[], datetime] = datetime.now,
     processos: Callable[[], list[str]] = _nomes_dos_processos,
+    sites: Callable[[], list[Site]] = list,
 ) -> list[Ferramenta]:
     cadastrados = ", ".join(cadastros.aplicativos) or "nenhum"
 
@@ -188,6 +190,10 @@ def ferramentas_do_sistema(
         return f"Abri {abriveis[0].name}."
 
     async def abrir_site(args: ArgsSite) -> str:
+        # Nome sem ponto que é sistema da empresa: "sc360" viraria sc360.com, site de outra empresa.
+        if "." not in args.endereco and len(achados := achar_sites(args.endereco, sites())) == 1:
+            await executor.iniciar(["xdg-open", achados[0].endereco])
+            return f"Abri o {achados[0].nome}."
         url = normalizar_site(args.endereco)
         if url is None:
             return f"Não abro esse endereço: {args.endereco}. Só sites http ou https."

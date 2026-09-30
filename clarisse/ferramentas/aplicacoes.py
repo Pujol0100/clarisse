@@ -127,7 +127,8 @@ class ArgsAbrir(Argumentos):
     nome: str = Field(max_length=80, description="O que abrir, como o usuário falou: programa, sistema ou projeto")
     onde: Literal["site", "local"] | None = Field(
         default=None,
-        description="'site' para a versão na internet, 'local' para rodar o projeto na máquina; vazio se o usuário não disse",
+        description="Só com a palavra do usuário: 'site' se ele disse site ou internet, 'local' se disse local, "
+        "rodar ou na máquina. Se ele só disse 'abre o X', deixe vazio: a Clarisse decide ou pergunta.",
     )
 
 

@@ -57,8 +57,12 @@ def montar_registro(
 ) -> Registro:
     registro = Registro()
     http_local = httpx.AsyncClient()
+
+    def sites_da_empresa():
+        return carregar_sites(ajustes.pasta_config)
+
     ferramentas = [
-        *ferramentas_do_sistema(cadastros, executor),
+        *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
         *ferramentas_de_aplicacoes(
@@ -67,7 +71,7 @@ def montar_registro(
             bancos=carregar_bancos(ajustes.pasta_config / "bancos.json"),
             esperar_site=lambda endereco, limite: esperar_site(endereco, http_local, limite=limite),
             cadastros=cadastros,
-            sites=lambda: carregar_sites(ajustes.pasta_config),
+            sites=sites_da_empresa,
         ),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,
