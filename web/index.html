@@ -19,25 +19,29 @@
     <p id="estado" class="estado" role="status" aria-live="polite">Pronta</p>
   </main>
 
-  <section class="conversa" aria-label="Última conversa">
-    <p id="voce" class="fala fala-voce" hidden></p>
-    <p id="clarisse" class="fala fala-clarisse" hidden></p>
-    <div id="confirmacao" class="confirmacao" hidden>
-      <button type="button" id="confirmar" class="botao botao-sim">Confirmar</button>
-      <button type="button" id="cancelar" class="botao botao-nao">Cancelar</button>
-    </div>
-    <p id="aviso-som" class="aviso-som" hidden>Clique em qualquer lugar da página para liberar o som.</p>
-  </section>
+  <aside class="painel" aria-label="Conversa com a Clarisse">
+    <section class="conversa" id="conversa" role="log" aria-live="polite" aria-label="Conversa">
+      <p class="conversa-vazia" id="conversa-vazia">Fale ou escreva. A conversa aparece aqui.</p>
+    </section>
 
-  <footer class="controles">
-    <button type="button" id="falar" class="botao botao-falar" aria-pressed="false">
-      <span class="botao-falar-rotulo">Falar</span>
-    </button>
-    <form id="formulario" class="escrever" autocomplete="off">
-      <label for="texto" class="apenas-leitor">Escrever para a Clarisse</label>
-      <input id="texto" name="texto" maxlength="2000" placeholder="Ou escreva aqui e aperte Enter">
-    </form>
-    <p class="dica">A barra de espaço também liga e desliga o microfone.</p>
-  </footer>
+    <div class="rodape-do-painel">
+      <div id="confirmacao" class="confirmacao" hidden>
+        <button type="button" id="confirmar" class="botao botao-sim">Confirmar</button>
+        <button type="button" id="cancelar" class="botao botao-nao">Cancelar</button>
+      </div>
+      <p id="aviso-som" class="aviso-som" hidden>Clique em qualquer lugar da página para liberar o som.</p>
+
+      <div class="controles">
+        <button type="button" id="falar" class="botao botao-falar" aria-pressed="false">
+          <span class="botao-falar-rotulo">Falar</span>
+        </button>
+        <form id="formulario" class="escrever" autocomplete="off">
+          <label for="texto" class="apenas-leitor">Escrever para a Clarisse</label>
+          <input id="texto" name="texto" maxlength="2000" placeholder="Ou escreva aqui e aperte Enter">
+        </form>
+        <p class="dica">A barra de espaço também liga e desliga o microfone.</p>
+      </div>
+    </div>
+  </aside>
 </body>
 </html>

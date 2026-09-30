@@ -12,8 +12,8 @@ const NOMES_DOS_ESTADOS = {
 const elementos = {
   corpo: document.body,
   estado: document.getElementById("estado"),
-  voce: document.getElementById("voce"),
-  clarisse: document.getElementById("clarisse"),
+  conversa: document.getElementById("conversa"),
+  conversaVazia: document.getElementById("conversa-vazia"),
   confirmacao: document.getElementById("confirmacao"),
   avisoSom: document.getElementById("aviso-som"),
   falar: document.getElementById("falar"),
@@ -33,14 +33,28 @@ function mudarEstado(estado) {
   Rosto.estado(estado);
 }
 
+/* ---------- conversa: histórico em balões, desde que a página abriu ---------- */
+
+const LIMITE_DE_FALAS = 100;
+
+function adicionarFala(quem, texto) {
+  if (!texto) return;
+  elementos.conversaVazia.hidden = true;
+  const fala = document.createElement("p");
+  fala.className = `fala fala-${quem}`;
+  fala.textContent = texto;
+  elementos.conversa.append(fala);
+  const falas = elementos.conversa.querySelectorAll(".fala");
+  for (let i = 0; i < falas.length - LIMITE_DE_FALAS; i++) falas[i].remove();
+  elementos.conversa.scrollTop = elementos.conversa.scrollHeight;
+}
+
 function mostrarVoce(texto) {
-  elementos.voce.textContent = texto;
-  elementos.voce.hidden = !texto;
+  adicionarFala("voce", texto);
 }
 
 function mostrarClarisse(texto, aguardandoConfirmacao = false) {
-  elementos.clarisse.textContent = texto;
-  elementos.clarisse.hidden = !texto;
+  adicionarFala("clarisse", texto);
   elementos.confirmacao.hidden = !aguardandoConfirmacao;
 }
 
@@ -185,7 +199,6 @@ async function chamar(caminho, opcoes) {
 }
 
 function enviarTexto(texto) {
-  mostrarVoce(texto);
   mudarEstado("thinking");
   return chamar("/api/mensagem", {
     method: "POST",
@@ -199,7 +212,8 @@ const tratadores = {
     const ocupadaAqui = audioTocando || (gravador && gravador.state === "recording");
     if (!(ocupadaAqui && e.estado === "idle")) mudarEstado(e.estado);
   },
-  transcricao: (e) => mostrarVoce(e.texto || "(não entendi nada)"),
+  // A frase entendida volta como fala_do_usuario; aqui só entra quando não se entendeu nada.
+  transcricao: (e) => { if (!e.texto) adicionarFala("aviso", "Não entendi o que foi dito. Tente de novo."); },
   fala_do_usuario: (e) => mostrarVoce(e.texto),
   resposta: (e) => mostrarClarisse(e.texto, e.aguardando_confirmacao),
   aviso: (e) => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`),

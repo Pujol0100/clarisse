@@ -5,7 +5,8 @@
   font-display: swap;
 }
 
-/* Cores da Smart Compass: preto, branco e dourado; vermelho só para o estado de erro. */
+/* Cores da Smart Compass: preto, branco e dourado; vermelho só para o estado de erro.
+   Tela larga: a Clarisse à esquerda e a conversa à direita; tela estreita: uma embaixo da outra. */
 :root {
   --fundo: #0a0a0a;
   --superficie: #141416;
@@ -15,6 +16,7 @@
   --texto-suave: #a3a3aa;
   --dourado: #c9a84c;
   --dourado-claro: #e5c875;
+  --dourado-fundo: rgba(201, 168, 76, 0.14);
   --erro: #e5484d;
 
   --cor-do-estado: var(--dourado-claro);
@@ -30,7 +32,8 @@ html, body { height: 100%; }
 body {
   margin: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 3fr) minmax(20rem, 2fr);
+  grid-template-rows: 100%;
   background: var(--fundo);
   color: var(--texto);
   font-family: var(--fonte);
@@ -38,11 +41,14 @@ body {
   line-height: 1.5;
 }
 
+/* ---------- a Clarisse ---------- */
+
 .palco {
   position: relative;
   display: grid;
-  place-items: center;
+  place-items: end center;
   min-height: 0;
+  overflow: hidden;
 }
 
 #enxame,
@@ -54,40 +60,82 @@ body {
 }
 
 .estado {
-  position: absolute;
-  bottom: 4%;
-  margin: 0;
+  position: relative;
+  z-index: 1;
+  margin: 0 0 4%;
+  padding: 0.1rem 1rem;
+  border-radius: 4px;
+  background: var(--fundo);
   font-size: 2.25rem;
   font-weight: 700;
   color: var(--cor-do-estado);
   transition: color 400ms ease;
-  z-index: 1;
-  padding: 0.1rem 1rem;
-  border-radius: 4px;
-  background: var(--fundo);
+}
+
+/* ---------- a conversa ---------- */
+
+.painel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--superficie);
+  border-left: 1px solid var(--linha);
 }
 
 .conversa {
-  width: min(46rem, 100% - 2rem);
-  margin: 0 auto;
-  display: grid;
-  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.conversa-vazia {
+  margin: auto;
+  color: var(--texto-suave);
+  text-align: center;
 }
 
 .fala {
   margin: 0;
-  max-width: 70ch;
+  max-width: 90%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--linha);
+  border-radius: 6px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
-.fala-voce { color: var(--texto-suave); }
-.fala-voce::before { content: "Você: "; font-weight: 700; }
+.fala-voce {
+  align-self: flex-end;
+  background: var(--superficie-2);
+}
 
-.fala-clarisse { font-size: 1.5rem; line-height: 1.45; }
+.fala-clarisse {
+  align-self: flex-start;
+  background: var(--dourado-fundo);
+  border-color: var(--dourado);
+}
+
+.fala-aviso {
+  align-self: center;
+  border: 0;
+  color: var(--texto-suave);
+  font-size: 1rem;
+}
+
+.rodape-do-painel {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--linha);
+  display: grid;
+  gap: 0.75rem;
+}
 
 .confirmacao {
   display: flex;
   gap: 1rem;
-  margin-top: 0.5rem;
 }
 
 .aviso-som {
@@ -96,8 +144,6 @@ body {
 }
 
 .controles {
-  width: min(46rem, 100% - 2rem);
-  margin: 1.5rem auto 2rem;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.75rem 1rem;
@@ -110,6 +156,8 @@ body {
   font-size: 1rem;
   color: var(--texto-suave);
 }
+
+/* ---------- botões e campo ---------- */
 
 .botao {
   font: inherit;
@@ -165,6 +213,18 @@ input:focus-visible {
 }
 
 [hidden] { display: none !important; }
+
+@media (max-width: 56rem) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 55vh minmax(0, 1fr);
+  }
+
+  .painel {
+    border-left: 0;
+    border-top: 1px solid var(--linha);
+  }
+}
 
 @media (max-width: 36rem) {
   body { font-size: 1.1rem; }

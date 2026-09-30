@@ -53,3 +53,18 @@ def test_scripts_so_procuram_elementos_que_existem_na_pagina():
     for script in _scripts_da_pagina():
         procurados = set(re.findall(r'getElementById\("([^"]+)"\)', (WEB / script).read_text(encoding="utf-8")))
         assert procurados <= ids, f"{script} procura {sorted(procurados - ids)}, que não existe na página"
+
+
+def test_conversa_fica_num_painel_ao_lado_da_clarisse_como_historico():
+    pagina = (WEB / "index.html").read_text(encoding="utf-8")
+
+    assert re.search(r'<main class="palco">[\s\S]*</main>\s*<aside class="painel"', pagina)
+    assert re.search(r'<section class="conversa" id="conversa" role="log"', pagina)
+    assert pagina.index('id="conversa"') < pagina.index('id="formulario"')
+
+
+def test_mensagens_do_chat_sao_criadas_como_texto_e_nunca_como_html():
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+
+    assert "innerHTML" not in app
+    assert "textContent" in app
