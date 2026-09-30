@@ -13,9 +13,11 @@ class ExecutorFalso:
         self.executados: list[tuple[list[str], Path | None]] = []
         self.iniciados: list[tuple[list[str], Path | None]] = []
         self.respostas: list[Resultado] = []
+        self.ambientes: list[dict[str, str]] = []
 
-    async def executar(self, argumentos, pasta=None, timeout=30):
+    async def executar(self, argumentos, pasta=None, timeout=30, ambiente=None):
         self.executados.append((argumentos, pasta))
+        self.ambientes.append(ambiente or {})
         return self.respostas.pop(0) if self.respostas else Resultado(0, "", "")
 
     async def iniciar(self, argumentos, pasta=None):

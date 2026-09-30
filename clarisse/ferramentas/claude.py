@@ -24,6 +24,10 @@ _PARA_VOZ = (
     "em no máximo quatro frases curtas, sem markdown, sem listas e sem caminhos de arquivo."
 )
 _TIMEOUT_DA_AGENDA = 120
+# Sem isto o Claude começa a responder antes de os conectores do claude.ai conectarem e,
+# às vezes, diz que não tem calendário (medido em 29/09/2026: 2 de 3 consultas). Com "false"
+# ele espera, no máximo 5 s, e segue.
+_ESPERAR_CONECTORES = {"MCP_CONNECTION_NONBLOCKING": "false"}
 _FERRAMENTAS_DE_MENSAGEM = ["SendMessage", "ListAgents"]
 _NAVEGADOR = "mcp__playwright"
 _REGRAS_DO_NAVEGADOR = (
@@ -86,6 +90,7 @@ async def rodar_claude(
         ],
         pasta=pasta,
         timeout=timeout,
+        ambiente=_ESPERAR_CONECTORES,
     )
     if resultado.estourou_tempo:
         return f"O Claude demorou mais de {int(timeout // 60)} minutos e eu interrompi."

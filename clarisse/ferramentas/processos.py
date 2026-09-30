@@ -35,11 +35,14 @@ def _conferir(argumentos) -> list[str]:
 
 
 class Executor:
-    async def executar(self, argumentos: list[str], pasta: Path | None = None, timeout: float = 30) -> Resultado:
+    async def executar(
+        self, argumentos: list[str], pasta: Path | None = None, timeout: float = 30,
+        ambiente: dict[str, str] | None = None,
+    ) -> Resultado:
         processo = await asyncio.create_subprocess_exec(
             *_conferir(argumentos),
             cwd=pasta,
-            env=ambiente_minimo(),
+            env={**ambiente_minimo(), **(ambiente or {})},
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

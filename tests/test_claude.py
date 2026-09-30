@@ -131,6 +131,20 @@ async def test_consultar_agenda_usa_so_a_leitura_do_calendario_e_a_data_de_hoje(
     assert "28 de setembro de 2026" in argumentos[2]
 
 
+
+@pytest.mark.parametrize("ferramenta,args", [
+    ("consultar_agenda", {"periodo": "amanhã"}),
+    ("criar_compromisso", {"titulo": "Reunião", "quando": "amanhã às 10h"}),
+])
+async def test_agenda_espera_os_conectores_antes_de_o_claude_comecar(montar, executor, ferramenta, args):
+    # Sem esperar, o Claude às vezes começa antes do Microsoft 365 conectar e responde que não tem calendário.
+    f = montar()[ferramenta]
+    executor.respostas.append(_json_do_claude("ok"))
+
+    await f.executar(f.argumentos(**args))
+
+    assert executor.ambientes[0].get("MCP_CONNECTION_NONBLOCKING") == "false"
+
 async def test_criar_compromisso_pede_confirmacao_e_so_pode_criar_evento(montar, executor):
     f = montar()["criar_compromisso"]
     args = f.argumentos(titulo="Reunião com João", quando="amanhã às 15h")

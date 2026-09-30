@@ -77,3 +77,14 @@ async def test_programa_executado_nao_recebe_segredos_do_ambiente(executor, monk
 
     assert "GITHUB_TOKEN" not in resultado.saida
     assert "HOME" in resultado.saida
+
+
+async def test_variavel_extra_chega_ao_programa_sem_trazer_segredos(executor, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "segredo-que-nao-pode-vazar")
+
+    resultado = await executor.executar(
+        [sys.executable, "-c", "import os; print(os.environ.get('CLARISSE_EXTRA'), 'GITHUB_TOKEN' in os.environ)"],
+        ambiente={"CLARISSE_EXTRA": "sim"},
+    )
+
+    assert resultado.saida.split() == ["sim", "False"]
