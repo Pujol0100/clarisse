@@ -232,3 +232,14 @@ def test_banco_local_da_maquina_e_dito_como_local(montar, tmp_path):
     frase = f.frase_de_confirmacao(f.argumentos(projeto="sc360"))
 
     assert "local desta máquina" in frase
+
+
+async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
+    _pacote(tmp_path / "omni-api", {"start:dev": "turbo run dev", "build": "turbo build"})
+    f = montar()
+
+    await f.executar(f.argumentos(projeto="omni api"))
+
+    assert executor.iniciados == [
+        (["ptyxis", "--new-window", "-d", str(tmp_path / "omni-api"), "--", "npm", "run", "start:dev"], None),
+    ]

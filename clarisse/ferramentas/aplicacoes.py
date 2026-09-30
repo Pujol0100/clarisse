@@ -35,18 +35,23 @@ class Banco:
     producao: bool
 
 
+_SCRIPTS_DE_DEV = ("dev", "start:dev")
+
+
 @dataclass
 class Parte:
     pasta: Path
+    script: str
     porta_web: int | None
 
 
-def _script_de_dev(pasta: Path) -> str | None:
+def _script_de_dev(pasta: Path) -> tuple[str, str] | None:
+    """Nome e conteúdo do script de desenvolvimento do package.json da pasta."""
     try:
         scripts = json.loads((pasta / "package.json").read_text()).get("scripts", {})
     except (OSError, json.JSONDecodeError):
         return None
-    return scripts.get("dev")
+    return next(((nome, scripts[nome]) for nome in _SCRIPTS_DE_DEV if nome in scripts), None)
 
 
 def _porta_web(script: str) -> int | None:
@@ -57,7 +62,12 @@ def _porta_web(script: str) -> int | None:
 
 def partes_do_projeto(projeto: Path) -> list[Parte]:
     pastas = [projeto] if _script_de_dev(projeto) else sorted(p for p in projeto.iterdir() if p.is_dir())
-    return [Parte(p, _porta_web(script)) for p in pastas if (script := _script_de_dev(p))]
+    partes = []
+    for pasta in pastas:
+        if achado := _script_de_dev(pasta):
+            nome, script = achado
+            partes.append(Parte(pasta, nome, _porta_web(script)))
+    return partes
 
 
 def bancos_do_env(pasta: Path) -> list[str]:
@@ -126,7 +136,7 @@ def ferramentas_de_aplicacoes(
         projeto = achados[0]
         partes = partes_do_projeto(projeto)
         if not partes:
-            return projeto, [], [], f"Não sei rodar o {projeto.name}: ele não tem script de desenvolvimento (npm run dev)."
+            return projeto, [], [], f"Não sei rodar o {projeto.name}: ele não tem script de desenvolvimento (npm run dev ou start:dev)."
         usados = [(parte, endereco) for parte in partes for endereco in bancos_do_env(parte.pasta)]
         producao = [bancos[e].nome for _, e in usados if e in bancos and bancos[e].producao]
         if producao:
@@ -165,7 +175,7 @@ def ferramentas_de_aplicacoes(
         if motivo:
             return motivo
         for parte in partes:
-            await executor.iniciar(["ptyxis", "--new-window", "-d", str(parte.pasta), "--", "npm", "run", "dev"])
+            await executor.iniciar(["ptyxis", "--new-window", "-d", str(parte.pasta), "--", "npm", "run", parte.script])
         web = next((p for p in partes if p.porta_web), None)
         if web is None:
             return f"Liguei o {projeto.name} em {len(partes)} terminal(is)."
