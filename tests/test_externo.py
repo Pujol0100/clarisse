@@ -114,14 +114,15 @@ async def test_sem_resposta_no_prazo_cancela(agente, executadas):
     assert executadas == []
 
 
-async def test_parar_cancela_a_confirmacao_do_claude(agente, executadas):
+async def test_parar_cancela_a_confirmacao_do_claude_na_hora(agente, executadas, confirmacoes):
+    confirmacoes._limite = 30
     pedido = asyncio.create_task(agente.executar_externo("colar", {"texto": "oi"}))
     await asyncio.sleep(0.05)
 
     resposta = await agente.responder("para")
 
     assert resposta.parar
-    assert "não confirmou" in (await pedido).lower()
+    assert "não confirmou" in (await asyncio.wait_for(pedido, 1)).lower()
     assert executadas == []
 
 
