@@ -18,6 +18,7 @@ from clarisse.ferramentas.noticias import ferramentas_de_noticias
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
 from clarisse.ferramentas.registro import Registro
+from clarisse.sites import carregar_sites, manter_sites_atualizados
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
@@ -65,6 +66,8 @@ def montar_registro(
             raizes=sorted({pasta.parent for pasta in cadastros.projetos.values()}),
             bancos=carregar_bancos(ajustes.pasta_config / "bancos.json"),
             esperar_site=lambda endereco, limite: esperar_site(endereco, http_local, limite=limite),
+            cadastros=cadastros,
+            sites=lambda: carregar_sites(ajustes.pasta_config),
         ),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,
@@ -96,6 +99,11 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     async def atualizar_agenda_do_linux():
         await atualizar_agendas(executor, agendas_do_microsoft365())
 
+    async def manter_sites_da_empresa():
+        await manter_sites_atualizados(
+            http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
+        )
+
     async def manter_agenda_do_linux():
         await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
 
@@ -114,5 +122,5 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[manter_agenda_do_linux],
+        tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa],
     )

@@ -8,6 +8,7 @@ import json
 import re
 import time
 from collections.abc import Awaitable, Callable
+from typing import Literal
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,8 +17,9 @@ import httpx
 from dotenv import dotenv_values
 from pydantic import Field
 
-from clarisse.config import normalizar
+from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
+from clarisse.sites import Site, achar_sites
 
 _ARQUIVOS_ENV = (".env", ".env.local", ".env.development")
 # Só as variáveis que o servidor de desenvolvimento usa por convenção. O .env costuma ter
@@ -121,12 +123,22 @@ class ArgsRodar(Argumentos):
     projeto: str = Field(max_length=80, description="Nome do projeto como o usuário falou")
 
 
+class ArgsAbrir(Argumentos):
+    nome: str = Field(max_length=80, description="O que abrir, como o usuário falou: programa, sistema ou projeto")
+    onde: Literal["site", "local"] | None = Field(
+        default=None,
+        description="'site' para a versão na internet, 'local' para rodar o projeto na máquina; vazio se o usuário não disse",
+    )
+
+
 def ferramentas_de_aplicacoes(
     executor,
     delegacoes,
     raizes: list[Path],
     bancos: dict[str, Banco],
     esperar_site: Callable[[str, float], Awaitable[bool]],
+    cadastros: Cadastros | None = None,
+    sites: Callable[[], list[Site]] = list,
 ) -> list[Ferramenta]:
 
     def _plano(args: ArgsRodar) -> tuple[Path | None, list[Parte], list[tuple[Parte, str]], str | None]:
@@ -207,7 +219,53 @@ def ferramentas_de_aplicacoes(
         delegacoes.iniciar(projeto.name, _quando_subir(projeto, endereco, limite))
         return f"Liguei o {projeto.name}.{demora} Aviso quando o site responder."
 
+    def _destino(args: ArgsAbrir) -> tuple[str, object]:
+        """O que "abrir" faz: ("app", Aplicativo), ("site", Site), ("local", ArgsRodar) ou ("responder", texto)."""
+        chave = cadastros.achar_aplicativo(args.nome) if cadastros and args.onde is None else None
+        if chave:
+            return "app", cadastros.aplicativos[chave]
+        achados = achar_sites(args.nome, sites()) if args.onde != "local" else []
+        projetos = achar_projetos(args.nome, raizes) if args.onde != "site" else []
+        if achados and projetos and args.onde is None:
+            return "responder", (
+                f"O {args.nome} tem o site no ar e o projeto nesta máquina. Quer abrir o site ou rodar o projeto local?"
+            )
+        if len(achados) > 1:
+            return "responder", f"Achei mais de um: {', '.join(s.nome for s in achados[:4])}. Qual deles?"
+        if achados:
+            return "site", achados[0]
+        if projetos:
+            return "local", ArgsRodar(projeto=args.nome)
+        if args.onde == "site":
+            return "responder", f"Não conheço o site do {args.nome}."
+        return "responder", f"Não conheço {args.nome}: não é programa instalado, sistema da empresa nem projeto da máquina."
+
+    def risco_de_abrir(args: ArgsAbrir) -> Risco:
+        tipo, alvo = _destino(args)
+        return risco(alvo) if tipo == "local" else Risco.SEGURO
+
+    def confirmar_abrir(args: ArgsAbrir) -> str:
+        return confirmar(_destino(args)[1])
+
+    async def abrir(args: ArgsAbrir) -> str:
+        tipo, alvo = _destino(args)
+        if tipo == "app":
+            await executor.iniciar(alvo.abrir)
+            return f"Abri o {args.nome}."
+        if tipo == "site":
+            await executor.iniciar(["xdg-open", alvo.endereco])
+            return f"Abri o {alvo.nome} no navegador."
+        if tipo == "local":
+            return await rodar_aplicacao(alvo)
+        return alvo
+
     return [
+        Ferramenta(
+            "abrir",
+            "Abre o que o usuário pedir pelo nome: programa instalado, sistema da empresa na internet ou projeto da "
+            "máquina (que roda local). Use para 'abre o X'. Se o usuário disser 'site' ou 'local', preencha onde.",
+            ArgsAbrir, abrir, risco=risco_de_abrir, descrever=confirmar_abrir,
+        ),
         Ferramenta(
             "rodar_aplicacao",
             "Roda na máquina um projeto de programação (npm run dev), em terminais visíveis, e abre o site "

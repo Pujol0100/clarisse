@@ -3,6 +3,7 @@ import json
 import pytest
 
 from clarisse.ferramentas.aplicacoes import Banco, ferramentas_de_aplicacoes
+from clarisse.sites import Site
 from clarisse.ferramentas.claude import Delegacoes
 from clarisse.ferramentas.registro import Risco
 
@@ -66,16 +67,32 @@ def esperas():
     return []
 
 
+SITES = [
+    Site("omni", "https://omni.exemplo.com/"),
+    Site("kanban", "https://kanban.exemplo.com/", ["quadro"]),
+    Site("dokploy do omni", "https://painel-omni.exemplo.com/"),
+    Site("dokploy da store", "https://painel-store.exemplo.com/"),
+]
+
+
 @pytest.fixture
-def montar(executor, delegacoes, tmp_path, esperas):
+def todas(executor, delegacoes, tmp_path, esperas, cadastros):
     def _montar(site_no_ar=True):
         async def esperar_site(endereco, limite):
             esperas.append(limite)
             return site_no_ar
 
-        [f] = ferramentas_de_aplicacoes(executor, delegacoes, raizes=[tmp_path], bancos=BANCOS, esperar_site=esperar_site)
-        return f
+        ferramentas = ferramentas_de_aplicacoes(
+            executor, delegacoes, raizes=[tmp_path], bancos=BANCOS, esperar_site=esperar_site,
+            cadastros=cadastros, sites=lambda: SITES,
+        )
+        return {f.nome: f for f in ferramentas}
     return _montar
+
+
+@pytest.fixture
+def montar(todas):
+    return lambda site_no_ar=True: todas(site_no_ar)["rodar_aplicacao"]
 
 
 def test_acha_o_projeto_pelo_nome_falado_e_prefere_o_nome_exato(montar, tmp_path):
@@ -323,3 +340,83 @@ async def test_terminal_fica_aberto_mostrando_o_erro_quando_o_servidor_para(mont
     comando = _comando(executor.iniciados[0][0])
     assert comando.startswith("npm run dev;")
     assert comando.rstrip().endswith("read")
+
+
+
+async def test_abrir_programa_instalado(todas, executor):
+    f = todas()["abrir"]
+    args = f.argumentos(nome="vs code")
+
+    await f.executar(args)
+
+    assert f.risco_de(args) is Risco.SEGURO
+    assert executor.iniciados == [(["code"], None)]
+
+
+async def test_abrir_sistema_da_internet_pelo_apelido(todas, executor):
+    f = todas()["abrir"]
+
+    resposta = await f.executar(f.argumentos(nome="quadro"))
+
+    assert executor.iniciados == [(["xdg-open", "https://kanban.exemplo.com/"], None)]
+    assert "kanban" in resposta
+
+
+async def test_nome_que_e_site_e_projeto_pergunta_sem_abrir_nada(todas, executor, tmp_path):
+    _pacote(tmp_path / "omni", {"dev": "vite"})
+    f = todas()["abrir"]
+    args = f.argumentos(nome="omni")
+
+    resposta = await f.executar(args)
+
+    assert f.risco_de(args) is Risco.SEGURO
+    assert executor.iniciados == []
+    assert "site" in resposta and "local" in resposta and resposta.rstrip().endswith("?")
+
+
+async def test_escolhido_o_site_abre_o_site(todas, executor, tmp_path):
+    _pacote(tmp_path / "omni", {"dev": "vite"})
+    f = todas()["abrir"]
+
+    await f.executar(f.argumentos(nome="omni", onde="site"))
+
+    assert executor.iniciados == [(["xdg-open", "https://omni.exemplo.com/"], None)]
+
+
+async def test_escolhido_o_local_roda_o_projeto_com_confirmacao(todas, executor, tmp_path):
+    _pacote(tmp_path / "omni", {"dev": "vite"})
+    f = todas()["abrir"]
+    args = f.argumentos(nome="omni", onde="local")
+
+    assert f.risco_de(args) is Risco.CONFIRMAR
+    assert "Vou rodar o omni" in f.frase_de_confirmacao(args)
+    await f.executar(args)
+    assert executor.iniciados[0][0][:4] == ["ptyxis", "--new-window", "-d", str(tmp_path / "omni")]
+
+
+async def test_projeto_sem_site_roda_local_com_confirmacao(todas, executor, tmp_path):
+    projeto = _smart_anchor(tmp_path)
+    f = todas()["abrir"]
+    args = f.argumentos(nome="smart anchor")
+
+    assert f.risco_de(args) is Risco.CONFIRMAR
+    await f.executar(args)
+    assert executor.iniciados[0][0][3] == str(projeto / "backend")
+
+
+async def test_varios_sites_com_o_nome_pergunta_qual(todas, executor):
+    f = todas()["abrir"]
+
+    resposta = await f.executar(f.argumentos(nome="dokploy"))
+
+    assert executor.iniciados == []
+    assert "dokploy do omni" in resposta and "dokploy da store" in resposta
+
+
+async def test_nome_desconhecido(todas, executor):
+    f = todas()["abrir"]
+
+    resposta = await f.executar(f.argumentos(nome="spotify"))
+
+    assert executor.iniciados == []
+    assert "não conheço" in resposta.lower()
