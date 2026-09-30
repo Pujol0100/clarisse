@@ -37,6 +37,10 @@ figura é o sistema, pela ferramenta usada e pelo dado, nunca o modelo.
 | "traz o VS Code pra frente", "coloca o WhatsApp na frente" | Traz para a frente uma janela já aberta, sem abrir outra |
 | "escreve bom dia equipe no WhatsApp" | Pede confirmação, traz a janela e cola o texto onde o cursor estiver; não aperta Enter |
 | "salva", "aperta enter", "desfaz", "fecha essa aba" | Aperta o atalho na janela pedida ou na da frente; fechar aba ou janela pede confirmação |
+| "marca uma reunião amanhã às 10 com o Bruno Santos" | Pede confirmação dizendo quem será convidado; o Claude acha a pessoa na empresa e **não cria** se o nome for ambíguo |
+| "abre a planilha de boletos", "abre o readme do smart anchor" | Procura o arquivo na pasta pessoal (nome e pasta; "planilha", "pdf", "documento" viram tipo) e abre; com vários, lista os 3 mais recentes |
+| "roda o smart anchor", "sobe o omni app" | Acha o projeto, abre um terminal por parte (`npm run dev` ou `start:dev`) e abre o site quando responder; a confirmação diz qual banco o `.env` usa |
+| "o que é a Smart Compass?", "qual a cotação do dólar?" | Pede ao Claude, que pesquisa na internet, e fala a resposta |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
 
 Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer
@@ -92,6 +96,10 @@ cp config/pastas.exemplo.json config/pastas.json
 
 Edite os três arquivos em `config/` com os seus projetos, aplicativos e pastas.
 Eles nunca vão para o git.
+
+Opcional: `config/bancos.json` (copie de `config/bancos.exemplo.json`) dá nome aos
+bancos que os seus projetos usam e marca os de produção. Ao rodar um projeto, a
+Clarisse fala o nome do banco e **recusa** os marcados como produção.
 
 Opcional, uma vez só:
 

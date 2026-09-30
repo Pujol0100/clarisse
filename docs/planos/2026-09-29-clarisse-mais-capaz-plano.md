@@ -49,6 +49,8 @@ agenda, de 12 a 24 s cada (antes 6 a 10 s, com falha em 2 de 3).
 
 ### 2. Participantes no compromisso
 
+**Feito em 29/09/2026** (3/3 no Gemma; pelo agente, chega à confirmação com os nomes).
+
 - `criar_compromisso` ganha `participantes: list[str]` (nomes como o usuário
   falou, até 10).
 - O Claude acha o e-mail pelo nome (`search_people`, só na empresa). Nome que
@@ -59,12 +61,16 @@ agenda, de 12 a 24 s cada (antes 6 a 10 s, com falha em 2 de 3).
 
 ### 3. Abrir arquivo
 
+**Feito em 29/09/2026.** Procura no caminho inteiro (pasta e nome); "planilha", "pdf", "documento" viram filtro de tipo.
+
 - `abrir_arquivo(nome)`: procura pelo nome dentro da pasta pessoal (pula pastas
   ocultas, `node_modules`, `.git`), mostra até 3 se houver vários, abre com o
   programa padrão (`xdg-open`).
 - Recusa executáveis, `.desktop`, `.sh` e parecidos: abrir pode executar.
 
 ### 4. Rodar aplicação local
+
+**Feito em 29/09/2026, com mudança de desenho** (decisão do usuário: qualquer projeto, sem cadastro). Acha o projeto sozinho; confirmação diz o banco do `.env` pela lista `config/bancos.json`; produção recusa; sem `node_modules` diz que falta `npm install`.
 
 - `projetos.json` passa a aceitar, por projeto, os comandos de iniciar e o
   endereço. O formato antigo (só o caminho) continua valendo.
@@ -90,6 +96,8 @@ agenda, de 12 a 24 s cada (antes 6 a 10 s, com falha em 2 de 3).
   aponta (no smart-anchor, 45432 é produção).
 
 ### 5. Perguntas de conhecimento vão ao Claude
+
+**Feito em 29/09/2026.** Regra no prompt, garantia quando o modelo só fala em pesquisar, e instrução ao Claude para pesquisar na web.
 
 - Regra no prompt: pergunta sobre empresa, pessoa, notícia específica ou fato que
   o modelo não sabe com certeza → `pedir_ao_claude` (que pesquisa na web).

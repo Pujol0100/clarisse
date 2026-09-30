@@ -57,6 +57,13 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **Teclado virtual** (`ydotool`): o `/dev/uinput` é liberado por `TAG+="uaccess"`
   só para quem está na sessão, **sem o grupo `input`**, que daria leitura de tudo o
   que é digitado no teclado de verdade (`scripts/instalar-teclado-virtual.sh`).
+- **Rodar aplicação** só roda o script de desenvolvimento do `package.json`
+  (`dev` ou `start:dev`), em terminal visível, depois de confirmação. Lê do `.env`
+  só endereço e porta das variáveis de banco que o servidor de desenvolvimento usa
+  (`DATABASE_URL`, `DB_HOST`/`DB_PORT`…), nunca a senha, e recusa banco marcado como
+  produção em `config/bancos.json`. Não roda `npm install` sozinha.
+- **Abrir arquivo** só dentro da pasta pessoal, sem pastas ocultas, e recusa o que
+  executa programa ao abrir (`.sh`, `.desktop`, `.AppImage`, arquivo executável).
 - **Não existe ferramenta de tecla livre.** Colar texto pede confirmação mostrando o
   texto e a janela, e não aperta Enter; os atalhos são uma lista fechada
   (`clarisse/ferramentas/janelas.py`), e fechar aba ou janela pede confirmação.
@@ -74,6 +81,10 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   programa já poderia executar comandos sozinho, então o risco novo é pequeno; o
   que se evitou foi o grupo `input`, que abriria a leitura do teclado.
 - **Texto colado fica na área de transferência** e substitui o que estava lá.
+- **Banco não reconhecido é só avisado.** Um `.env` que aponte para produção por
+  uma variável fora da convenção, ou um banco de produção que não está em
+  `config/bancos.json`, passa com "um banco que eu não conheço" na confirmação.
+- **Perguntas sobre o mundo vão para a Anthropic** e o Claude pesquisa na web.
 - **Atalho sem programa vai para a janela da frente.** O modelo às vezes não
   repassa o programa citado ("salva o arquivo no vs code"). A resposta falada diz
   onde apertou, e fechar aba ou janela pede confirmação mostrando o destino.
