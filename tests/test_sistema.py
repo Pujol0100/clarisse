@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -131,3 +132,67 @@ async def test_falha_do_programa_vira_mensagem(ferramentas, executor):
     resposta = await _rodar(ferramentas, "ajustar_volume", nivel=10)
 
     assert "não consegui" in resposta.lower()
+
+
+def _arquivo(pasta, nome, idade=0):
+    caminho = pasta / nome
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_text("x")
+    antigo = 1_700_000_000 - idade
+    os.utime(caminho, (antigo, antigo))
+    return caminho
+
+
+async def test_abre_o_arquivo_pelo_nome_falado_sem_acento_e_fora_de_ordem(ferramentas, executor, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    alvo = _arquivo(tmp_path / "Documentos", "Relatório-Setembro-2026.pdf")
+
+    resposta = await _rodar(ferramentas, "abrir_arquivo", nome="setembro relatorio")
+
+    assert executor.iniciados == [(["xdg-open", str(alvo)], None)]
+    assert "Relatório-Setembro-2026.pdf" in resposta
+
+
+async def test_varios_arquivos_nao_abre_e_lista_os_mais_recentes(ferramentas, executor, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    for i in range(5):
+        _arquivo(tmp_path / "Documentos", f"boletos-{i}.xlsx", idade=i * 100)
+
+    resposta = await _rodar(ferramentas, "abrir_arquivo", nome="boletos")
+
+    assert executor.iniciados == []
+    assert "5" in resposta
+    assert "boletos-0.xlsx" in resposta and "boletos-2.xlsx" in resposta
+    assert "boletos-4.xlsx" not in resposta
+
+
+async def test_nao_procura_em_pasta_oculta_nem_em_node_modules(ferramentas, executor, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    _arquivo(tmp_path / ".cache", "contrato.pdf")
+    _arquivo(tmp_path / "projeto" / "node_modules" / "pacote", "contrato.pdf")
+
+    resposta = await _rodar(ferramentas, "abrir_arquivo", nome="contrato")
+
+    assert executor.iniciados == []
+    assert "não achei" in resposta.lower()
+
+
+@pytest.mark.parametrize("nome", ["instalar.sh", "atalho.desktop", "programa.AppImage"])
+async def test_nao_abre_arquivo_que_executa_programa(ferramentas, executor, tmp_path, monkeypatch, nome):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    _arquivo(tmp_path / "Downloads", nome)
+
+    resposta = await _rodar(ferramentas, "abrir_arquivo", nome=nome.split(".")[0])
+
+    assert executor.iniciados == []
+    assert "não abro" in resposta.lower()
+
+
+async def test_nao_abre_arquivo_marcado_como_executavel(ferramentas, executor, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    _arquivo(tmp_path / "Downloads", "rodar-backup").chmod(0o755)
+
+    resposta = await _rodar(ferramentas, "abrir_arquivo", nome="rodar backup")
+
+    assert executor.iniciados == []
+    assert "não abro" in resposta.lower()

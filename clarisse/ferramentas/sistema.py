@@ -1,4 +1,6 @@
-"""Ferramentas do computador: hora, aplicativos, pastas, sites e volume."""
+"""Ferramentas do computador: hora, aplicativos, pastas, arquivos, sites e volume."""
+import asyncio
+import os
 import re
 from collections.abc import Callable
 from datetime import datetime
@@ -8,7 +10,7 @@ from urllib.parse import urlparse
 import psutil
 from pydantic import Field
 
-from clarisse.config import Cadastros
+from clarisse.config import Cadastros, normalizar
 from clarisse.figuras import RELOGIO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 
@@ -16,6 +18,9 @@ _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta
 _MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
           "agosto", "setembro", "outubro", "novembro", "dezembro"]
 _ESQUEMAS_PERIGOSOS = ("javascript:", "data:", "file:", "vbscript:", "mailto:")
+_PASTAS_PULADAS = {"node_modules", "__pycache__", "venv", "site-packages", "dist", "build", "graphify-out"}
+# Abrir estes pode executar um programa em vez de mostrar o arquivo.
+_EXTENSOES_QUE_EXECUTAM = {".sh", ".bash", ".desktop", ".appimage", ".run", ".bin", ".exe", ".jar", ".deb", ".rpm"}
 
 
 def data_por_extenso(momento: datetime) -> str:
@@ -55,6 +60,30 @@ class ArgsNome(Argumentos):
 
 class ArgsPasta(Argumentos):
     pasta: str = Field(max_length=300, description="Apelido cadastrado ou caminho dentro da pasta pessoal")
+
+
+class ArgsArquivo(Argumentos):
+    nome: str = Field(max_length=200, description="Nome ou pedaço do nome do arquivo, como o usuário falou")
+
+
+def _palavras(texto: str) -> list[str]:
+    normalizado = normalizar(texto)
+    return [p for p in normalizado.split("-") if len(p) >= 3] or [normalizado]
+
+
+def _procurar_arquivos(nome: str) -> list[Path]:
+    palavras = _palavras(nome)
+    achados = []
+    for raiz, pastas, arquivos in os.walk(Path.home()):
+        pastas[:] = [p for p in pastas if not p.startswith(".") and p not in _PASTAS_PULADAS]
+        for arquivo in arquivos:
+            if not arquivo.startswith(".") and all(p in normalizar(arquivo) for p in palavras):
+                achados.append(Path(raiz) / arquivo)
+    return sorted(achados, key=lambda c: c.stat().st_mtime, reverse=True)
+
+
+def _executa_programa(caminho: Path) -> bool:
+    return caminho.suffix.lower() in _EXTENSOES_QUE_EXECUTAM or os.access(caminho, os.X_OK)
 
 
 class ArgsSite(Argumentos):
@@ -117,6 +146,26 @@ def ferramentas_do_sistema(
         await executor.iniciar(["xdg-open", str(destino)])
         return f"Abri a pasta {destino.name}."
 
+    async def abrir_arquivo(args: ArgsArquivo) -> str:
+        achados = await asyncio.to_thread(_procurar_arquivos, args.nome)
+        abriveis = [c for c in achados if not _executa_programa(c)]
+        if not abriveis:
+            if achados:
+                return f"Não abro {achados[0].name}: esse tipo de arquivo executa um programa."
+            return f"Não achei arquivo com o nome {args.nome} na sua pasta pessoal."
+        if len(abriveis) > 1:
+            casa = Path.home()
+            recentes = "; ".join(
+                f"{c.name}, " + ("na pasta pessoal" if c.parent == casa else f"em {c.parent.relative_to(casa)}")
+                for c in abriveis[:3]
+            )
+            return (
+                f"Achei {len(abriveis)} arquivos com esse nome. Os mais recentes: {recentes}. "
+                "Diga um pedaço a mais do nome."
+            )
+        await executor.iniciar(["xdg-open", str(abriveis[0])])
+        return f"Abri {abriveis[0].name}."
+
     async def abrir_site(args: ArgsSite) -> str:
         url = normalizar_site(args.endereco)
         if url is None:
@@ -139,6 +188,10 @@ def ferramentas_do_sistema(
         ),
         Ferramenta("listar_programas_abertos", "Lista os programas abertos no computador.", Argumentos, listar_programas_abertos),
         Ferramenta("abrir_pasta", "Abre uma pasta no gerenciador de arquivos.", ArgsPasta, abrir_pasta),
+        Ferramenta(
+            "abrir_arquivo", "Procura um arquivo pelo nome na pasta pessoal e abre no programa padrão.",
+            ArgsArquivo, abrir_arquivo,
+        ),
         Ferramenta("abrir_site", "Abre um site no navegador.", ArgsSite, abrir_site),
         Ferramenta("ajustar_volume", "Ajusta o volume do sistema.", ArgsVolume, ajustar_volume),
     ]

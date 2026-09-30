@@ -21,7 +21,7 @@ def test_registro_tem_todas_as_ferramentas_do_desenho(cadastros, executor, tmp_p
 
     assert set(registro.nomes()) == {
         "hora_e_data", "abrir_aplicativo", "fechar_aplicativo", "listar_programas_abertos",
-        "abrir_pasta", "abrir_site", "ajustar_volume",
+        "abrir_pasta", "abrir_arquivo", "abrir_site", "ajustar_volume",
         "abrir_projeto_vscode", "git",
         "abrir_claude_na_tela", "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
         "mandar_para_conversa_do_claude", "fazer_no_navegador",
