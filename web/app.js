@@ -1,11 +1,12 @@
 "use strict";
 
+// Parada ou falando, embaixo do rosto não aparece o estado: falando, aparece a legenda.
 const NOMES_DOS_ESTADOS = {
-  idle: "Pronta",
-  listening: "Ouvindo",
-  thinking: "Pensando",
-  executing: "Fazendo",
-  speaking: "Falando",
+  idle: "",
+  listening: "Ouvindo…",
+  thinking: "Pensando…",
+  executing: "Fazendo…",
+  speaking: "",
   error: "Algo falhou",
 };
 
@@ -24,13 +25,26 @@ const elementos = {
 /* ---------- estado ---------- */
 
 let estadoAtual = "idle";
+let legendaAtual = null;
+
+function atualizarRotulo() {
+  const texto = legendaAtual || NOMES_DOS_ESTADOS[estadoAtual] || "";
+  elementos.estado.textContent = texto;
+  elementos.estado.classList.toggle("legenda", Boolean(legendaAtual));
+  elementos.estado.hidden = !texto;
+}
 
 function mudarEstado(estado) {
   estadoAtual = estado;
   elementos.corpo.dataset.estado = estado;
-  elementos.estado.textContent = NOMES_DOS_ESTADOS[estado] || estado;
+  atualizarRotulo();
   Enxame.estado(estado);
   Rosto.estado(estado);
+}
+
+function mostrarLegenda(texto) {
+  legendaAtual = texto;
+  atualizarRotulo();
 }
 
 /* ---------- conversa: histórico em balões, desde que a página abriu ---------- */
@@ -63,7 +77,6 @@ function mostrarClarisse(texto, aguardandoConfirmacao = false) {
 let contextoDeAudio = null;
 let analisadorDoMicrofone = null;
 let analisadorDaVoz = null;
-let audioTocando = null;
 
 function liberarSom() {
   if (!contextoDeAudio) {
@@ -102,37 +115,89 @@ function mostrarFigura(figura) {
   Rosto.canto(Boolean(figura));
 }
 
-async function tocar(url, figura) {
-  pararDeFalar(false);
-  mostrarFigura(figura);
-  const audio = new Audio(url);
-  audioTocando = audio;
-  if (contextoDeAudio) {
-    contextoDeAudio.createMediaElementSource(audio).connect(analisadorDaVoz);
+/* ---------- fala em trechos, com legenda ----------
+   O servidor manda cada trecho assim que fica pronto. Eles tocam em fila, com o próximo já
+   carregado; o texto da resposta só entra no chat quando a voz começa. */
+
+let falaAtual = null;
+const falasCanceladas = new Set();
+const textosEsperandoAFala = new Map();
+
+function esperarFala(fala, mostrar) {
+  if (!fala || falasCanceladas.has(fala)) {
+    mostrar();
+    return;
   }
-  audio.addEventListener("ended", () => terminarFala(audio));
-  mudarEstado("speaking");
+  textosEsperandoAFala.set(fala, mostrar);
+  setTimeout(() => soltarTexto(fala), 20000);  // sem voz, o texto aparece mesmo assim
+}
+
+function soltarTexto(fala) {
+  const mostrar = textosEsperandoAFala.get(fala);
+  if (!mostrar) return;
+  textosEsperandoAFala.delete(fala);
+  mostrar();
+}
+
+function receberTrecho(e) {
+  if (falasCanceladas.has(e.fala)) return;
+  if (!falaAtual || falaAtual.id !== e.fala) {
+    pararDeFalar(false);
+    falaAtual = { id: e.fala, total: e.total, trechos: [], proximo: 0, tocando: null };
+    mostrarFigura(e.figura);
+    mudarEstado("speaking");
+  }
+  const audio = new Audio(e.audio);
+  audio.preload = "auto";
+  falaAtual.trechos[e.parte] = { audio, legenda: e.legenda };
+  if (!falaAtual.tocando) tocarProximo();
+}
+
+async function tocarProximo() {
+  const fala = falaAtual;
+  const trecho = fala && fala.trechos[fala.proximo];
+  if (!trecho) return;  // ainda não chegou: receberTrecho chama de novo
+  fala.tocando = trecho.audio;
+  if (contextoDeAudio) contextoDeAudio.createMediaElementSource(trecho.audio).connect(analisadorDaVoz);
+  const parte = fala.proximo;
+  trecho.audio.addEventListener("playing", () => {
+    if (falaAtual !== fala) return;
+    mostrarLegenda(trecho.legenda);
+    if (parte === 0) soltarTexto(fala.id);
+  }, { once: true });
+  trecho.audio.addEventListener("ended", () => {
+    if (falaAtual !== fala) return;
+    fala.proximo += 1;
+    fala.tocando = null;
+    if (fala.proximo >= fala.total) terminarFala(fala);
+    else tocarProximo();
+  });
   try {
-    await audio.play();
+    await trecho.audio.play();
   } catch {
     elementos.avisoSom.hidden = false;
-    terminarFala(audio);
+    soltarTexto(fala.id);
+    terminarFala(fala);
   }
 }
 
-function terminarFala(audio) {
-  if (audioTocando !== audio) return;
-  audioTocando = null;
+function terminarFala(fala) {
+  if (falaAtual !== fala) return;
+  falaAtual = null;
+  mostrarLegenda(null);
   mostrarFigura(null);
   mudarEstado("idle");
   fetch("/api/fim-da-fala", { method: "POST" });
 }
 
 function pararDeFalar(avisarServidor = true) {
-  if (!audioTocando) return;
-  const audio = audioTocando;
-  audioTocando = null;
-  audio.pause();
+  if (!falaAtual) return;
+  const fala = falaAtual;
+  falaAtual = null;
+  falasCanceladas.add(fala.id);
+  soltarTexto(fala.id);
+  if (fala.tocando) fala.tocando.pause();
+  mostrarLegenda(null);
   mostrarFigura(null);
   if (avisarServidor) {
     mudarEstado("idle");
@@ -209,23 +274,30 @@ function enviarTexto(texto) {
 
 const tratadores = {
   estado: (e) => {
-    const ocupadaAqui = audioTocando || (gravador && gravador.state === "recording");
+    const ocupadaAqui = falaAtual || (gravador && gravador.state === "recording");
     if (!(ocupadaAqui && e.estado === "idle")) mudarEstado(e.estado);
   },
   // A frase entendida volta como fala_do_usuario; aqui só entra quando não se entendeu nada.
   transcricao: (e) => { if (!e.texto) adicionarFala("aviso", "Não entendi o que foi dito. Tente de novo."); },
   fala_do_usuario: (e) => mostrarVoce(e.texto),
-  resposta: (e) => mostrarClarisse(e.texto, e.aguardando_confirmacao),
-  aviso: (e) => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`),
-  falar: (e) => tocar(e.audio, e.figura),
+  resposta: (e) => esperarFala(e.fala, () => mostrarClarisse(e.texto, e.aguardando_confirmacao)),
+  aviso: (e) => esperarFala(e.fala, () => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`)),
+  falar: receberTrecho,
   figura: (e) => {
     // Figura mandada pelo Claude das etapas, sem fala junto: fica alguns segundos e sai.
     mostrarFigura(e.figura);
-    figuraSemFala = setTimeout(() => { if (!audioTocando) mostrarFigura(null); }, 8000);
+    figuraSemFala = setTimeout(() => { if (!falaAtual) mostrarFigura(null); }, 8000);
   },
   parar: () => pararDeFalar(),
   escutar: () => alternarMicrofone(),
-  erro: (e) => mostrarClarisse(e.texto),
+  erro: (e) => {
+    // Voz falhou no meio: o texto que esperava aparece, e a fala termina onde parou.
+    if (e.fala) {
+      soltarTexto(e.fala);
+      if (falaAtual && falaAtual.id === e.fala) falaAtual.total = falaAtual.trechos.length;
+    }
+    mostrarClarisse(e.texto);
+  },
 };
 
 let espera = 500;
