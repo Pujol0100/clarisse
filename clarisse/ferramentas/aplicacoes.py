@@ -25,6 +25,8 @@ _ARQUIVOS_ENV = (".env", ".env.local", ".env.development")
 _URLS_DO_BANCO = ("DATABASE_URL", "MONGO_URI", "MONGODB_URI", "MONGO_URL", "REDIS_URL")
 _PREFIXOS_HOST_PORTA = ("DB", "POSTGRES", "PG", "MYSQL")
 _LOCAIS = {"localhost", "127.0.0.1", "::1"}
+_ESPERA_DO_SITE = 120
+_ESPERA_COM_INSTALACAO = 600
 _PORTA_NO_SCRIPT = re.compile(r"(?:-p|--port)[ =](\d+)")
 _PORTA_PADRAO = {"next": 3000, "vite": 5173, "react-scripts": 3000, "nuxt": 3000}
 
@@ -122,7 +124,7 @@ def ferramentas_de_aplicacoes(
     delegacoes,
     raizes: list[Path],
     bancos: dict[str, Banco],
-    esperar_site: Callable[[str], Awaitable[bool]],
+    esperar_site: Callable[[str, float], Awaitable[bool]],
 ) -> list[Ferramenta]:
 
     def _plano(args: ArgsRodar) -> tuple[Path | None, list[Parte], list[tuple[Parte, str]], str | None]:
@@ -137,20 +139,17 @@ def ferramentas_de_aplicacoes(
         partes = partes_do_projeto(projeto)
         if not partes:
             return projeto, [], [], f"Não sei rodar o {projeto.name}: ele não tem script de desenvolvimento (npm run dev ou start:dev)."
-        sem_dependencias = [
-            _nome_da_parte(projeto, p) for p in partes
-            if not (p.pasta / "node_modules").is_dir() and not (projeto / "node_modules").is_dir()
-        ]
-        if sem_dependencias:
-            return projeto, partes, [], (
-                f"O {projeto.name} não tem as dependências instaladas nesta máquina. "
-                f"Falta rodar npm install em: {', '.join(sem_dependencias)}."
-            )
         usados = [(parte, endereco) for parte in partes for endereco in bancos_do_env(parte.pasta)]
         producao = [bancos[e].nome for _, e in usados if e in bancos and bancos[e].producao]
         if producao:
             return projeto, partes, usados, f"Não rodo o {projeto.name}: o .env aponta para {producao[0]}."
         return projeto, partes, usados, None
+
+    def _instalar(projeto: Path, parte: Parte) -> str | None:
+        """Comando de instalação, se a parte ainda não tem as dependências nesta máquina."""
+        if (parte.pasta / "node_modules").is_dir() or (projeto / "node_modules").is_dir():
+            return None
+        return "npm ci" if (parte.pasta / "package-lock.json").is_file() else "npm install"
 
     def _nome_da_parte(projeto: Path, parte: Parte) -> str:
         return parte.pasta.name if parte.pasta != projeto else projeto.name
@@ -161,7 +160,11 @@ def ferramentas_de_aplicacoes(
     def confirmar(args: ArgsRodar) -> str:
         projeto, partes, usados, _ = _plano(args)
         nomes = [_nome_da_parte(projeto, p) for p in partes]
-        frase = f"Vou rodar o {projeto.name}" + (f" ({' e '.join(nomes)})." if len(nomes) > 1 else ".")
+        instala = any(_instalar(projeto, p) for p in partes)
+        frase = ("Vou instalar as dependências e rodar" if instala else "Vou rodar") + f" o {projeto.name}"
+        frase += f" ({' e '.join(nomes)})." if len(nomes) > 1 else "."
+        if instala:
+            frase += " A instalação pode levar alguns minutos."
         for parte, endereco in usados:
             quem = _nome_da_parte(projeto, parte)
             if endereco in bancos:
@@ -173,8 +176,8 @@ def ferramentas_de_aplicacoes(
                 frase += f" O {quem} usa um banco que eu não conheço, no endereço {host}" + (f" porta {porta}." if porta else ".")
         return frase + " Confirma?"
 
-    async def _quando_subir(projeto: Path, endereco: str) -> str:
-        if await esperar_site(endereco):
+    async def _quando_subir(projeto: Path, endereco: str, limite: float) -> str:
+        if await esperar_site(endereco, limite):
             await executor.iniciar(["xdg-open", endereco])
             return f"O {projeto.name} está no ar. Abri {endereco} no navegador."
         return f"O {projeto.name} não respondeu em {endereco}. Olhe o erro no terminal dele."
@@ -183,14 +186,22 @@ def ferramentas_de_aplicacoes(
         projeto, partes, _, motivo = _plano(args)
         if motivo:
             return motivo
+        instala = False
         for parte in partes:
-            await executor.iniciar(["ptyxis", "--new-window", "-d", str(parte.pasta), "--", "npm", "run", parte.script])
+            comando = ["npm", "run", parte.script]
+            if instalar := _instalar(projeto, parte):
+                # Só "&&" e nomes fixos: o script vem de _SCRIPTS_DE_DEV, nunca do pedido.
+                comando = ["bash", "-c", f"{instalar} && npm run {parte.script}"]
+                instala = True
+            await executor.iniciar(["ptyxis", "--new-window", "-d", str(parte.pasta), "--", *comando])
+        demora = " Como preciso instalar as dependências antes, pode levar alguns minutos." if instala else ""
         web = next((p for p in partes if p.porta_web), None)
         if web is None:
-            return f"Liguei o {projeto.name} em {len(partes)} terminal(is)."
+            return f"Liguei o {projeto.name} em {len(partes)} terminal(is).{demora}"
         endereco = f"http://localhost:{web.porta_web}"
-        delegacoes.iniciar(projeto.name, _quando_subir(projeto, endereco))
-        return f"Liguei o {projeto.name}. Aviso quando o site responder."
+        limite = _ESPERA_COM_INSTALACAO if instala else _ESPERA_DO_SITE
+        delegacoes.iniciar(projeto.name, _quando_subir(projeto, endereco, limite))
+        return f"Liguei o {projeto.name}.{demora} Aviso quando o site responder."
 
     return [
         Ferramenta(

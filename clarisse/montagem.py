@@ -64,7 +64,7 @@ def montar_registro(
             executor, delegacoes,
             raizes=sorted({pasta.parent for pasta in cadastros.projetos.values()}),
             bancos=carregar_bancos(ajustes.pasta_config / "bancos.json"),
-            esperar_site=lambda endereco: esperar_site(endereco, http_local),
+            esperar_site=lambda endereco, limite: esperar_site(endereco, http_local, limite=limite),
         ),
         *ferramentas_do_claude(
             cadastros, executor, delegacoes,

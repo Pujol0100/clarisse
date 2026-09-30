@@ -12,9 +12,11 @@ BANCOS = {
 }
 
 
-def _pacote(pasta, scripts, instalado=True):
+def _pacote(pasta, scripts, instalado=True, trava=True):
     pasta.mkdir(parents=True, exist_ok=True)
     (pasta / "package.json").write_text(json.dumps({"scripts": scripts}))
+    if trava:
+        (pasta / "package-lock.json").write_text("{}")
     if instalado:
         (pasta / "node_modules").mkdir(exist_ok=True)
 
@@ -54,9 +56,15 @@ def delegacoes(avisos):
 
 
 @pytest.fixture
-def montar(executor, delegacoes, tmp_path):
+def esperas():
+    return []
+
+
+@pytest.fixture
+def montar(executor, delegacoes, tmp_path, esperas):
     def _montar(site_no_ar=True):
-        async def esperar_site(endereco):
+        async def esperar_site(endereco, limite):
+            esperas.append(limite)
             return site_no_ar
 
         [f] = ferramentas_de_aplicacoes(executor, delegacoes, raizes=[tmp_path], bancos=BANCOS, esperar_site=esperar_site)
@@ -248,18 +256,44 @@ async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
 
 
 
-async def test_sem_dependencias_instaladas_nao_abre_terminal_e_diz_o_que_falta(montar, executor, tmp_path):
+async def test_sem_dependencias_instala_com_npm_ci_antes_de_rodar(montar, executor, delegacoes, esperas, tmp_path):
     projeto = tmp_path / "smart-anchor"
     _pacote(projeto / "backend", {"dev": "nest start --watch"}, instalado=False)
     _pacote(projeto / "frontend", {"dev": "next dev -p 3100"})
     f = montar()
     args = f.argumentos(projeto="smart-anchor")
 
+    frase = f.frase_de_confirmacao(args)
     resposta = await f.executar(args)
+    await delegacoes.aguardar()
 
-    assert f.risco_de(args) is Risco.SEGURO
-    assert executor.iniciados == []
-    assert "npm install" in resposta and "backend" in resposta
+    assert f.risco_de(args) is Risco.CONFIRMAR
+    assert "instalar as dependências" in frase
+    assert "minutos" in resposta
+    assert executor.iniciados[:2] == [
+        (["ptyxis", "--new-window", "-d", str(projeto / "backend"), "--", "bash", "-c", "npm ci && npm run dev"], None),
+        (["ptyxis", "--new-window", "-d", str(projeto / "frontend"), "--", "npm", "run", "dev"], None),
+    ]
+    assert esperas == [600]
+
+
+async def test_sem_package_lock_instala_com_npm_install(montar, executor, tmp_path):
+    _pacote(tmp_path / "painel", {"dev": "vite"}, instalado=False, trava=False)
+    f = montar()
+
+    await f.executar(f.argumentos(projeto="painel"))
+
+    assert executor.iniciados[0][0][-3:] == ["bash", "-c", "npm install && npm run dev"]
+
+
+async def test_com_dependencias_espera_o_site_so_dois_minutos(montar, delegacoes, esperas, tmp_path):
+    _smart_anchor(tmp_path)
+    f = montar()
+
+    await f.executar(f.argumentos(projeto="smart-anchor"))
+    await delegacoes.aguardar()
+
+    assert esperas == [120]
 
 
 async def test_dependencias_na_raiz_do_projeto_valem_para_as_partes(montar, executor, tmp_path):
