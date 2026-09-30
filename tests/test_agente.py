@@ -376,6 +376,28 @@ async def test_pedido_sem_claude_nao_e_desviado_para_o_claude(novo_agente, pedid
     assert pedidos_ao_claude == []
 
 
+
+@pytest.mark.parametrize("dito", [
+    "Para te dar informações sobre a Smart Compass, eu preciso pesquisar na internet. Qual é o seu interesse?",
+    "Vou chamar a ferramenta `pedir_ao_claude` agora para descobrir quem fundou a Anthropic.",
+    "Isso o Claude responde melhor.",
+])
+async def test_modelo_que_so_fala_em_pesquisar_ou_no_claude_tem_a_pergunta_levada_ao_claude(novo_agente, pedidos_ao_claude, dito):
+    modelo = ModeloFalso(texto(dito), texto(dito))
+
+    resposta = await novo_agente(modelo).responder("o que é a Smart Compass?")
+
+    assert pedidos_ao_claude == ["o que é a Smart Compass?"]
+    assert resposta.texto == "Pedi ao Claude. Aviso quando ele terminar."
+
+
+async def test_resposta_direta_nao_vai_ao_claude(novo_agente, pedidos_ao_claude):
+    modelo = ModeloFalso(texto("Uma API é um conjunto de regras para programas conversarem."))
+
+    await novo_agente(modelo).responder("o que é uma API?")
+
+    assert pedidos_ao_claude == []
+
 async def test_garantia_do_claude_nao_duplica_quando_o_modelo_ja_chamou(novo_agente, pedidos_ao_claude):
     modelo = ModeloFalso(
         RespostaDoModelo("", [ChamadaDeFerramenta("pedir_ao_claude", {"pedido": "explicar REST"})],

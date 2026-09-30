@@ -42,6 +42,13 @@ CASOS = [
     ("sobe o omni app pra eu testar", "rodar_aplicacao", {"projeto": "omni"}),
     ("inicia o sc360 local", "rodar_aplicacao", {"projeto": "sc360"}),
     ("abre o projeto smart anchor no vs code", "abrir_projeto_vscode", {}),
+    ("O que você me fala sobre a Smart Compass?", "pedir_ao_claude", {"pedido": "smart compass"}),
+    ("quem fundou a Anthropic?", "pedir_ao_claude", {"pedido": "anthropic"}),
+    ("qual a cotação do dólar hoje?", "pedir_ao_claude", {"pedido": "dólar"}),
+    ("quem ganhou o jogo do Palmeiras ontem?", "pedir_ao_claude", {"pedido": "palmeiras"}),
+    ("o que é uma API?", None, {}),
+    ("quanto é quinze por cento de duzentos?", None, {}),
+    ("me conta uma curiosidade rápida", None, {}),
     ("oi clarisse, tudo bem?", None, {}),
     ("obrigado, era só isso", None, {}),
 ]

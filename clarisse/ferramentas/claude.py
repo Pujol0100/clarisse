@@ -257,7 +257,8 @@ def ferramentas_do_claude(
         Ferramenta(
             "pedir_ao_claude",
             "Envia um pedido a uma conversa NOVA do Claude, em segundo plano; o resultado é falado quando fica pronto. "
-            "Use para perguntas difíceis, programação, análise e leitura de sites.",
+            "Use para perguntas difíceis, programação, análise, leitura de sites e para pesquisar na internet: "
+            "empresas, pessoas, cotações, resultados de jogos e fatos de hoje.",
             ArgsPedido, pedir_ao_claude, figura=CODIGO,
         ),
         Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda, figura=CALENDARIO),

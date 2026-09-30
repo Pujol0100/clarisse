@@ -21,6 +21,8 @@ _CONVERSAS_LEMBRADAS = 4
 _LIMITE_DO_RESULTADO_LEMBRADO = 300
 _ANUNCIO = re.compile(r"\b(vou|irei|vamos)\b", re.IGNORECASE)
 _CITA_O_CLAUDE = re.compile(r"\bclaude\b", re.IGNORECASE)
+# O modelo diz que precisa pesquisar ou do Claude, mas não chama: a pergunta vai ao Claude.
+_QUER_O_CLAUDE = re.compile(r"\bclaude\b|pedir_ao_claude|pesquis", re.IGNORECASE)
 _CUTUCADA = {
     "role": "user",
     "content": "Você disse que ia fazer isso, mas não chamou nenhuma ferramenta. "
@@ -35,6 +37,7 @@ Responda sempre em português do Brasil, em no máximo duas frases curtas, porqu
 Quando o pedido exigir uma ação ou uma informação do mundo real, chame a ferramenta adequada. Nunca invente o resultado de uma ferramenta e nunca diga que fez algo sem ter chamado a ferramenta.
 Para conversa, contas simples ou conhecimento geral, responda direto, sem ferramenta.
 Tarefas complexas de programação, análise, leitura de sites ou agenda vão para o Claude.
+Perguntas sobre uma empresa, uma pessoa, preços, cotações, resultados ou fatos de hoje vão para pedir_ao_claude, que pesquisa na internet. Nunca responda que não tem a informação sem antes pedir ao Claude.
 Qualquer pergunta sobre a agenda, inclusive se um compromisso que você acabou de criar está lá, chama consultar_agenda. Nunca confirme o que está na agenda de memória.
 Quando o usuário mencionar o Claude, chame pedir_ao_claude (ou abrir_claude_na_tela, se ele quiser ver o Claude trabalhando) na mesma hora. Nunca responda que vai pedir ao Claude sem chamar a ferramenta.
 Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usuário disse. O sistema confirma sozinho as ações arriscadas.
@@ -117,7 +120,8 @@ class Agente:
             if not resposta.chamadas:
                 fala = mensagens[inicio]["content"]
                 agiu = any(m["role"] == "tool" for m in mensagens[inicio:])
-                if not agiu and _CITA_O_CLAUDE.search(fala) and "pedir_ao_claude" in self._registro.nomes():
+                pediu_o_claude = _CITA_O_CLAUDE.search(fala) or _QUER_O_CLAUDE.search(resposta.texto or "")
+                if not agiu and pediu_o_claude and "pedir_ao_claude" in self._registro.nomes():
                     return await self._delegar_ao_claude(mensagens, inicio, fala)
                 return self._concluir(mensagens, inicio, resposta.texto or _ultimo_resultado(mensagens) or "Pronto.")
 
@@ -145,7 +149,7 @@ class Agente:
         return resposta
 
     async def _delegar_ao_claude(self, mensagens: list[dict], inicio: int, fala: str) -> Resposta:
-        """O usuário citou o Claude e o modelo não chamou nada: a frase dele vai inteira para o Claude."""
+        """O usuário ou o modelo citou o Claude (ou pesquisa) e nada foi chamado: a frase do usuário vai inteira ao Claude."""
         argumentos = {"pedido": fala}
         decisao = avaliar(self._registro, "pedir_ao_claude", argumentos)
         if decisao.acao != "executar":
