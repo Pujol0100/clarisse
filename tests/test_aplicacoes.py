@@ -420,3 +420,15 @@ async def test_nome_desconhecido(todas, executor):
 
     assert executor.iniciados == []
     assert "não conheço" in resposta.lower()
+
+
+async def test_pedido_de_site_que_so_existe_como_projeto_nao_roda_o_projeto(todas, executor, tmp_path):
+    _smart_anchor(tmp_path)
+    f = todas()["abrir"]
+    args = f.argumentos(nome="smart anchor", onde="site")
+
+    resposta = await f.executar(args)
+
+    assert f.risco_de(args) is Risco.SEGURO
+    assert executor.iniciados == []
+    assert "não conheço o site" in resposta.lower()
