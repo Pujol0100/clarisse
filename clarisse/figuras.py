@@ -11,6 +11,8 @@ class Retorno:
 
     texto: str
     figura: str | None = None
+    # Texto para a Clarisse falar inteiro, sem o modelo resumir (ex.: ler a resposta do Claude).
+    na_integra: bool = False
 
 
 def figura_do_tempo(codigo: int) -> str:

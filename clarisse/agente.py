@@ -95,11 +95,13 @@ class Agente:
         self._pendente: tuple[Decisao, list[dict], int] | None = None
         self._trava = asyncio.Lock()
         self._figura: str | None = None
+        self._na_integra: str | None = None
 
     async def responder(self, fala: str) -> Resposta:
         async with self._trava:
             fala = fala.strip()
             self._figura = None
+            self._na_integra = None
             if pede_para_parar(fala):
                 self._pendente = None
                 if self._confirmacoes:
@@ -156,6 +158,8 @@ class Agente:
                     return self._concluir([*mensagens[inicio:], espera], 0, frase, aguardando=True)
                 else:
                     mensagens.append(await self._executar(decisao))
+                    if self._na_integra is not None:
+                        return self._concluir(mensagens, inicio, self._na_integra)
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
 
     async def _perguntar(self, mensagens: list[dict]):
@@ -209,6 +213,8 @@ class Agente:
             situacao = "concluida"
             if isinstance(resultado, Retorno):
                 figura = resultado.figura or decisao.ferramenta.figura
+                if resultado.na_integra:
+                    self._na_integra = resultado.texto
                 resultado = resultado.texto
             else:
                 figura = decisao.ferramenta.figura

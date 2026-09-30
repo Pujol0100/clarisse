@@ -579,3 +579,21 @@ async def test_sem_a_ferramenta_de_etapas_o_encadeado_vai_ao_modelo(novo_agente)
     await novo_agente(modelo).responder("abre o kanban e depois o chrome")
 
     assert len(modelo.recebidas) == 1
+
+
+async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(registro, eventos, auditoria):
+    from clarisse.figuras import Retorno
+
+    longo = "Primeiro parágrafo da resposta do Claude.\n\nSegundo parágrafo, com mais detalhes."
+
+    async def ler(args):
+        return Retorno(longo, na_integra=True)
+
+    registro.registrar(Ferramenta("ler", "lê", Argumentos, ler))
+    modelo = ModeloFalso(chamada("ler"), texto("Resumo curto que não pode aparecer."))
+    agente = Agente(modelo, registro, eventos, auditoria, projetos=[], agora=lambda: datetime(2026, 9, 30, 10, 0))
+
+    resposta = await agente.responder("lê a última resposta do Claude")
+
+    assert resposta.texto == longo
+    assert len(modelo.recebidas) == 1
