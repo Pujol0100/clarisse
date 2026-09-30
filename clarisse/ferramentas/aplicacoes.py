@@ -27,6 +27,8 @@ _PREFIXOS_HOST_PORTA = ("DB", "POSTGRES", "PG", "MYSQL")
 _LOCAIS = {"localhost", "127.0.0.1", "::1"}
 _ESPERA_DO_SITE = 120
 _ESPERA_COM_INSTALACAO = 600
+# Sem isto a janela fecha quando o servidor morre e o erro some junto.
+_SEGURAR_A_JANELA = "; echo; echo 'O servidor parou. Veja o erro acima e aperte Enter para fechar.'; read"
 _PORTA_NO_SCRIPT = re.compile(r"(?:-p|--port)[ =](\d+)")
 _PORTA_PADRAO = {"next": 3000, "vite": 5173, "react-scripts": 3000, "nuxt": 3000}
 
@@ -188,12 +190,14 @@ def ferramentas_de_aplicacoes(
             return motivo
         instala = False
         for parte in partes:
-            comando = ["npm", "run", parte.script]
+            # Só nomes fixos no bash: o script vem de _SCRIPTS_DE_DEV, nunca do pedido.
+            comando = f"npm run {parte.script}"
             if instalar := _instalar(projeto, parte):
-                # Só "&&" e nomes fixos: o script vem de _SCRIPTS_DE_DEV, nunca do pedido.
-                comando = ["bash", "-c", f"{instalar} && npm run {parte.script}"]
+                comando = f"{instalar} && {comando}"
                 instala = True
-            await executor.iniciar(["ptyxis", "--new-window", "-d", str(parte.pasta), "--", *comando])
+            await executor.iniciar(
+                ["ptyxis", "--new-window", "-d", str(parte.pasta), "--", "bash", "-c", comando + _SEGURAR_A_JANELA]
+            )
         demora = " Como preciso instalar as dependências antes, pode levar alguns minutos." if instala else ""
         web = next((p for p in partes if p.porta_web), None)
         if web is None:

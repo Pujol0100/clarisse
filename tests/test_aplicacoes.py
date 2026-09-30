@@ -37,6 +37,12 @@ def _smart_anchor(raiz, banco="10.0.0.5:65432"):
     return projeto
 
 
+def _comando(argumentos):
+    """O que roda dentro do terminal: ptyxis ... -- bash -c "<comando>"."""
+    assert argumentos[-3:-1] == ["bash", "-c"]
+    return argumentos[-1]
+
+
 class Avisos:
     def __init__(self):
         self.recebidos = []
@@ -124,10 +130,11 @@ async def test_abre_um_terminal_visivel_por_parte(montar, executor, tmp_path):
 
     await f.executar(f.argumentos(projeto="smart-anchor"))
 
-    assert executor.iniciados == [
-        (["ptyxis", "--new-window", "-d", str(projeto / "backend"), "--", "npm", "run", "dev"], None),
-        (["ptyxis", "--new-window", "-d", str(projeto / "frontend"), "--", "npm", "run", "dev"], None),
+    assert [a[:4] for a, _ in executor.iniciados] == [
+        ["ptyxis", "--new-window", "-d", str(projeto / "backend")],
+        ["ptyxis", "--new-window", "-d", str(projeto / "frontend")],
     ]
+    assert all(_comando(a).startswith("npm run dev;") for a, _ in executor.iniciados)
 
 
 async def test_quando_o_site_responde_abre_o_navegador_e_avisa(montar, executor, delegacoes, avisos, tmp_path):
@@ -250,9 +257,9 @@ async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
 
     await f.executar(f.argumentos(projeto="omni api"))
 
-    assert executor.iniciados == [
-        (["ptyxis", "--new-window", "-d", str(tmp_path / "omni-api"), "--", "npm", "run", "start:dev"], None),
-    ]
+    [(argumentos, _)] = executor.iniciados
+    assert argumentos[3] == str(tmp_path / "omni-api")
+    assert _comando(argumentos).startswith("npm run start:dev;")
 
 
 
@@ -270,10 +277,9 @@ async def test_sem_dependencias_instala_com_npm_ci_antes_de_rodar(montar, execut
     assert f.risco_de(args) is Risco.CONFIRMAR
     assert "instalar as dependências" in frase
     assert "minutos" in resposta
-    assert executor.iniciados[:2] == [
-        (["ptyxis", "--new-window", "-d", str(projeto / "backend"), "--", "bash", "-c", "npm ci && npm run dev"], None),
-        (["ptyxis", "--new-window", "-d", str(projeto / "frontend"), "--", "npm", "run", "dev"], None),
-    ]
+    backend, frontend = (a for a, _ in executor.iniciados[:2])
+    assert backend[3] == str(projeto / "backend") and _comando(backend).startswith("npm ci && npm run dev;")
+    assert frontend[3] == str(projeto / "frontend") and _comando(frontend).startswith("npm run dev;")
     assert esperas == [600]
 
 
@@ -283,7 +289,7 @@ async def test_sem_package_lock_instala_com_npm_install(montar, executor, tmp_pa
 
     await f.executar(f.argumentos(projeto="painel"))
 
-    assert executor.iniciados[0][0][-3:] == ["bash", "-c", "npm install && npm run dev"]
+    assert _comando(executor.iniciados[0][0]).startswith("npm install && npm run dev;")
 
 
 async def test_com_dependencias_espera_o_site_so_dois_minutos(montar, delegacoes, esperas, tmp_path):
@@ -305,3 +311,15 @@ async def test_dependencias_na_raiz_do_projeto_valem_para_as_partes(montar, exec
     await f.executar(f.argumentos(projeto="monorepo"))
 
     assert len(executor.iniciados) == 1
+
+
+
+async def test_terminal_fica_aberto_mostrando_o_erro_quando_o_servidor_para(montar, executor, tmp_path):
+    _pacote(tmp_path / "painel", {"dev": "vite"})
+    f = montar()
+
+    await f.executar(f.argumentos(projeto="painel"))
+
+    comando = _comando(executor.iniciados[0][0])
+    assert comando.startswith("npm run dev;")
+    assert comando.rstrip().endswith("read")
