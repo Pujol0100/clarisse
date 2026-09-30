@@ -461,4 +461,35 @@ async def test_pergunta_do_claude_aparece_com_os_botoes_e_e_falada_uma_vez(tmp_p
 
     publicados = [fila.get_nowait() for _ in range(fila.qsize())]
     assert {"tipo": "resposta", "texto": "O Claude quer: Vou colar oi. Confirma?", "aguardando_confirmacao": True}.items() <= publicados[0].items()
-    assert locutor.textos == ["O Claude quer: Vou colar oi. Confirma?"]
+    assert " ".join(locutor.textos) == "O Claude quer: Vou colar oi. Confirma?"
+
+
+def test_fala_sai_em_partes_com_legenda_e_a_resposta_espera_a_fala(logado, partes):
+    _, agente, _, locutor, eventos = partes
+    agente.proxima = Resposta("Em Campinas faz 27 graus. Hoje chove à tarde. Amanhã abre sol.")
+    fila = eventos.assinar()
+
+    logado.post("/api/mensagem", json={"texto": "e o tempo?"})
+
+    publicados = _eventos_publicados(fila)
+    [resposta] = [e for e in publicados if e["tipo"] == "resposta"]
+    falas = [e for e in publicados if e["tipo"] == "falar"]
+    assert [f["legenda"] for f in falas] == ["Em Campinas faz 27 graus.", "Hoje chove à tarde. Amanhã abre sol."]
+    assert [(f["parte"], f["total"]) for f in falas] == [(0, 2), (1, 2)]
+    assert {f["fala"] for f in falas} == {resposta["fala"]}
+    assert locutor.textos == ["Em Campinas faz 27 graus.", "Hoje chove à tarde. Amanhã abre sol."]
+
+
+async def test_aviso_e_pergunta_do_claude_tambem_esperam_a_fala(tmp_path):
+    from clarisse.web import criar_anunciador
+
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("Claude", "Terminei.")
+    await criar_anunciador(eventos, locutor)("O Claude quer: fechar. Confirma?")
+
+    publicados = _eventos_publicados(fila)
+    for tipo in ("aviso", "resposta"):
+        [texto] = [e for e in publicados if e["tipo"] == tipo]
+        assert texto["fala"] in {e["fala"] for e in publicados if e["tipo"] == "falar"}

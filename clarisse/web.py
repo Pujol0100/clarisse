@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import logging
+import uuid
 import re
 import secrets
 from collections.abc import Awaitable, Callable
@@ -19,6 +20,7 @@ from starlette.websockets import WebSocketClose
 from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
 from clarisse.figuras import MENSAGEM
+from clarisse.voz import dividir_em_trechos
 
 log = logging.getLogger(__name__)
 
@@ -101,33 +103,50 @@ class Mensagem(BaseModel):
     texto: str = Field(min_length=1, max_length=2000)
 
 
-async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = None) -> str | None:
-    try:
-        caminho = await locutor.sintetizar(texto)
-    except Exception:
-        log.exception("a síntese de voz falhou")
-        await eventos.publicar({"tipo": "erro", "texto": "A voz não está disponível agora; a resposta ficou só na tela."})
-        await eventos.estado(Estado.PARADA)
-        return None
-    url = f"/audio/{caminho.name}"
-    await eventos.estado(Estado.FALANDO)
-    await eventos.publicar({"tipo": "falar", "audio": url, "figura": figura})
-    return url
+def _nova_fala() -> str:
+    return uuid.uuid4().hex
+
+
+async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = None, fala: str | None = None) -> str | None:
+    """Fala em trechos: o primeiro sai assim que fica pronto e os outros são gerados enquanto ele toca.
+    Cada trecho leva a legenda; o texto na tela espera a fala `fala` começar."""
+    fala = fala or _nova_fala()
+    trechos = dividir_em_trechos(texto)
+    primeiro = None
+    for parte, trecho in enumerate(trechos):
+        try:
+            caminho = await locutor.sintetizar(trecho)
+        except Exception:
+            log.exception("a síntese de voz falhou")
+            await eventos.publicar({"tipo": "erro", "fala": fala, "texto": "A voz não está disponível agora; a resposta ficou só na tela."})
+            await eventos.estado(Estado.PARADA)
+            return primeiro
+        url = f"/audio/{caminho.name}"
+        if parte == 0:
+            await eventos.estado(Estado.FALANDO)
+        await eventos.publicar({
+            "tipo": "falar", "fala": fala, "parte": parte, "total": len(trechos),
+            "audio": url, "legenda": trecho, "figura": figura,
+        })
+        primeiro = primeiro or url
+    return primeiro
 
 
 def criar_anunciador(eventos: Eventos, locutor) -> Callable[[str], Awaitable[None]]:
     """Pergunta de confirmação vinda do Claude: aparece com os botões e é falada."""
     async def anunciar(frase: str) -> None:
-        await eventos.publicar({"tipo": "resposta", "texto": frase, "aguardando_confirmacao": True})
-        await _falar(eventos, locutor, frase, figura=MENSAGEM)
+        fala = _nova_fala()
+        await eventos.publicar({"tipo": "resposta", "fala": fala, "texto": frase, "aguardando_confirmacao": True})
+        await _falar(eventos, locutor, frase, figura=MENSAGEM, fala=fala)
 
     return anunciar
 
 
 def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[None]]:
     async def avisar(titulo: str, texto: str) -> None:
-        await eventos.publicar({"tipo": "aviso", "titulo": titulo, "texto": texto})
-        await _falar(eventos, locutor, f"Do {titulo}: {texto}", figura=MENSAGEM)
+        fala = _nova_fala()
+        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto})
+        await _falar(eventos, locutor, f"Do {titulo}: {texto}", figura=MENSAGEM, fala=fala)
 
     return avisar
 
@@ -161,10 +180,12 @@ def criar_app(
             await eventos.publicar({"tipo": "parar"})
             await eventos.estado(Estado.PARADA)
             return {"texto": resposta.texto, "audio": None, "aguardando_confirmacao": False, "parar": True}
-        await eventos.publicar(
-            {"tipo": "resposta", "texto": resposta.texto, "aguardando_confirmacao": resposta.aguardando_confirmacao}
-        )
-        audio = await _falar(eventos, locutor, resposta.texto, figura=resposta.figura)
+        fala = _nova_fala()
+        await eventos.publicar({
+            "tipo": "resposta", "fala": fala, "texto": resposta.texto,
+            "aguardando_confirmacao": resposta.aguardando_confirmacao,
+        })
+        audio = await _falar(eventos, locutor, resposta.texto, figura=resposta.figura, fala=fala)
         return {
             "texto": resposta.texto,
             "audio": audio,

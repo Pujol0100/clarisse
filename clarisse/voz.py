@@ -38,6 +38,28 @@ def texto_para_fala(texto: str) -> str:
     return " ".join(falado.split())
 
 
+_FIM_DE_FRASE = re.compile(r"(?<=[.!?;])\s+")
+_TAMANHO_DO_TRECHO = 220
+
+
+def dividir_em_trechos(texto: str) -> list[str]:
+    """Texto já limpo para a fala, em trechos: a primeira frase sozinha, para a voz começar logo,
+    e as seguintes juntas até ~220 letras, sem cortar nenhuma frase ao meio."""
+    frases = [f for f in _FIM_DE_FRASE.split(texto_para_fala(texto)) if f]
+    if not frases:
+        return []
+    trechos, atual = [frases[0]], ""
+    for frase in frases[1:]:
+        if atual and len(atual) + 1 + len(frase) > _TAMANHO_DO_TRECHO:
+            trechos.append(atual)
+            atual = frase
+        else:
+            atual = f"{atual} {frase}".strip()
+    if atual:
+        trechos.append(atual)
+    return trechos
+
+
 class Transcritor:
     def __init__(self, carregar: Callable[[], object], dicas: list[str]):
         self._carregar = carregar

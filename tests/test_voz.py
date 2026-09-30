@@ -95,3 +95,38 @@ def test_tabela_e_lida_sem_as_barras():
 
     assert "|" not in falado and "---" not in falado
     assert "Kanban" in falado and "no ar" in falado
+
+
+def test_primeira_frase_sai_sozinha_para_a_voz_comecar_logo():
+    from clarisse.voz import dividir_em_trechos
+
+    assert dividir_em_trechos("Oi. Tudo bem com você? Hoje faz sol em Campinas.") == [
+        "Oi.", "Tudo bem com você? Hoje faz sol em Campinas.",
+    ]
+
+
+def test_trechos_seguintes_juntam_frases_sem_cortar_nenhuma():
+    from clarisse.voz import dividir_em_trechos
+
+    frases = [f"Esta é a frase número {i}, com algumas palavras a mais." for i in range(12)]
+    trechos = dividir_em_trechos(" ".join(frases))
+
+    assert trechos[0] == frases[0]
+    assert " ".join(trechos) == " ".join(frases)
+    assert all(len(t) <= 230 for t in trechos[1:])
+    assert len(trechos) < len(frases)
+
+
+def test_frase_mais_longa_que_o_limite_fica_inteira():
+    from clarisse.voz import dividir_em_trechos
+
+    longa = "Esta frase " + "muito " * 60 + "comprida termina aqui."
+
+    assert dividir_em_trechos(f"Primeira. {longa}") == ["Primeira.", longa]
+
+
+def test_trechos_ja_saem_limpos_para_a_fala():
+    from clarisse.voz import dividir_em_trechos
+
+    assert dividir_em_trechos("Rode:\n\n```bash\nls\n```\n\nPronto.") == ["Rode: Trecho de código.", "Pronto."]
+    assert dividir_em_trechos("   ") == []
