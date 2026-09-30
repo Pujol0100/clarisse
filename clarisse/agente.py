@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from clarisse.auditoria import Auditoria
+from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Estado, Eventos
 from clarisse.figuras import Retorno
 from clarisse.ferramentas.registro import Registro
@@ -70,6 +71,7 @@ class Agente:
         agora: Callable[[], datetime] = datetime.now,
         cidade: str | None = None,
         sistemas: Callable[[], list[str]] = list,
+        confirmacoes: Confirmacoes | None = None,
         max_rodadas: int = 4,
         timeout_da_ferramenta: float = 180,
     ):
@@ -80,6 +82,7 @@ class Agente:
         self._projetos = projetos
         self._cidade = cidade
         self._sistemas = sistemas
+        self._confirmacoes = confirmacoes
         self._agora = agora
         self._max_rodadas = max_rodadas
         self._timeout = timeout_da_ferramenta
@@ -94,7 +97,12 @@ class Agente:
             self._figura = None
             if pede_para_parar(fala):
                 self._pendente = None
+                if self._confirmacoes:
+                    self._confirmacoes.cancelar()
                 return Resposta("Parei.", parar=True)
+
+            if self._confirmacoes and (texto := self._confirmacoes.responder(fala)):
+                return Resposta(texto)
 
             if self._pendente:
                 decisao, mensagens, inicio = self._pendente
@@ -163,8 +171,29 @@ class Agente:
         mensagens += [chamada, resultado]
         return self._concluir(mensagens, inicio, resultado["content"])
 
+    async def executar_externo(self, nome: str, argumentos: dict) -> str:
+        """Ferramenta pedida pelo Claude: mesma avaliação, e o que altera algo é confirmado pela voz."""
+        decisao = avaliar(self._registro, nome, argumentos)
+        if decisao.acao == "recusar":
+            return f"Recusado: {decisao.motivo}."
+        if decisao.acao == "confirmar":
+            frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
+            if not (self._confirmacoes and await self._confirmacoes.pedir(f"O Claude quer: {frase}")):
+                return "O usuário não confirmou; não fiz isso."
+        mensagem, figura = await self._rodar(decisao)
+        if figura:
+            await self._eventos.publicar({"tipo": "figura", "figura": figura})
+        await self._eventos.estado(Estado.PARADA)
+        return mensagem["content"]
+
     async def _executar(self, decisao: Decisao) -> dict:
+        mensagem, figura = await self._rodar(decisao)
+        self._figura = figura or self._figura
+        return mensagem
+
+    async def _rodar(self, decisao: Decisao) -> tuple[dict, str | None]:
         nome = decisao.ferramenta.nome
+        figura = None
         await self._eventos.estado(Estado.EXECUTANDO)
         await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": "iniciada"})
         inicio = time.monotonic()
@@ -172,10 +201,10 @@ class Agente:
             resultado = await asyncio.wait_for(decisao.ferramenta.executar(decisao.args), self._timeout)
             situacao = "concluida"
             if isinstance(resultado, Retorno):
-                self._figura = resultado.figura or decisao.ferramenta.figura
+                figura = resultado.figura or decisao.ferramenta.figura
                 resultado = resultado.texto
             else:
-                self._figura = decisao.ferramenta.figura or self._figura
+                figura = decisao.ferramenta.figura
         except Exception as erro:
             log.exception("ferramenta %s falhou", nome)
             resultado = f"Erro ao executar {nome}: {erro}"
@@ -188,7 +217,7 @@ class Agente:
             duracao_ms=round((time.monotonic() - inicio) * 1000),
         )
         await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": situacao})
-        return _mensagem_de_ferramenta(nome, resultado)
+        return _mensagem_de_ferramenta(nome, resultado), figura
 
     def _historico(self) -> list[dict]:
         return [mensagem for conversa in self._conversas for mensagem in conversa]
