@@ -44,3 +44,12 @@ def test_cores_da_marca_na_pagina():
 
     assert "#0a0a0a" in css and "#c9a84c" in css
     assert "#15294a" not in css and "#0e1a2b" not in css
+
+
+def test_scripts_so_procuram_elementos_que_existem_na_pagina():
+    pagina = (WEB / "index.html").read_text(encoding="utf-8")
+    ids = set(re.findall(r'id="([^"]+)"', pagina))
+
+    for script in _scripts_da_pagina():
+        procurados = set(re.findall(r'getElementById\("([^"]+)"\)', (WEB / script).read_text(encoding="utf-8")))
+        assert procurados <= ids, f"{script} procura {sorted(procurados - ids)}, que não existe na página"
