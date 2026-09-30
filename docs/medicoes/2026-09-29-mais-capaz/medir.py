@@ -25,29 +25,21 @@ SEM = set(filter(None, os.environ.get("SEM", "").split(",")))
 
 # (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor}); "participantes" junta a lista
 CASOS = [
-    ("abre o omni", "abrir", {"nome": "omni", "onde": None}),
-    ("abre o kanban", "abrir", {"nome": "kanban", "onde": None}),
-    ("abre o chrome", "abrir", {"nome": "chrome"}),
-    ("abre o vs code", "abrir", {"nome": "code"}),
-    ("abre o smart anchor", "abrir", {"nome": "anchor", "onde": None}),
-    ("abre o sc360", "abrir", {"nome": "sc360", "onde": None}),
-    ("abre o omni app", "abrir", {"nome": "omni", "onde": None}),
-    ("abre o painel fidc", "abrir", {"nome": "fidc", "onde": None}),
-    ("abre o omni local", "abrir", {"nome": "omni", "onde": "local"}),
-    ("abre o site do sc360", "abrir", {"nome": "sc360", "onde": "site"}),
-    ("roda o smart anchor", "abrir", {"nome": "anchor"}),
-    ("consegue abrir o smart-anchor local", "abrir", {"nome": "anchor", "onde": "local"}),
-    ("abre o dokploy do omni", "abrir", {"nome": "dokploy"}),
-    ("abre o painel de inadimplência", "abrir", {"nome": "inadimpl"}),
-    ("abre o github", "abrir_site", {"endereco": "github"}),
-    ("abre a pasta de downloads", "abrir_pasta", {}),
-    ("abre a planilha de boletos", "abrir_arquivo", {"nome": "boletos"}),
-    ("abre o projeto omni api no vs code", "abrir_projeto_vscode", {}),
-    ("traz o vs code pra frente", "trazer_para_frente", {}),
-    ("fecha o chrome", "fechar_aplicativo", {}),
+    ("abre o projeto omni api no vs code e depois abre o arquivo readme", "fazer_em_etapas", {}),
+    ("abre o kanban e depois me diz a previsão do tempo", "fazer_em_etapas", {}),
+    ("vê que horas são e depois abre o chrome", "fazer_em_etapas", {}),
+    ("abre a planilha de boletos e depois traz o vs code pra frente", "fazer_em_etapas", {}),
+    ("abre o site do omni, confere se está no ar e me avisa", "fazer_em_etapas", {}),
+    ("roda o smart anchor e quando subir abre o readme dele", "fazer_em_etapas", {}),
+    # uma etapa só: não pode ir ao Claude
+    ("abre o kanban", "abrir", {}),
     ("que horas são?", "hora_e_data", {}),
-    ("oi clarisse, tudo bem?", None, {}),
+    ("marca dentista quinta às 14h", "criar_compromisso", {}),
+    ("abre a planilha de boletos", "abrir_arquivo", {}),
+    ("traz o vs code pra frente", "trazer_para_frente", {}),
     ("o que é uma API?", None, {}),
+    ("oi clarisse, tudo bem?", None, {}),
+    ("qual a cotação do dólar hoje?", "pedir_ao_claude", {}),
 ]
 
 

@@ -533,3 +533,49 @@ async def test_sem_sistemas_o_prompt_nao_fala_deles(novo_agente):
     await novo_agente(modelo).responder("oi")
 
     assert "Sistemas da empresa" not in modelo.recebidas[0][0]["content"]
+
+
+@pytest.fixture
+def pedidos_em_etapas(registro):
+    recebidos = []
+
+    async def etapas(args):
+        recebidos.append(args.pedido)
+        return "Pedi ao Claude para fazer isso em etapas. Aviso quando terminar."
+
+    registro.registrar(Ferramenta("fazer_em_etapas", "etapas", ArgsPedido, etapas))
+    return recebidos
+
+
+@pytest.mark.parametrize("fala", [
+    "abre o kanban e depois me diz a previsão do tempo",
+    "vê que horas são e em seguida abre o chrome",
+    "roda o smart anchor e quando subir abre o readme dele",
+    "abre o omni, depois disso confere o login",
+])
+async def test_pedido_encadeado_vai_inteiro_para_as_etapas_sem_passar_pelo_modelo(novo_agente, pedidos_em_etapas, fala):
+    modelo = ModeloFalso()
+
+    resposta = await novo_agente(modelo).responder(fala)
+
+    assert pedidos_em_etapas == [fala]
+    assert modelo.recebidas == []
+    assert "etapas" in resposta.texto
+
+
+@pytest.mark.parametrize("fala", ["me lembra de ligar pro João depois", "abre o kanban", "o que acontece depois do deploy?"])
+async def test_pedido_sem_encadeamento_segue_pelo_modelo(novo_agente, pedidos_em_etapas, fala):
+    modelo = ModeloFalso(texto("Certo."))
+
+    await novo_agente(modelo).responder(fala)
+
+    assert pedidos_em_etapas == []
+    assert len(modelo.recebidas) == 1
+
+
+async def test_sem_a_ferramenta_de_etapas_o_encadeado_vai_ao_modelo(novo_agente):
+    modelo = ModeloFalso(texto("Certo."))
+
+    await novo_agente(modelo).responder("abre o kanban e depois o chrome")
+
+    assert len(modelo.recebidas) == 1
