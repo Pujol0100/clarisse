@@ -15,7 +15,10 @@ no meio. Quem escolhe a figura é o sistema, pela ferramenta usada e pelo dado, 
 modelo. O rosto parte do modelo aberto de rosto do Google MediaPipe (Apache 2.0).
 
 A tela tem a Clarisse à esquerda e a conversa à direita, em balões, desde que a página
-foi aberta; em janela estreita, a conversa desce para baixo do rosto.
+foi aberta; em janela estreita, a conversa desce para baixo do rosto. A voz sai em
+trechos: a primeira frase é sintetizada sozinha, para ela começar a falar logo, e o que
+ela está dizendo aparece como legenda embaixo do rosto. A resposta entra no chat quando
+a voz começa.
 
 > O código antigo, que dava voz ao Claude Code no Windows, está em
 > [`legado-windows/`](legado-windows/README.md).
