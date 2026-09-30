@@ -25,21 +25,16 @@ SEM = set(filter(None, os.environ.get("SEM", "").split(",")))
 
 # (pedido, ferramenta esperada ou None, {argumento: trecho esperado no valor}); "participantes" junta a lista
 CASOS = [
-    ("abre o projeto omni api no vs code e depois abre o arquivo readme", "fazer_em_etapas", {}),
-    ("abre o kanban e depois me diz a previsão do tempo", "fazer_em_etapas", {}),
-    ("vê que horas são e depois abre o chrome", "fazer_em_etapas", {}),
-    ("abre a planilha de boletos e depois traz o vs code pra frente", "fazer_em_etapas", {}),
-    ("abre o site do omni, confere se está no ar e me avisa", "fazer_em_etapas", {}),
-    ("roda o smart anchor e quando subir abre o readme dele", "fazer_em_etapas", {}),
-    # uma etapa só: não pode ir ao Claude
-    ("abre o kanban", "abrir", {}),
+    ("lê a última resposta do Claude", "ler_resposta_do_claude", {}),
+    ("lê o que o Claude acabou de responder", "ler_resposta_do_claude", {}),
+    ("Clarisse, lê pra mim a resposta do Claude", "ler_resposta_do_claude", {}),
+    ("lê a última resposta da conversa clarisse", "ler_resposta_do_claude", {"conversa": "clarisse"}),
+    ("lê a resposta do Claude na conversa do omni", "ler_resposta_do_claude", {"conversa": "omni"}),
+    ("pergunta pro Claude o que é REST", "pedir_ao_claude", {}),
+    ("manda pra conversa omni do Claude: roda os testes de novo", "mandar_para_conversa_do_claude", {}),
+    ("abre o Claude no omni api e pede pra ele corrigir o teste", "abrir_claude_na_tela", {}),
     ("que horas são?", "hora_e_data", {}),
-    ("marca dentista quinta às 14h", "criar_compromisso", {}),
-    ("abre a planilha de boletos", "abrir_arquivo", {}),
-    ("traz o vs code pra frente", "trazer_para_frente", {}),
-    ("o que é uma API?", None, {}),
     ("oi clarisse, tudo bem?", None, {}),
-    ("qual a cotação do dólar hoje?", "pedir_ao_claude", {}),
 ]
 
 

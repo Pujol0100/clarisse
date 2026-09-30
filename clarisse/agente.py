@@ -22,13 +22,15 @@ _CONVERSAS_LEMBRADAS = 4
 _LIMITE_DO_RESULTADO_LEMBRADO = 300
 _ANUNCIO = re.compile(r"\b(vou|irei|vamos)\b", re.IGNORECASE)
 _CITA_O_CLAUDE = re.compile(r"\bclaude\b", re.IGNORECASE)
-# O modelo diz que precisa pesquisar ou do Claude, mas não chama: a pergunta vai ao Claude.
 # Pedido encadeado vai inteiro ao Claude das etapas: o modelo local só faz a primeira etapa.
 _ENCADEADO = re.compile(
     r"\be depois\b|\bem seguida\b|\bdepois disso\b|\be quando (?:subir|terminar|abrir|estiver|ele|ela)\b",
     re.IGNORECASE,
 )
+# O modelo diz que precisa pesquisar ou do Claude, mas não chama: a pergunta vai ao Claude.
 _QUER_O_CLAUDE = re.compile(r"\bclaude\b|pedir_ao_claude|pesquis", re.IGNORECASE)
+# "Lê a resposta do Claude" cita o Claude, mas é leitura: sem ferramenta chamada, lê em vez de perguntar a ele.
+_PEDE_LEITURA = re.compile(r"\b(?:l[eê]|leia|ler)\b.*\b(?:resposta|respondeu|claude)\b", re.IGNORECASE)
 _CUTUCADA = {
     "role": "user",
     "content": "Você disse que ia fazer isso, mas não chamou nenhuma ferramenta. "
@@ -141,6 +143,8 @@ class Agente:
             if not resposta.chamadas:
                 fala = mensagens[inicio]["content"]
                 agiu = any(m["role"] == "tool" for m in mensagens[inicio:])
+                if not agiu and _PEDE_LEITURA.search(fala) and "ler_resposta_do_claude" in self._registro.nomes():
+                    return await self._delegar("ler_resposta_do_claude", mensagens, inicio, fala, argumentos={})
                 pediu_o_claude = _CITA_O_CLAUDE.search(fala) or _QUER_O_CLAUDE.search(resposta.texto or "")
                 if not agiu and pediu_o_claude and "pedir_ao_claude" in self._registro.nomes():
                     return await self._delegar("pedir_ao_claude", mensagens, inicio, fala)
@@ -171,9 +175,12 @@ class Agente:
             resposta = await self._modelo.conversar([*mensagens, resposta.mensagem, _CUTUCADA], esquemas)
         return resposta
 
-    async def _delegar(self, ferramenta: str, mensagens: list[dict], inicio: int, fala: str) -> Resposta:
-        """A frase do usuário vai inteira ao Claude: citou o Claude ou pesquisa sem nada chamado, ou é encadeada."""
-        argumentos = {"pedido": fala}
+    async def _delegar(
+        self, ferramenta: str, mensagens: list[dict], inicio: int, fala: str, argumentos: dict | None = None,
+    ) -> Resposta:
+        """Chama a ferramenta sem o modelo: a frase vai inteira ao Claude (citou o Claude ou pesquisa sem nada
+        chamado, ou é encadeada), ou a leitura da resposta do Claude quando o modelo não a chamou."""
+        argumentos = {"pedido": fala} if argumentos is None else argumentos
         decisao = avaliar(self._registro, ferramenta, argumentos)
         if decisao.acao != "executar":
             return self._concluir(mensagens, inicio, f"Não consegui passar o pedido ao Claude: {decisao.motivo}.")

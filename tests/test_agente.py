@@ -597,3 +597,40 @@ async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(r
 
     assert resposta.texto == longo
     assert len(modelo.recebidas) == 1
+
+
+@pytest.fixture
+def leituras(registro):
+    from clarisse.figuras import Retorno
+
+    class ArgsLeitura(Argumentos):
+        conversa: str | None = None
+
+    feitas = []
+
+    async def ler(args):
+        feitas.append(args.conversa)
+        return Retorno("Texto da resposta do Claude.", na_integra=True)
+
+    registro.registrar(Ferramenta("ler_resposta_do_claude", "lê", ArgsLeitura, ler))
+    return feitas
+
+
+@pytest.mark.parametrize("fala", ["Clarisse, lê pra mim a resposta do Claude", "leia o que o Claude respondeu"])
+async def test_pedido_de_leitura_sem_ferramenta_chamada_le_em_vez_de_mandar_ao_claude(novo_agente, pedidos_ao_claude, leituras, fala):
+    modelo = ModeloFalso(texto("Qual resposta do Claude você gostaria que eu lesse?"), texto("Qual resposta?"))
+
+    resposta = await novo_agente(modelo).responder(fala)
+
+    assert leituras == [None]
+    assert pedidos_ao_claude == []
+    assert resposta.texto == "Texto da resposta do Claude."
+
+
+async def test_pergunta_ao_claude_continua_indo_ao_claude(novo_agente, pedidos_ao_claude, leituras):
+    modelo = ModeloFalso(texto("Vou pedir ao Claude."), texto("Vou pedir ao Claude, pode deixar."))
+
+    await novo_agente(modelo).responder("pergunta pro Claude o que é REST")
+
+    assert leituras == []
+    assert pedidos_ao_claude == ["pergunta pro Claude o que é REST"]
