@@ -14,6 +14,9 @@ mensagem —, o rosto vai para o canto e "drones" de luz saem dele para desenhar
 no meio. Quem escolhe a figura é o sistema, pela ferramenta usada e pelo dado, nunca o
 modelo. O rosto parte do modelo aberto de rosto do Google MediaPipe (Apache 2.0).
 
+A tela tem a Clarisse à esquerda e a conversa à direita, em balões, desde que a página
+foi aberta; em janela estreita, a conversa desce para baixo do rosto.
+
 > O código antigo, que dava voz ao Claude Code no Windows, está em
 > [`legado-windows/`](legado-windows/README.md).
 
@@ -45,6 +48,7 @@ modelo. O rosto parte do modelo aberto de rosto do Google MediaPipe (Apache 2.0)
 | "roda o smart anchor", "sobe o omni app" | Acha o projeto, abre um terminal por parte (`npm run dev` ou `start:dev`), instala as dependências antes se faltarem (`npm ci`) e abre o site quando responder; a confirmação diz qual banco o `.env` usa |
 | "o que é a Smart Compass?", "qual a cotação do dólar?" | Pede ao Claude, que pesquisa na internet, e fala a resposta |
 | "abre o kanban e depois me diz o tempo" (pedido com "e depois", "em seguida"…) | Vai inteiro para um Claude que usa as ferramentas da própria Clarisse, etapa por etapa; o que altera algo é perguntado pela voz ("O Claude quer: … Confirma?") |
+| "lê a última resposta do Claude", "lê a resposta da conversa clarisse" | Lê em voz alta, na íntegra, o que o Claude Code respondeu por último (conversa mais recente ou pelo nome); código vira "trecho de código" |
 | "para", "cancela" | Para na hora, sem passar pelo modelo |
 
 Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer

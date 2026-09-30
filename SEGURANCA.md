@@ -99,6 +99,10 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   induzi-lo a agir. Ele só alcança as ferramentas da Clarisse, e as que alteram algo
   (e os atalhos) dependem do "sim" falado; as de leitura e abrir site/programa rodam
   sem pergunta.
+- **Ler a resposta do Claude** abre, só para leitura, as conversas que o Claude Code
+  grava em `~/.claude/projects/` e fala a última resposta. O texto vai para a
+  Microsoft para virar voz, como toda fala da Clarisse: resposta com dado sensível de
+  cliente sai da máquina se for lida.
 - **Perguntas sobre o mundo vão para a Anthropic** e o Claude pesquisa na web.
 - **Instalar dependências executa código de terceiros** (scripts de instalação dos
   pacotes npm), como quando o usuário roda `npm ci` à mão. Autorizado pelo usuário em
