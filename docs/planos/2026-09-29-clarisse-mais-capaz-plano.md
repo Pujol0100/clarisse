@@ -30,6 +30,14 @@ Cada tarefa: teste primeiro, implementação, mutação, medição com o Gemma r
 
 ### 1. Agenda que some às vezes (depuração primeiro)
 
+**Feito em 29/09/2026.** Causa provada pelo `--debug-file`: o Claude roda os
+conectores do claude.ai "fully async (nonblocking)" e, quando a lista de
+conectores demora, manda a primeira pergunta ao modelo antes de o Microsoft 365
+conectar ("Tool search disabled: no deferred tools available"). Correção:
+`MCP_CONNECTION_NONBLOCKING=false` em toda chamada ao Claude — ele espera os
+conectores (no máximo 5 s) antes de começar. Resultado: 10 de 10 consultas com a
+agenda, de 12 a 24 s cada (antes 6 a 10 s, com falha em 2 de 3).
+
 - Reproduzir com o `claude -p` da `consultar_agenda` e registrar a saída JSON
   inteira (ferramentas disponíveis, `ToolSearch`, erros de conexão do MCP).
 - Hipótese a provar ou derrubar: o conector do Microsoft 365 ainda está
