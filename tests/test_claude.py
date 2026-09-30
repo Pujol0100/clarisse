@@ -97,6 +97,20 @@ async def test_pedir_ao_claude_sem_projeto_roda_numa_pasta_neutra(montar, delega
     assert (tmp_path / "neutra").is_dir()
 
 
+async def test_pergunta_ao_claude_nao_carrega_nem_espera_os_conectores_da_conta(montar, delegacoes, executor):
+    # Esperar conectores que a pergunta não pode usar custava ~6 s antes de o Claude começar (30/09/2026).
+    f = montar()["pedir_ao_claude"]
+    executor.respostas.append(_json_do_claude("Ottawa."))
+
+    await f.executar(f.argumentos(pedido="qual a capital do Canadá?"))
+    await delegacoes.aguardar()
+
+    argumentos, _ = executor.executados[0]
+    assert "--strict-mcp-config" in argumentos
+    assert json.loads(_valor_da_opcao(argumentos, "--mcp-config")) == {"mcpServers": {}}
+    assert "MCP_CONNECTION_NONBLOCKING" not in executor.ambientes[0]
+
+
 async def test_falha_do_claude_vira_aviso_legivel(montar, delegacoes, executor, avisos):
     f = montar()["pedir_ao_claude"]
     executor.respostas.append(Resultado(1, "", "Error: not logged in"))

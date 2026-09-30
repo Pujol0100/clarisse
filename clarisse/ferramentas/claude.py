@@ -36,6 +36,7 @@ _PESQUISE = (
 # ele espera, no máximo 5 s, e segue.
 _ESPERAR_CONECTORES = {"MCP_CONNECTION_NONBLOCKING": "false"}
 _FERRAMENTAS_DE_MENSAGEM = ["SendMessage", "ListAgents"]
+_NENHUM_SERVIDOR = '{"mcpServers":{}}'
 _NAVEGADOR = "mcp__playwright"
 _CLARISSE = "mcp__clarisse"
 _REGRAS_EM_ETAPAS = (
@@ -85,6 +86,20 @@ def _embutidas(ferramentas: list[str]) -> list[str]:
     return embutidas
 
 
+def _usa_mcp(ferramentas: list[str], mcp_config: Path | None) -> bool:
+    return mcp_config is not None or any(f.startswith("mcp__") for f in ferramentas)
+
+
+def _servidores_mcp(ferramentas: list[str], mcp_config: Path | None) -> list[str]:
+    """Sem nenhuma ferramenta de MCP, o Claude abre sem os conectores da conta: carregá-los e esperá-los
+    custava ~6 s antes de ele começar a pensar (medido em 30/09/2026)."""
+    if mcp_config:
+        return ["--mcp-config", str(mcp_config), "--strict-mcp-config"]
+    if _usa_mcp(ferramentas, None):
+        return []
+    return ["--mcp-config", _NENHUM_SERVIDOR, "--strict-mcp-config"]
+
+
 async def rodar_claude(
     executor, pedido: str, pasta: Path, ferramentas: list[str], modelo: str, timeout: float, teto_usd: float,
     mcp_config: Path | None = None,
@@ -100,11 +115,11 @@ async def rodar_claude(
             "--append-system-prompt", _PARA_VOZ,
             "--allowedTools", ",".join(ferramentas),
             "--tools", ",".join(_embutidas(ferramentas)),
-            *(["--mcp-config", str(mcp_config), "--strict-mcp-config"] if mcp_config else []),
+            *_servidores_mcp(ferramentas, mcp_config),
         ],
         pasta=pasta,
         timeout=timeout,
-        ambiente=_ESPERAR_CONECTORES,
+        ambiente=_ESPERAR_CONECTORES if _usa_mcp(ferramentas, mcp_config) else None,
     )
     if resultado.estourou_tempo:
         return f"O Claude demorou mais de {int(timeout // 60)} minutos e eu interrompi."
