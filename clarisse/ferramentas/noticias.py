@@ -72,7 +72,6 @@ def _com_ponto(frase: str) -> str:
 
 class ArgsNoticias(Argumentos):
     tema: str | None = Field(None, max_length=60, description="Tema opcional: " + ", ".join(FEEDS))
-    ler_titulos: bool = Field(False, description="true só se o usuário pedir para ouvir os títulos das manchetes")
 
 
 class ArgsLerNoticia(Argumentos):
@@ -107,12 +106,7 @@ def ferramentas_de_noticias(
         if falha := await buscar(args.tema):
             return falha
         tema, noticias = ultimas["tema"], ultimas["noticias"]
-        pergunta = "Qual você quer que eu leia? Diga o número."
-        if args.ler_titulos:
-            lista = " ".join(f"{i}, {_com_ponto(n.titulo)}" for i, n in enumerate(noticias, 1))
-            texto = f"Manchetes de {tema}: {lista} {pergunta}"
-        else:
-            texto = f"Separei {len(noticias)} manchetes de {tema} na tela. {pergunta}"
+        texto = f"Separei {len(noticias)} manchetes de {tema} na tela. Qual você quer que eu leia? Diga o número."
         itens = []
         for i, n in enumerate(noticias, 1):
             item = {"numero": i, "titulo": n.titulo}

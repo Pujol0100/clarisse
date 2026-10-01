@@ -96,13 +96,6 @@ async def test_manchetes_vao_para_a_tela_e_ela_so_pergunta_qual_ler():
     ]
 
 
-async def test_le_os_titulos_so_quando_pedido():
-    resposta = await _chamar(_montar(_feed_de_exemplo()), "noticias_do_dia", tema="tecnologia", ler_titulos=True)
-
-    assert resposta.texto.startswith("Manchetes de tecnologia: 1, Cidade fictícia testa ônibus sem motorista no centro. 2, ")
-    assert resposta.texto.endswith("Qual você quer que eu leia? Diga o número.")
-
-
 async def test_a_lista_fica_guardada_para_voltar_a_ela():
     from clarisse.cartoes import UltimaEscolha
 

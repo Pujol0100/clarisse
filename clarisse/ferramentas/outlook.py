@@ -19,7 +19,6 @@ _BRASILIA = ZoneInfo("America/Sao_Paulo")
 _DIAS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 _PERIODOS = {"hoje": (0, 1), "amanha": (1, 1), "depois-de-amanha": (2, 1), "semana": (0, 7)}
 _NOMES = {"hoje": "Hoje", "amanha": "Amanhã", "depois-de-amanha": "Depois de amanhã", "semana": "Nos próximos 7 dias"}
-_FALADOS = 5
 _NA_LISTA = 10
 # Onde começa o histórico citado de uma resposta: daí para baixo não se lê.
 _HISTORICO = re.compile(r"^(De|From|Enviado|Sent):\s|^-{2,}\s*(Mensagem original|Original Message)|^Em .+ escreveu:$", re.IGNORECASE)
@@ -68,10 +67,6 @@ class ArgsAgenda(Argumentos):
     periodo: str | None = Field("hoje", max_length=40, description="hoje, amanhã, depois de amanhã ou semana")
 
 
-class ArgsNaoLidos(Argumentos):
-    ler_titulos: bool = Field(False, description="true só se o usuário pedir para ouvir remetente e assunto")
-
-
 class ArgsLerEmail(Argumentos):
     numero: int = Field(ge=1, le=_NA_LISTA, description="Número do e-mail na última lista de não lidos")
 
@@ -113,7 +108,7 @@ def ferramentas_do_outlook(
         cartao = {"tipo": "lista", "titulo": "Agenda", "canto": nome.lower() if periodo != "semana" else "semana", "itens": itens}
         return Retorno(texto, cartao=cartao)
 
-    async def emails_nao_lidos(args: ArgsNaoLidos) -> Retorno | str:
+    async def emails_nao_lidos(args: Argumentos) -> Retorno | str:
         try:
             caixa = await conta.get("/me/mailFolders/inbox", {"$select": "unreadItemCount"})
             dados = await conta.get(
@@ -127,17 +122,12 @@ def ferramentas_do_outlook(
         total = caixa.get("unreadItemCount", len(ultimos))
         if not ultimos:
             return Retorno("Nenhum e-mail não lido na caixa de entrada.", na_integra=True)
-        pergunta = "Qual você quer que eu leia? Diga o número."
-        if args.ler_titulos:
-            falados = " ".join(
-                f"{i}, de {_remetente(m)}: {m.get('subject') or 'sem assunto'}." for i, m in enumerate(ultimos[:_FALADOS], 1)
-            )
-            texto = f"Você tem {total} e-mails não lidos. Os mais recentes: {falados} {pergunta}"
-        else:
-            texto = f"Você tem {total} e-mails não lidos. Os {len(ultimos)} mais recentes estão na tela. {pergunta}"
+        texto = (f"Você tem {total} e-mails não lidos. Os {len(ultimos)} mais recentes estão na tela. "
+                 "Qual você quer que eu leia? Diga o número.")
         cartao = {
             "tipo": "escolha", "titulo": "E-mail", "canto": f"{total} não lidos", "pedido": "lê o e-mail",
-            "itens": [{"numero": i, "titulo": m.get("subject") or "sem assunto", "detalhe": _remetente(m)}
+            "itens": [{"numero": i, "titulo": m.get("subject") or "sem assunto", "detalhe": _remetente(m),
+                       "falado": f"de {_remetente(m)}: {m.get('subject') or 'sem assunto'}"}
                       for i, m in enumerate(ultimos, 1)],
         }
         escolhas.guardar(cartao)
@@ -169,7 +159,7 @@ def ferramentas_do_outlook(
         Ferramenta(
             "emails_nao_lidos",
             "Lista os e-mails não lidos da caixa de entrada do Outlook. Use para 'tenho e-mail?', 'e-mails novos'.",
-            ArgsNaoLidos, emails_nao_lidos, grupo="email",
+            Argumentos, emails_nao_lidos, grupo="email",
         ),
         Ferramenta(
             "ler_email",
