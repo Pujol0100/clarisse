@@ -647,3 +647,37 @@ async def test_pergunta_ao_claude_continua_indo_ao_claude(novo_agente, pedidos_a
 
     assert leituras == []
     assert pedidos_ao_claude == ["pergunta pro Claude o que é REST"]
+
+
+def test_prompt_sem_o_claude_manda_dizer_que_nao_sabe_em_vez_de_pesquisar():
+    from clarisse.agente import prompt_do_sistema
+
+    texto = prompt_do_sistema(
+        [], datetime(2026, 10, 1, 9, 0), ferramentas={"hora_e_data", "abrir_claude_na_tela", "ler_resposta_do_claude"},
+    )
+
+    assert "pedir_ao_claude" not in texto
+    assert "consultar_agenda" not in texto
+    assert "Você não tem acesso à internet para pesquisar" in texto
+    assert "ler_resposta_do_claude" in texto and "abrir_claude_na_tela" in texto
+
+
+def test_prompt_com_o_claude_manda_pesquisar_com_ele():
+    from clarisse.agente import prompt_do_sistema
+
+    texto = prompt_do_sistema(
+        [], datetime(2026, 10, 1, 9, 0), ferramentas={"pedir_ao_claude", "consultar_agenda", "abrir_claude_na_tela"},
+    )
+
+    assert "vão para pedir_ao_claude" in texto
+    assert "chama consultar_agenda" in texto
+    assert "não tem acesso à internet" not in texto
+
+
+async def test_agente_monta_o_prompt_com_as_ferramentas_que_existem(novo_agente):
+    modelo = ModeloFalso(texto("Não sei a cotação de hoje."))
+
+    await novo_agente(modelo).responder("quanto está o dólar?")
+
+    prompt = modelo.recebidas[0][0]["content"]
+    assert "Você não tem acesso à internet para pesquisar" in prompt

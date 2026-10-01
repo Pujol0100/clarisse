@@ -72,6 +72,14 @@ def _config_da_clarisse(porta: int) -> Path:
     return caminho
 
 
+# Ferramentas que mandam o pedido ao Claude. Sem `usar_claude`, ficam de fora; abrir o Claude na tela
+# e ler a resposta dele ficam, porque não mandam nada.
+DELEGAM_AO_CLAUDE = {
+    "pedir_ao_claude", "fazer_em_etapas", "fazer_no_navegador",
+    "mandar_para_conversa_do_claude", "consultar_agenda", "criar_compromisso",
+}
+
+
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
     apos_mudar_agenda=None,
@@ -111,7 +119,8 @@ def montar_registro(
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
     ]
     for ferramenta in ferramentas:
-        registro.registrar(ferramenta)
+        if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:
+            registro.registrar(ferramenta)
     return registro
 
 

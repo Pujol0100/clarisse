@@ -15,20 +15,35 @@ async def _avisar(titulo, texto):
     pass
 
 
-def test_registro_tem_todas_as_ferramentas_do_desenho(cadastros, executor, tmp_path):
+LOCAIS = {
+    "hora_e_data", "abrir_aplicativo", "fechar_aplicativo", "listar_programas_abertos",
+    "abrir_pasta", "abrir_arquivo", "abrir_site", "ajustar_volume",
+    "abrir_projeto_vscode", "git",
+    "abrir_claude_na_tela", "ler_resposta_do_claude",
+    "noticias_do_dia", "ler_noticia", "previsao_do_tempo",
+    "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir",
+}
+DELEGAM_AO_CLAUDE = {
+    "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
+    "mandar_para_conversa_do_claude", "fazer_no_navegador", "fazer_em_etapas",
+}
+
+
+def test_com_o_claude_ligado_o_registro_tem_tudo(cadastros, executor, tmp_path):
+    ajustes = Ajustes(_env_file=None, pasta_dados=tmp_path, usar_claude=True)
+
+    registro = montar_registro(ajustes, cadastros, executor, httpx.AsyncClient(), Delegacoes(_avisar))
+
+    assert set(registro.nomes()) == LOCAIS | DELEGAM_AO_CLAUDE
+
+
+def test_sem_o_claude_fica_so_o_que_roda_aqui_e_continua_abrindo_e_lendo_o_claude(cadastros, executor, tmp_path):
     ajustes = Ajustes(_env_file=None, pasta_dados=tmp_path)
 
     registro = montar_registro(ajustes, cadastros, executor, httpx.AsyncClient(), Delegacoes(_avisar))
 
-    assert set(registro.nomes()) == {
-        "hora_e_data", "abrir_aplicativo", "fechar_aplicativo", "listar_programas_abertos",
-        "abrir_pasta", "abrir_arquivo", "abrir_site", "ajustar_volume",
-        "abrir_projeto_vscode", "git",
-        "abrir_claude_na_tela", "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
-        "mandar_para_conversa_do_claude", "fazer_no_navegador",
-        "noticias_do_dia", "previsao_do_tempo",
-        "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir", "fazer_em_etapas", "ler_resposta_do_claude",
-    }
+    assert not ajustes.usar_claude
+    assert set(registro.nomes()) == LOCAIS
 
 
 def test_chave_gravada_so_para_o_dono(tmp_path):
