@@ -19,6 +19,7 @@ const GRUPOS = [
   { grupo: "github", rotulo: "GitHub" },
   { grupo: "notas", rotulo: "Notas" },
   { grupo: "servidores", rotulo: "Servidores" },
+  { grupo: "lembretes", rotulo: "Lembretes" },
   { grupo: "navegador", rotulo: "Navegador" },
   { grupo: "claude", rotulo: "Claude" },
   { grupo: "codigo", rotulo: "Código" },

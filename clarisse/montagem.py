@@ -20,6 +20,7 @@ from clarisse.ferramentas.dokploy import ferramentas_do_dokploy
 from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
+from clarisse.ferramentas.lembretes import Lembretes, ferramentas_de_lembretes, manter_lembretes
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
 from clarisse.ferramentas.notas import ferramentas_de_notas
 from clarisse.ferramentas.outlook import ferramentas_do_outlook
@@ -131,6 +132,7 @@ def montar_registro(
         *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
         *ferramentas_do_github(executor, cadastros),
         *ferramentas_do_dokploy(http, _paineis_do_dokploy),
+        *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),
     ]
     cofre = ajustes.cofre_de_notas.expanduser() if ajustes.cofre_de_notas else None
     if cofre and cofre.is_dir():
@@ -159,6 +161,9 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
             http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
         )
 
+    async def avisar_os_lembretes():
+        await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
+
     async def manter_agenda_do_linux():
         await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
 
@@ -179,6 +184,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa],
+        tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )

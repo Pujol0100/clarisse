@@ -561,3 +561,11 @@ async def test_aviso_e_pergunta_do_claude_tambem_esperam_a_fala(tmp_path):
     for tipo in ("aviso", "resposta"):
         [texto] = [e for e in publicados if e["tipo"] == tipo]
         assert texto["fala"] in {e["fala"] for e in publicados if e["tipo"] == "falar"}
+
+
+async def test_aviso_pode_ter_o_texto_falado_proprio(tmp_path):
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+
+    await criar_avisador(eventos, locutor)("Lembrete", "ligar para o financeiro", falar="Lembrete: ligar para o financeiro.")
+
+    assert locutor.textos == ["Lembrete: ligar para o financeiro."]
