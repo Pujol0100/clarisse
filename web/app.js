@@ -341,7 +341,7 @@ const tratadores = {
     if (e.cartao) Cartoes.mostrar(e.cartao);
   }),
   aviso: (e) => esperarFala(e.fala, () => {
-    mostrarClarisse(`Do ${e.titulo}: ${e.texto}`);
+    mostrarClarisse(e.falado || `Do ${e.titulo}: ${e.texto}`);
     if (e.cartao) Cartoes.mostrar(e.cartao);
   }),
   falar: receberTrecho,

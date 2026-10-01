@@ -14,7 +14,7 @@ PROJETOS = {
     ]}]}],
 }
 DEPLOYS = {
-    "a1": [{"status": "done", "createdAt": "2026-09-30T18:04:43.092Z", "title": "Merge pull request #432"},
+    "a1": [{"status": "done", "createdAt": "2026-09-30T18:04:43.092Z", "title": "Merge pull request #432\n\nDevelop"},
            {"status": "error", "createdAt": "2026-09-29T10:00:00.000Z", "title": "antigo"}],
     "a2": [{"status": "error", "createdAt": "2026-10-01T12:30:00.000Z", "title": "Merge pull request #440"}],
     "b1": [],

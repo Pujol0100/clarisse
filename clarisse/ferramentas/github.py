@@ -12,6 +12,7 @@ from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 
 # Situação de cada checagem no singular e no plural, na ordem em que importa ouvir.
+_FALADAS = 5
 _SITUACOES = {
     "fail": ("falhou", "falharam"), "cancel": ("cancelada", "canceladas"), "pending": ("rodando", "rodando"),
     "pass": ("passou", "passaram"), "skipping": ("pulada", "puladas"),
@@ -45,8 +46,9 @@ def ferramentas_do_github(executor, cadastros: Cadastros) -> list[Ferramenta]:
             vazio = "Nenhuma PR sua aberta." if args.de == "minhas" else "Nenhuma PR esperando a sua revisão."
             return Retorno(vazio, na_integra=True)
         quais = "abertas" if args.de == "minhas" else "esperando a sua revisão"
-        lista = " ".join(f"{p['number']} do {p['repository']['name']}, {p['title']}." for p in prs)
-        texto = f"Você tem {len(prs)} PR{'s' if len(prs) > 1 else ''} {quais}: {lista}"
+        lista = " ".join(f"{p['number']} do {p['repository']['name']}, {p['title']}." for p in prs[:_FALADAS])
+        quantas = f"Você tem {len(prs)} PR{'s' if len(prs) > 1 else ''} {quais}"
+        texto = f"{quantas}: {lista}" if len(prs) <= _FALADAS else f"{quantas}. As {_FALADAS} mais recentes: {lista}"
         cartao = {
             "tipo": "lista", "titulo": "GitHub",
             "canto": "suas PRs abertas" if args.de == "minhas" else "para você revisar",

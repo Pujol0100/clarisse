@@ -157,8 +157,9 @@ def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[
     async def avisar(titulo: str, texto: str, falar: str | None = None) -> None:
         fala = _nova_fala()
         cartao = {"tipo": "texto", "titulo": titulo, "texto": texto}
-        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto, "cartao": cartao})
-        await _falar(eventos, locutor, falar or f"Do {titulo}: {texto}", fala=fala)
+        falado = falar or f"Do {titulo}: {texto}"
+        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto, "cartao": cartao, "falado": falado})
+        await _falar(eventos, locutor, falado, fala=fala)
 
     return avisar
 

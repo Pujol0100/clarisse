@@ -58,7 +58,7 @@ def ferramentas_do_dokploy(http: httpx.AsyncClient, paineis: Callable[[], list[t
             ultimo = deploys[0]
             quando = datetime.fromisoformat(ultimo["createdAt"].replace("Z", "+00:00")).astimezone(_BRASILIA)
             como = _DEPLOYS.get(ultimo.get("status"), ultimo.get("status") or "")
-            titulo = (ultimo.get("title") or "").strip()
+            titulo = (ultimo.get("title") or "").strip().split("\n")[0].strip()
             texto = (f"{nome} está {situacao}. Último deploy em {quando:%d/%m} às {quando:%H:%M}, {como}"
                      + (f": {titulo}." if titulo else "."))
             itens.append(["último deploy", f"{quando:%d/%m %H:%M} · {como}"])

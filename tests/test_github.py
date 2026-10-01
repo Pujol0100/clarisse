@@ -79,3 +79,14 @@ async def test_projeto_desconhecido_na_situacao_da_pr(executor, cadastros):
     resposta = await _chamar(_ferramentas(executor, cadastros), "situacao_da_pr", projeto="financeiro", numero=3)
 
     assert "financeiro" in resposta and executor.executados == []
+
+
+async def test_lista_longa_fala_so_as_cinco_primeiras_e_mostra_todas(executor, cadastros):
+    prs = [{"number": n, "title": f"PR {n}", "repository": {"name": "omni-api", "nameWithOwner": "x/omni-api"}} for n in range(1, 9)]
+    executor.respostas.append(Resultado(0, json.dumps(prs), ""))
+
+    resposta = await _chamar(_ferramentas(executor, cadastros), "prs_abertas")
+
+    assert resposta.texto.startswith("Você tem 8 PRs abertas. As 5 mais recentes: 1 do omni-api, PR 1.")
+    assert "PR 6" not in resposta.texto
+    assert len(resposta.cartao["itens"]) == 8
