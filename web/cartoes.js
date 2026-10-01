@@ -100,6 +100,12 @@ const Cartoes = (() => {
     if (paragrafos[indice]) paragrafos[indice].scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
+  /** Fim da fala: o cartão desce para a fileira, menos o de manchetes, que espera a escolha
+      até o próximo cartão chegar. */
+  function encerrar() {
+    if (atual && atual.dado.tipo !== "noticias") guardar();
+  }
+
   function lendo() {
     return Boolean(atual && atual.dado.tipo === "leitura");
   }
@@ -111,7 +117,9 @@ const Cartoes = (() => {
     const cartao = el("article", `cartao cartao-${dado.tipo}`);
     for (let i = 0; i < 4; i++) cartao.append(el("i"));
     const titulo = el("div", "cartao-titulo");
-    titulo.append(el("span", null, dado.titulo || ""), el("span", null, dado.canto || ""));
+    // Na leitura, o título da matéria já vem grande no corpo; o cabeçalho diz só de onde ela é.
+    const cabecalho = dado.tipo === "leitura" ? "Notícia" : dado.titulo || "";
+    titulo.append(el("span", null, cabecalho), el("span", null, dado.canto || dado.fonte || ""));
     cartao.append(titulo);
     montar(cartao, dado);
     palco.append(cartao);
@@ -134,7 +142,7 @@ const Cartoes = (() => {
 
   return {
     mostrar,
-    guardar,
+    encerrar,
     marcarParagrafo,
     lendo,
     set aoEscolher(fn) { aoEscolher = fn; },

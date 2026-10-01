@@ -275,23 +275,24 @@ body::after {
 .lista li.escolhida { background: rgba(201, 168, 76, 0.24); }
 
 /* matéria escolhida: o cartão vira bloco de leitura */
-.cartao.cartao-leitura { width: min(720px, calc(92vw - var(--chat))); }
+.cartao.cartao-leitura { width: min(720px, calc(92vw - var(--chat))); max-height: calc(100vh - 210px); margin-top: -20px; }
 
 .leitura-foto {
   display: block;
   width: 100%;
-  height: 170px;
-  margin: 14px 0 16px;
+  height: 130px;
+  margin: 14px 0 12px;
   object-fit: cover;
   border: 1px solid var(--linha);
   border-radius: 4px;
 }
 
-.leitura-titulo { margin: 14px 0 8px; font-size: 26px; line-height: 1.25; font-weight: 700; }
-.leitura-sub { margin: 0 0 16px; font-size: 17px; color: var(--texto-suave); }
+.leitura-titulo { margin: 12px 0 6px; font-size: 24px; line-height: 1.25; font-weight: 700; }
+.leitura-sub { margin: 0 0 12px; font-size: 16px; color: var(--texto-suave); }
 
 .leitura-corpo {
-  max-height: 34vh;
+  max-height: calc(100vh - 560px);
+  min-height: 120px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--linha) transparent;

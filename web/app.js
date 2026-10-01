@@ -204,7 +204,7 @@ async function tocarProximo() {
 function encerrarCena() {
   mostrarLegenda(null);
   esconderVoce();
-  Cartoes.guardar();
+  Cartoes.encerrar();
 }
 
 function terminarFala(fala) {
