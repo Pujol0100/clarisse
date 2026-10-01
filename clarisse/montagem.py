@@ -16,6 +16,7 @@ from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
+from clarisse.ferramentas.dokploy import ferramentas_do_dokploy
 from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
@@ -25,7 +26,7 @@ from clarisse.ferramentas.outlook import ferramentas_do_outlook
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
 from clarisse.ferramentas.registro import Registro
-from clarisse.sites import carregar_sites, manter_sites_atualizados
+from clarisse.sites import carregar_sites, manter_sites_atualizados, servidores_do_dokploy
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
@@ -84,6 +85,12 @@ DELEGAM_AO_CLAUDE = {
 }
 
 
+def _paineis_do_dokploy() -> list[tuple[str, str]]:
+    """Os mesmos painéis e chaves de leitura que o Claude Code usa, lidos a cada pergunta."""
+    configuracao = Path.home() / ".claude.json"
+    return servidores_do_dokploy(configuracao) if configuracao.is_file() else []
+
+
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
     apos_mudar_agenda=None,
@@ -123,6 +130,7 @@ def montar_registro(
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
         *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
         *ferramentas_do_github(executor, cadastros),
+        *ferramentas_do_dokploy(http, _paineis_do_dokploy),
     ]
     cofre = ajustes.cofre_de_notas.expanduser() if ajustes.cofre_de_notas else None
     if cofre and cofre.is_dir():
