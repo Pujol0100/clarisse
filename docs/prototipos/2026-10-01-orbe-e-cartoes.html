@@ -114,6 +114,48 @@
   .mic-ponto { width: 10px; height: 10px; border-radius: 50%; background: var(--line); border: 1px solid var(--muted); }
   body[data-estado="listening"] .mic-ponto { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 12px var(--gold); }
   body[data-estado="listening"] .mic { color: var(--gold-text); }
+
+  /* ---------- escrita opcional: o chat abre à direita e a Clarisse vai para a esquerda ---------- */
+  body { --chat: 0px; }
+  body.com-chat { --chat: min(400px, 40vw); }
+  .topo, .palco-cartao { right: var(--chat); transition: right .45s ease; }
+  .voce, .legenda, .fileira { left: calc((100vw - var(--chat)) / 2); transition: left .45s ease, opacity .3s; }
+  .hora { right: calc(28px + var(--chat)); transition: right .45s ease; }
+  .mic { right: calc(28px + var(--chat)); transition: right .45s ease; }
+  .legenda { width: min(760px, calc(90vw - var(--chat))); }
+
+  .botao-escrever {
+    position: fixed; left: 28px; bottom: 24px; z-index: 6;
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+    background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; cursor: pointer;
+  }
+  .botao-escrever:hover, .botao-escrever:focus-visible { color: var(--gold-text); border-color: var(--gold); outline: none; }
+  body.com-chat .botao-escrever { color: var(--gold-text); border-color: var(--gold); }
+
+  .chat {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 40vw); z-index: 7;
+    display: flex; flex-direction: column;
+    background: rgba(20,20,22,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid var(--line);
+    transform: translateX(100%); transition: transform .45s ease; visibility: hidden;
+  }
+  body.com-chat .chat { transform: none; visibility: visible; }
+  .chat-topo { display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
+  .chat-topo span { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; color: var(--gold-text); }
+  .chat-fechar { background: none; border: 0; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .chat-fechar:hover { color: var(--text); }
+  .chat-falas { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-falas p { margin: 0; padding: 10px 12px; border-radius: 6px; font-size: 16px; line-height: 1.4; max-width: 88%; }
+  .fala-voce { align-self: flex-end; background: var(--surface-2); border: 1px solid var(--line); }
+  .fala-clarisse { align-self: flex-start; border: 1px solid rgba(201,168,76,0.35); }
+  .chat-form { padding: 14px 20px 20px; border-top: 1px solid var(--line); }
+  .chat-form input {
+    width: 100%; padding: 12px 14px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 16px;
+  }
+  .chat-form input:focus { outline: none; border-color: var(--gold); }
+  .chat-dica { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body data-estado="idle">
@@ -132,6 +174,21 @@
   <div class="fileira" id="fileira"></div>
   <div class="mic"><span class="mic-ponto"></span><span id="mic-texto">Diga “Clarisse”</span></div>
 
+  <button type="button" class="botao-escrever" id="escrever" aria-expanded="false" aria-controls="chat">✎ Escrever</button>
+
+  <aside class="chat" id="chat" aria-label="Escrever para a Clarisse">
+    <div class="chat-topo">
+      <span>CONVERSA</span>
+      <button type="button" class="chat-fechar" id="fechar-chat" aria-label="Fechar a escrita">×</button>
+    </div>
+    <section class="chat-falas" id="falas" role="log" aria-live="polite"></section>
+    <form class="chat-form" id="formulario" autocomplete="off">
+      <label for="texto" style="position:absolute;left:-9999px">Escrever para a Clarisse</label>
+      <input id="texto" maxlength="2000" placeholder="Escreva e aperte Enter">
+      <p class="chat-dica">A voz continua ligada. Feche aqui para voltar só à voz.</p>
+    </form>
+  </aside>
+
 <script>
 "use strict";
 
@@ -149,13 +206,20 @@ const FERRAMENTAS = [
   { nome: "Claude", ang: 218 }, { nome: "Código", ang: 188 }, { nome: "Janelas", ang: 158 }, { nome: "Arquivos", ang: 130 },
 ].map((f) => ({ ...f, brilho: 0, ativo: false }));
 
+let chatAtual = 0;  // largura do chat aberto, animada
+
 function medir() {
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   L = innerWidth; A = innerHeight;
   tela.width = L * DPR; tela.height = A * DPR;
   c.setTransform(DPR, 0, 0, DPR, 0, 0);
-  CX = L / 2; CY = A * 0.46;
-  R = Math.min(L * 0.5, A * 0.9) * 0.27;
+  posicionar();
+}
+
+function posicionar() {
+  const livre = L - chatAtual;
+  CX = livre / 2; CY = A * 0.46;
+  R = Math.min(livre * 0.5, A * 0.9) * 0.27;
   for (const f of FERRAMENTAS) {
     const a = (f.ang * Math.PI) / 180;
     f.x = CX + Math.cos(a) * R * 2.35;
@@ -337,6 +401,11 @@ function quadro(agora) {
   brilho += (alvo.brilho - brilho) * dt * 3;
   giro += alvo.giro * dt;
   nivel = simularNivel(t);
+  const chatAlvo = document.body.classList.contains("com-chat") ? Math.min(400, L * 0.4) : 0;
+  if (Math.abs(chatAlvo - chatAtual) > 0.5) {
+    chatAtual += (chatAlvo - chatAtual) * Math.min(1, dt * 7);
+    posicionar();
+  }
 
   c.clearRect(0, 0, L, A);
   poeira();
@@ -440,10 +509,43 @@ const ROTEIRO = [
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* ---------- escrita opcional ---------- */
+
+const fila = [];  // pedidos escritos passam na frente do roteiro
+
+function abrirChat(aberto) {
+  document.body.classList.toggle("com-chat", aberto);
+  $("escrever").setAttribute("aria-expanded", String(aberto));
+  if (aberto) setTimeout(() => $("texto").focus(), 300);
+}
+
+function adicionarFala(quem, texto) {
+  const p = el("p", `fala-${quem}`, texto);
+  $("falas").append(p);
+  $("falas").scrollTop = $("falas").scrollHeight;
+}
+
+$("escrever").addEventListener("click", () => abrirChat(!document.body.classList.contains("com-chat")));
+$("fechar-chat").addEventListener("click", () => abrirChat(false));
+$("formulario").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const texto = $("texto").value.trim();
+  if (!texto) return;
+  $("texto").value = "";
+  fila.push({
+    voce: texto, ferramenta: "Claude", escrito: true,
+    legenda: "No protótipo eu só repito: aqui entraria a resposta de verdade.",
+    cartao: { tipo: "lista", titulo: "Resposta", canto: "escrita", resumo: texto, itens: [["›", texto]] },
+  });
+});
+
 async function cena(passo) {
-  mudarEstado("listening");
-  $("voce").classList.remove("visivel");
-  await espera(1800);
+  if (!passo.escrito) {
+    mudarEstado("listening");
+    $("voce").classList.remove("visivel");
+    await espera(1800);
+  }
+  adicionarFala("voce", passo.voce);
   $("voce").textContent = passo.voce;
   $("voce").classList.add("visivel");
   mudarEstado("thinking");
@@ -458,6 +560,7 @@ async function cena(passo) {
   $("palco-cartao").append(cartao);
   requestAnimationFrame(() => requestAnimationFrame(() => cartao.classList.add("entrou")));
   mudarEstado("speaking");
+  adicionarFala("clarisse", passo.legenda);
   $("legenda").textContent = passo.legenda;
   $("legenda").classList.add("visivel");
   await espera(4800);
@@ -474,7 +577,11 @@ async function cena(passo) {
 
 (async () => {
   await espera(1500);
-  for (let i = 0; ; i = (i + 1) % ROTEIRO.length) await cena(ROTEIRO[i]);
+  for (let i = 0; ; ) {
+    if (fila.length) { await cena(fila.shift()); continue; }
+    await cena(ROTEIRO[i]);
+    i = (i + 1) % ROTEIRO.length;
+  }
 })();
 </script>
 </body>
