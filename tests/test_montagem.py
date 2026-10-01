@@ -23,6 +23,7 @@ LOCAIS = {
     "noticias_do_dia", "ler_noticia", "previsao_do_tempo",
     "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir",
     "consultar_agenda", "emails_nao_lidos", "ler_email",
+    "prs_abertas", "situacao_da_pr",
 }
 DELEGAM_AO_CLAUDE = {
     "pedir_ao_claude", "criar_compromisso",

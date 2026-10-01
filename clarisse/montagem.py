@@ -16,6 +16,7 @@ from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
+from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
@@ -120,6 +121,7 @@ def montar_registro(
         *ferramentas_de_noticias(http),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
         *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
+        *ferramentas_do_github(executor, cadastros),
     ]
     for ferramenta in ferramentas:
         if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:
