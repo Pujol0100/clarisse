@@ -115,6 +115,30 @@
   body[data-estado="listening"] .mic-ponto { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 12px var(--gold); }
   body[data-estado="listening"] .mic { color: var(--gold-text); }
 
+  /* ---------- notícia escolhida: o cartão vira bloco de leitura ---------- */
+  .cartao { pointer-events: auto; }
+  .lista li.clicavel { cursor: pointer; border-radius: 4px; transition: background .2s; }
+  .lista li.clicavel:hover { background: rgba(201,168,76,0.08); }
+  .lista li.escolhida { background: rgba(201,168,76,0.14); }
+  .cartao.leitura {
+    width: min(720px, calc(92vw - var(--chat)));
+    transition: width .5s ease, opacity .45s ease, transform .55s cubic-bezier(.2,.9,.25,1.15);
+  }
+  .leitura-corpo { max-height: 34vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .leitura-foto {
+    height: 170px; margin: 14px 0 16px; border-radius: 4px; border: 1px solid var(--line);
+    background: linear-gradient(135deg, #1C1C20, #2A2A30 60%, rgba(201,168,76,0.25));
+    display: grid; place-items: center; color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: .2em;
+  }
+  .leitura-titulo { margin: 0 0 8px; font-size: 26px; line-height: 1.25; font-weight: 700; }
+  .leitura-sub { margin: 0 0 16px; font-size: 17px; color: var(--muted); }
+  .leitura-corpo p {
+    margin: 0 0 14px; font-size: 19px; line-height: 1.6; color: rgba(255,255,255,0.45);
+    border-left: 2px solid transparent; padding-left: 12px; transition: color .3s, border-color .3s;
+  }
+  .leitura-corpo p.lendo { color: var(--text); border-left-color: var(--gold); }
+  .leitura-corpo p.lido { color: rgba(255,255,255,0.7); }
+
   /* ---------- escrita opcional: o chat abre à direita e a Clarisse vai para a esquerda ---------- */
   body { --chat: 0px; }
   body.com-chat { --chat: min(400px, 40vw); }
@@ -460,11 +484,12 @@ function montarCartao(dado) {
     cartao.append(linha, dias);
   } else {
     const ul = el("ul", "lista");
-    for (const [marca, texto] of dado.itens) {
-      const li = el("li");
+    dado.itens.forEach(([marca, texto], indice) => {
+      const li = el("li", dado.clicavel ? "clicavel" : null);
+      li.dataset.indice = indice;
       li.append(el("span", "marca-item", marca), el("span", null, texto));
       ul.append(li);
-    }
+    });
     cartao.append(ul);
   }
   return cartao;
@@ -495,9 +520,10 @@ const ROTEIRO = [
   },
   {
     voce: "Quais as notícias de tecnologia?", ferramenta: "Notícias",
-    legenda: "Separei as três manchetes principais de tecnologia de hoje.",
-    cartao: { tipo: "lista", titulo: "Notícias", canto: "tecnologia", resumo: "3 manchetes",
+    legenda: "Separei três manchetes de tecnologia. Quer que eu leia alguma? É só dizer o número.",
+    cartao: { tipo: "lista", titulo: "Notícias", canto: "tecnologia", resumo: "3 manchetes", clicavel: true,
       itens: [["01", "Manchete fictícia sobre chips de IA"], ["02", "Manchete fictícia sobre redes 6G"], ["03", "Manchete fictícia sobre carros elétricos"]] },
+    leitura: { fala: "Lê a segunda", indice: 1 },
   },
   {
     voce: "Pede para o Claude revisar a PR de ontem", ferramenta: "Claude",
@@ -508,6 +534,74 @@ const ROTEIRO = [
 ];
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Matérias fictícias: na Clarisse de verdade o texto vem do próprio feed do g1. */
+const MATERIAS = [
+  { titulo: "Manchete fictícia sobre chips de IA", subtitulo: "Texto de exemplo para o protótipo.", fonte: "g1 · tecnologia",
+    paragrafos: ["Primeiro parágrafo de exemplo, lido em voz alta pela Clarisse.", "Segundo parágrafo de exemplo.", "Terceiro parágrafo de exemplo."] },
+  { titulo: "Manchete fictícia sobre redes 6G", subtitulo: "Testes da nova geração de redes móveis começam em laboratório.", fonte: "g1 · tecnologia",
+    paragrafos: [
+      "Este é um texto de exemplo. Na Clarisse de verdade, aqui entra a matéria inteira que já vem no feed do g1, sem abrir o site.",
+      "Enquanto ela lê, o parágrafo da vez fica aceso e o bloco rola sozinho, para você acompanhar com os olhos se quiser.",
+      "Os parágrafos já lidos ficam em cinza claro. Dizer “para” interrompe a leitura a qualquer momento.",
+      "No fim da matéria, o bloco volta a ser um cartão e desce para a fileira, como os outros.",
+    ] },
+  { titulo: "Manchete fictícia sobre carros elétricos", subtitulo: "Texto de exemplo para o protótipo.", fonte: "g1 · tecnologia",
+    paragrafos: ["Primeiro parágrafo de exemplo.", "Segundo parágrafo de exemplo."] },
+];
+
+/* Espera a pessoa escolher clicando numa manchete; sem clique, segue a escolha falada do roteiro. */
+function esperarEscolha(cartao, ms) {
+  return new Promise((resolver) => {
+    const tempo = setTimeout(() => { cartao.removeEventListener("click", clique); resolver(null); }, ms);
+    function clique(e) {
+      const li = e.target.closest("li[data-indice]");
+      if (!li) return;
+      clearTimeout(tempo);
+      cartao.removeEventListener("click", clique);
+      resolver(Number(li.dataset.indice));
+    }
+    cartao.addEventListener("click", clique);
+  });
+}
+
+function abrirLeitura(cartao, m) {
+  cartao.classList.add("leitura");
+  cartao.querySelector(".lista").remove();
+  cartao.querySelector(".cartao-titulo span:last-child").textContent = m.fonte;
+  const corpo = el("div", "leitura-corpo");
+  m.paragrafos.forEach((t) => corpo.append(el("p", null, t)));
+  cartao.append(el("div", "leitura-foto", "FOTO DA MATÉRIA"), el("h2", "leitura-titulo", m.titulo), el("p", "leitura-sub", m.subtitulo), corpo);
+  return [...corpo.children];
+}
+
+async function lerNoticia(cartao, passo) {
+  const clicada = await esperarEscolha(cartao, 3500);
+  const indice = clicada ?? passo.leitura.indice;
+  const fala = clicada == null ? passo.leitura.fala : `(clicou na notícia ${indice + 1})`;
+  $("legenda").classList.remove("visivel");
+  if (clicada == null) {
+    mudarEstado("listening");
+    await espera(1500);
+  }
+  $("voce").textContent = fala;
+  $("voce").classList.add("visivel");
+  adicionarFala("voce", fala);
+  cartao.querySelector(`li[data-indice="${indice}"]`).classList.add("escolhida");
+  mudarEstado("thinking");
+  await espera(800);
+
+  const materia = MATERIAS[indice];
+  const paragrafos = abrirLeitura(cartao, materia);
+  mudarEstado("speaking");
+  adicionarFala("clarisse", `Lendo: ${materia.titulo}`);
+  for (const p of paragrafos) {
+    p.classList.add("lendo");
+    p.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    await espera(Math.max(2600, p.textContent.split(" ").length * 230));
+    p.classList.replace("lendo", "lido");
+  }
+}
 
 /* ---------- escrita opcional ---------- */
 
@@ -564,6 +658,7 @@ async function cena(passo) {
   $("legenda").textContent = passo.legenda;
   $("legenda").classList.add("visivel");
   await espera(4800);
+  if (passo.leitura) await lerNoticia(cartao, passo);
 
   $("legenda").classList.remove("visivel");
   cartao.classList.add("saindo");
@@ -577,7 +672,8 @@ async function cena(passo) {
 
 (async () => {
   await espera(1500);
-  for (let i = 0; ; ) {
+  // ?cena=3 começa direto pelas notícias
+  for (let i = (Number(new URLSearchParams(location.search).get("cena")) || 1) - 1; ; ) {
     if (fila.length) { await cena(fila.shift()); continue; }
     await cena(ROTEIRO[i]);
     i = (i + 1) % ROTEIRO.length;
