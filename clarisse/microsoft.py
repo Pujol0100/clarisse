@@ -2,6 +2,7 @@
 já está ligada no GNOME (Configurações → Contas on-line). Nenhum app registrado, nada passa pelo Claude.
 
 O token nunca vai para log nem para o modelo: só para o cabeçalho do pedido ao Graph."""
+import json
 import re
 
 import httpx
@@ -50,15 +51,25 @@ class ContaMicrosoft:
             raise SemContaMicrosoft("A conta Microsoft do GNOME não devolveu acesso; entre de novo nas contas on-line.")
         return achado.group(1)
 
-    async def get(self, caminho: str, parametros: dict, cabecalhos: dict | None = None) -> dict:
+    async def _pedir(self, metodo: str, caminho: str, parametros: dict | None = None,
+                     corpo: dict | None = None, cabecalhos: dict | None = None) -> dict:
+        conteudo = json.dumps(corpo, ensure_ascii=False, separators=(",", ":")).encode() if corpo is not None else None
+        extras = {"Content-Type": "application/json"} if conteudo is not None else {}
         for tentativa in range(2):
             if self._token is None or tentativa:
                 self._token = await self._novo_token()
-            resposta = await self._http.get(
-                f"{GRAPH}{caminho}", params=parametros, timeout=15,
-                headers={"Authorization": f"Bearer {self._token}", **(cabecalhos or {})},
+            resposta = await self._http.request(
+                metodo, f"{GRAPH}{caminho}", params=parametros, content=conteudo, timeout=15,
+                headers={"Authorization": f"Bearer {self._token}", **extras, **(cabecalhos or {})},
             )
             if resposta.status_code != 401:
                 break
         resposta.raise_for_status()
-        return resposta.json()
+        return resposta.json() if resposta.content else {}
+
+    async def get(self, caminho: str, parametros: dict, cabecalhos: dict | None = None) -> dict:
+        return await self._pedir("GET", caminho, parametros, cabecalhos=cabecalhos)
+
+    async def post(self, caminho: str, corpo: dict | None) -> dict:
+        """Escrita: só criar rascunho e enviar o rascunho que o usuário confirmou."""
+        return await self._pedir("POST", caminho, corpo=corpo)

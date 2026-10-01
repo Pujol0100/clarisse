@@ -65,10 +65,13 @@ const Cartoes = (() => {
       cartao.append(ul, el("p", "cartao-dica", "Diga o número ou clique para eu ler."));
     },
     leitura(cartao, dado) {
-      const voltar = el("button", "leitura-voltar", "← Voltar à lista");
-      voltar.type = "button";
-      voltar.addEventListener("click", () => aoVoltar());
-      cartao.append(voltar);
+      // Só o que foi escolhido numa lista (notícia, e-mail recebido, nota) tem para onde voltar.
+      if (dado.lista) {
+        const voltar = el("button", "leitura-voltar", "← Voltar à lista");
+        voltar.type = "button";
+        voltar.addEventListener("click", () => aoVoltar());
+        cartao.append(voltar);
+      }
       if (dado.imagem) {
         const foto = el("img", "leitura-foto");
         foto.alt = "";

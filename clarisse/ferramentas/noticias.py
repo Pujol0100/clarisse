@@ -141,7 +141,7 @@ def ferramentas_de_noticias(
             return "Essa notícia não tem texto para eu ler; é vídeo, fotos ou página de jogo."
         texto = "\n\n".join([_com_ponto(noticia.titulo), *noticia.paragrafos])
         cartao = {
-            "tipo": "leitura", "rotulo": "Notícia", "titulo": noticia.titulo, "subtitulo": noticia.subtitulo, "imagem": noticia.imagem,
+            "tipo": "leitura", "rotulo": "Notícia", "lista": True, "titulo": noticia.titulo, "subtitulo": noticia.subtitulo, "imagem": noticia.imagem,
             "fonte": f"g1 · {ultimas['tema']}", "paragrafos": noticia.paragrafos,
         }
         return Retorno(texto, cartao=cartao, na_integra=True)

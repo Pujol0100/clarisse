@@ -681,3 +681,50 @@ async def test_agente_monta_o_prompt_com_as_ferramentas_que_existem(novo_agente)
 
     prompt = modelo.recebidas[0][0]["content"]
     assert "Você não tem acesso à internet para pesquisar" in prompt
+
+
+@pytest.fixture
+def enviados():
+    return []
+
+
+@pytest.fixture
+def com_email(registro, enviados):
+    from clarisse.cartoes import Retorno
+
+    async def escrever(args):
+        return Retorno("Escrevi o e-mail para ana@x.com. Deseja enviar?", cartao={"tipo": "email"}, na_integra=True,
+                       confirmar_depois=("enviar", {}))
+
+    async def enviar(args):
+        enviados.append(1)
+        return Retorno("Enviei o e-mail para ana@x.com.", na_integra=True)
+
+    registro.registrar(Ferramenta("escrever", "escreve", Argumentos, escrever, grupo="email"))
+    registro.registrar(Ferramenta("enviar", "envia", Argumentos, enviar, risco=Risco.CONFIRMAR, grupo="email",
+                                  descrever=lambda a: "Envio? Confirma?"))
+    return registro
+
+
+async def test_depois_de_escrever_pergunta_e_so_envia_com_o_sim(novo_agente, com_email, enviados):
+    modelo = ModeloFalso(chamada("escrever"))
+    agente = novo_agente(modelo)
+
+    pergunta = await agente.responder("escreve um e-mail para a ana")
+    resposta = await agente.responder("sim")
+
+    assert pergunta.texto == "Escrevi o e-mail para ana@x.com. Deseja enviar?"
+    assert pergunta.aguardando_confirmacao and pergunta.cartao == {"tipo": "email"}
+    assert enviados == [1]
+    assert resposta.texto == "Enviei o e-mail para ana@x.com."
+    assert len(modelo.recebidas) == 1
+
+
+async def test_depois_de_escrever_o_nao_nao_envia(novo_agente, com_email, enviados):
+    agente = novo_agente(ModeloFalso(chamada("escrever")))
+
+    await agente.responder("escreve um e-mail para a ana")
+    resposta = await agente.responder("não")
+
+    assert enviados == []
+    assert resposta.texto == "Tudo bem, cancelei."

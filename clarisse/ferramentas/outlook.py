@@ -12,7 +12,7 @@ from pydantic import Field
 
 from clarisse.cartoes import Retorno, UltimaEscolha
 from clarisse.config import normalizar
-from clarisse.ferramentas.registro import Argumentos, Ferramenta
+from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.microsoft import FUSO, SemContaMicrosoft
 
 _BRASILIA = ZoneInfo("America/Sao_Paulo")
@@ -67,6 +67,23 @@ class ArgsAgenda(Argumentos):
     periodo: str | None = Field("hoje", max_length=40, description="hoje, amanhã, depois de amanhã ou semana")
 
 
+_ENDERECO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _paragrafos_do_texto(texto: str) -> list[str]:
+    blocos = re.split(r"\n\s*\n", texto.replace("\r\n", "\n").strip())
+    return [" ".join(linha.strip() for linha in bloco.splitlines() if linha.strip()) for bloco in blocos if bloco.strip()]
+
+
+class ArgsEscreverEmail(Argumentos):
+    para: str = Field(min_length=2, max_length=120, description="Nome da pessoa ou endereço de e-mail, como o usuário disse")
+    assunto: str = Field(min_length=1, max_length=150, description="Assunto curto do e-mail")
+    texto: str = Field(
+        min_length=1, max_length=4000,
+        description="O e-mail inteiro já escrito, em português, educado, com saudação e despedida, a partir do que o usuário pediu",
+    )
+
+
 class ArgsLerEmail(Argumentos):
     numero: int = Field(ge=1, le=_NA_LISTA, description="Número do e-mail na última lista de não lidos")
 
@@ -76,6 +93,25 @@ def ferramentas_do_outlook(
 ) -> list[Ferramenta]:
     ultimos: list[dict] = []
     escolhas = escolhas or UltimaEscolha()
+    rascunho: dict = {}
+
+    async def destinatario(para: str) -> dict | str:
+        """{'address', 'name'?} do destinatário, ou a pergunta a fazer ao usuário."""
+        para = para.strip()
+        if "@" in para:
+            return {"address": para.lower()} if _ENDERECO.match(para) else f"O endereço {para} não parece um e-mail. Diga de novo."
+        dados = await conta.get("/me/people", {"$search": f'"{para}"', "$top": "5", "$select": "displayName,scoredEmailAddresses"})
+        pessoas = [
+            {"address": p["scoredEmailAddresses"][0]["address"], "name": p.get("displayName") or ""}
+            for p in dados.get("value", []) if p.get("scoredEmailAddresses")
+        ]
+        exatas = [p for p in pessoas if normalizar(p["name"]) == normalizar(para)]
+        if len(exatas) == 1 or len(pessoas) == 1:
+            return (exatas or pessoas)[0]
+        if not pessoas:
+            return f"Não achei {para} nos seus contatos. Diga o endereço do e-mail."
+        nomes = ", ".join(f"{p['name']} ({p['address']})" for p in pessoas)
+        return f"Achei mais de uma pessoa: {nomes}. Para qual delas?"
 
     async def consultar_agenda(args: ArgsAgenda) -> Retorno | str:
         periodo = _periodo(args.periodo)
@@ -146,11 +182,59 @@ def ferramentas_do_outlook(
         assunto, quem = mensagem.get("subject") or "sem assunto", _remetente(mensagem)
         paragrafos = _paragrafos_do_email((mensagem.get("body") or {}).get("content") or "")
         texto = "\n\n".join([f"E-mail de {quem}: {assunto}.", *paragrafos])
-        cartao = {"tipo": "leitura", "rotulo": "E-mail", "titulo": assunto, "subtitulo": f"De {quem}",
+        cartao = {"tipo": "leitura", "rotulo": "E-mail", "lista": True, "titulo": assunto, "subtitulo": f"De {quem}",
                   "imagem": None, "fonte": "Outlook", "paragrafos": paragrafos}
         return Retorno(texto, cartao=cartao, na_integra=True)
 
+    async def escrever_email(args: ArgsEscreverEmail) -> Retorno | str:
+        try:
+            quem = await destinatario(args.para)
+            if isinstance(quem, str):
+                return quem
+            criado = await conta.post("/me/messages", {
+                "subject": args.assunto,
+                "body": {"contentType": "Text", "content": args.texto},
+                "toRecipients": [{"emailAddress": quem}],
+            })
+        except (SemContaMicrosoft, httpx.HTTPError) as erro:
+            return str(erro) if isinstance(erro, SemContaMicrosoft) else f"Não consegui escrever o e-mail agora: {type(erro).__name__}."
+        rascunho.clear()
+        rascunho.update(id=criado["id"], assunto=args.assunto, endereco=quem["address"])
+        nome = f"{quem['name']} ({quem['address']})" if quem.get("name") else quem["address"]
+        texto = (f"Escrevi o e-mail para {nome}, com o assunto {args.assunto}. Está na tela e salvo nos rascunhos. "
+                 "Deseja enviar? Se não, ele fica nos rascunhos.")
+        cartao = {"tipo": "leitura", "rotulo": "E-mail para enviar", "titulo": args.assunto, "subtitulo": f"Para {nome}",
+                  "imagem": None, "fonte": "rascunho no Outlook", "paragrafos": _paragrafos_do_texto(args.texto)}
+        return Retorno(texto, cartao=cartao, na_integra=True, confirmar_depois=("enviar_email", {}))
+
+    def confirmar_envio(args: Argumentos) -> str:
+        if not rascunho:
+            return "Não tenho e-mail escrito para enviar. Confirma?"
+        return f"Envio o e-mail {rascunho['assunto']} para {rascunho['endereco']}? Confirma?"
+
+    async def enviar_email(args: Argumentos) -> Retorno | str:
+        if not rascunho:
+            return "Não tenho e-mail escrito para enviar."
+        try:
+            await conta.post(f"/me/messages/{rascunho['id']}/send", None)
+        except (SemContaMicrosoft, httpx.HTTPError) as erro:
+            return str(erro) if isinstance(erro, SemContaMicrosoft) else f"Não consegui enviar agora: {type(erro).__name__}. O e-mail continua nos rascunhos."
+        endereco = rascunho["endereco"]
+        rascunho.clear()
+        return Retorno(f"Enviei o e-mail para {endereco}.", na_integra=True)
+
     return [
+        Ferramenta(
+            "escrever_email",
+            "Escreve um e-mail para uma pessoa (nome ou endereço), salva como rascunho no Outlook e mostra na tela. "
+            "Use para 'escreve um e-mail para…', 'manda um e-mail para…'. O envio é perguntado depois.",
+            ArgsEscreverEmail, escrever_email, grupo="email",
+        ),
+        Ferramenta(
+            "enviar_email",
+            "Envia o e-mail que acabou de ser escrito. Só depois de escrever_email.",
+            Argumentos, enviar_email, risco=Risco.CONFIRMAR, descrever=confirmar_envio, grupo="email",
+        ),
         Ferramenta(
             "consultar_agenda",
             "Lê os compromissos da agenda do Outlook de hoje, amanhã, depois de amanhã ou da semana.",

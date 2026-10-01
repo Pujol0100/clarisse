@@ -123,6 +123,7 @@ class Agente:
         self._cartao: dict | None = None
         self._grupo: str | None = None
         self._na_integra: str | None = None
+        self._depois: tuple[str, dict] | None = None
 
     async def responder(self, fala: str) -> Resposta:
         async with self._trava:
@@ -130,6 +131,7 @@ class Agente:
             self._cartao = None
             self._grupo = None
             self._na_integra = None
+            self._depois = None
             if pede_para_parar(fala):
                 self._pendente = None
                 if self._confirmacoes:
@@ -145,6 +147,8 @@ class Agente:
                 if confirma(fala):
                     self._conversas.pop()
                     mensagens.append(await self._executar(decisao))
+                    if self._na_integra is not None:
+                        return self._concluir(mensagens, inicio, self._na_integra)
                     return await self._laco(mensagens, inicio)
                 if nega(fala):
                     return self._concluir([{"role": "user", "content": fala}], 0, "Tudo bem, cancelei.")
@@ -190,6 +194,11 @@ class Agente:
                     return self._concluir([*mensagens[inicio:], espera], 0, frase, aguardando=True)
                 else:
                     mensagens.append(await self._executar(decisao))
+                    seguinte = avaliar(self._registro, *self._depois) if self._depois else None
+                    if seguinte and seguinte.acao != "recusar":
+                        self._pendente = (seguinte, mensagens, inicio)
+                        pergunta = self._na_integra or mensagens[-1]["content"]
+                        return self._concluir(mensagens, inicio, pergunta, aguardando=True)
                     if self._na_integra is not None:
                         return self._concluir(mensagens, inicio, self._na_integra)
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
@@ -249,6 +258,7 @@ class Agente:
                 cartao = resultado.cartao
                 if resultado.na_integra:
                     self._na_integra = resultado.texto
+                self._depois = resultado.confirmar_depois
                 resultado = resultado.texto
         except Exception as erro:
             log.exception("ferramenta %s falhou", nome)

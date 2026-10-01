@@ -67,3 +67,20 @@ async def test_sem_conta_microsoft_no_gnome_avisa(executor):
 
     with pytest.raises(SemContaMicrosoft):
         await _conta(executor, lambda p: httpx.Response(200)).get("/me", {})
+
+
+async def test_post_manda_o_corpo_com_o_token_e_aceita_resposta_vazia(executor):
+    executor.respostas += [Resultado(0, CONTAS, ""), Resultado(0, "('token-1', 3599)", "")]
+    pedidos = []
+
+    def responder(pedido):
+        pedidos.append(pedido)
+        return httpx.Response(202) if pedido.url.path.endswith("/send") else httpx.Response(201, json={"id": "r1"})
+
+    conta = _conta(executor, responder)
+    criado = await conta.post("/me/messages", {"subject": "Oi"})
+    enviado = await conta.post("/me/messages/r1/send", None)
+
+    assert criado == {"id": "r1"} and enviado == {}
+    assert pedidos[0].method == "POST" and pedidos[0].headers["Authorization"] == "Bearer token-1"
+    assert pedidos[0].read() == b'{"subject":"Oi"}'

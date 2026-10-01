@@ -131,6 +131,7 @@ async def test_le_a_noticia_pelo_numero_da_ultima_lista():
     assert resposta.cartao == {
         "tipo": "leitura",
         "rotulo": "Notícia",
+        "lista": True,
         "titulo": "Cidade fictícia testa ônibus sem motorista no centro",
         "subtitulo": "Teste dura três meses e usa duas linhas de exemplo.",
         "imagem": "https://s2-g1.glbimg.com/exemplo/onibus.jpg",

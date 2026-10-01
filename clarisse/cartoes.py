@@ -28,6 +28,9 @@ class Retorno:
     cartao: dict | None = None
     # Texto para a Clarisse falar inteiro, sem o modelo resumir (ex.: ler a resposta do Claude).
     na_integra: bool = False
+    # Ação que fica esperando o "sim" do usuário logo depois desta (ex.: enviar o e-mail que acabou de
+    # ser escrito): (nome da ferramenta, argumentos). O texto deve terminar com a pergunta.
+    confirmar_depois: tuple[str, dict] | None = None
 
 
 def cartao_de_texto(grupo: str, texto: str) -> dict:

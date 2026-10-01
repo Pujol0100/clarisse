@@ -110,7 +110,7 @@ def ferramentas_de_notas(cofre: Path, escolhas: UltimaEscolha | None = None) -> 
         nota = ultimas[args.numero - 1]
         paragrafos = paragrafos_da_nota(nota.read_text(encoding="utf-8", errors="ignore"))
         texto = "\n\n".join([f"Nota {nota.stem}.", *paragrafos])
-        cartao = {"tipo": "leitura", "rotulo": "Nota", "titulo": nota.stem, "subtitulo": str(nota.parent.relative_to(cofre)),
+        cartao = {"tipo": "leitura", "rotulo": "Nota", "lista": True, "titulo": nota.stem, "subtitulo": str(nota.parent.relative_to(cofre)),
                   "imagem": None, "fonte": "Obsidian", "paragrafos": paragrafos}
         return Retorno(texto, cartao=cartao, na_integra=True)
 

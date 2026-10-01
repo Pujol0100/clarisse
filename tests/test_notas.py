@@ -58,6 +58,7 @@ async def test_le_a_nota_sem_marcacao_de_markdown(cofre):
 
     assert resposta.na_integra
     assert resposta.cartao["rotulo"] == "Nota"
+    assert resposta.cartao["lista"] is True
     assert resposta.cartao["titulo"] == "smart-anchor"
     assert resposta.cartao["paragrafos"] == [
         "Smart Anchor",
