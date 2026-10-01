@@ -264,6 +264,52 @@ body::after {
   font-variant-numeric: tabular-nums;
 }
 
+.cartao-texto { max-height: 40vh; overflow-y: auto; }
+
+.cartao-dica { margin: 10px 0 0; font-size: 14px; color: var(--texto-suave); }
+
+/* manchetes clicáveis */
+.lista li.clicavel { cursor: pointer; border-radius: 4px; transition: background 200ms; }
+.lista li.clicavel:hover,
+.lista li.clicavel:focus-visible { background: var(--dourado-fundo); outline: none; }
+.lista li.escolhida { background: rgba(201, 168, 76, 0.24); }
+
+/* matéria escolhida: o cartão vira bloco de leitura */
+.cartao.cartao-leitura { width: min(720px, calc(92vw - var(--chat))); }
+
+.leitura-foto {
+  display: block;
+  width: 100%;
+  height: 170px;
+  margin: 14px 0 16px;
+  object-fit: cover;
+  border: 1px solid var(--linha);
+  border-radius: 4px;
+}
+
+.leitura-titulo { margin: 14px 0 8px; font-size: 26px; line-height: 1.25; font-weight: 700; }
+.leitura-sub { margin: 0 0 16px; font-size: 17px; color: var(--texto-suave); }
+
+.leitura-corpo {
+  max-height: 34vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--linha) transparent;
+}
+
+.leitura-corpo p {
+  margin: 0 0 14px;
+  padding-left: 12px;
+  border-left: 2px solid transparent;
+  font-size: 19px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 300ms, border-color 300ms;
+}
+
+.leitura-corpo p.lendo { color: var(--texto); border-left-color: var(--dourado); }
+.leitura-corpo p.lido { color: rgba(255, 255, 255, 0.7); }
+
 /* ---------- legenda e fileira ---------- */
 
 .legenda {

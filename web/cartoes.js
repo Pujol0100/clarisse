@@ -41,13 +41,67 @@ const Cartoes = (() => {
     texto(cartao, dado) {
       cartao.append(el("p", "cartao-texto", dado.texto));
     },
+    // Manchetes numeradas: clicar numa pede a leitura dela, como dizer "lê a notícia 2".
+    noticias(cartao, dado) {
+      const ul = el("ul", "lista");
+      for (const item of dado.itens || []) {
+        const li = el("li", "clicavel");
+        li.dataset.numero = item.numero;
+        li.tabIndex = 0;
+        li.setAttribute("role", "button");
+        li.append(el("span", "marca-item", String(item.numero).padStart(2, "0")), el("span", null, item.titulo));
+        ul.append(li);
+      }
+      const escolher = (e) => {
+        const li = e.target.closest("li[data-numero]");
+        if (!li || (e.type === "keydown" && e.key !== "Enter")) return;
+        li.classList.add("escolhida");
+        aoEscolher(Number(li.dataset.numero));
+      };
+      ul.addEventListener("click", escolher);
+      ul.addEventListener("keydown", escolher);
+      cartao.append(ul, el("p", "cartao-dica", "Diga o número ou clique na manchete para eu ler."));
+    },
+    leitura(cartao, dado) {
+      if (dado.imagem) {
+        const foto = el("img", "leitura-foto");
+        foto.alt = "";
+        foto.referrerPolicy = "no-referrer";
+        foto.src = dado.imagem;
+        foto.addEventListener("error", () => foto.remove());
+        cartao.append(foto);
+      }
+      cartao.append(el("h2", "leitura-titulo", dado.titulo), el("p", "leitura-sub", dado.subtitulo || ""));
+      const corpo = el("div", "leitura-corpo");
+      for (const paragrafo of dado.paragrafos || []) corpo.append(el("p", null, paragrafo));
+      cartao.append(corpo);
+    },
   };
 
   function resumoDe(dado) {
     if (dado.resumo) return dado.resumo;
     if (dado.tipo === "clima") return `${dado.temp} · ${dado.cond}`;
     if (dado.tipo === "lista") return `${(dado.itens || []).length} itens`;
+    if (dado.tipo === "noticias") return `${(dado.itens || []).length} manchetes`;
+    if (dado.tipo === "leitura") return dado.titulo;
     return dado.texto || "";
+  }
+
+  let aoEscolher = () => {};
+
+  /** Na leitura de uma matéria: acende o parágrafo que está sendo lido e apaga os anteriores. */
+  function marcarParagrafo(indice) {
+    if (!atual || atual.dado.tipo !== "leitura") return;
+    const paragrafos = atual.cartao.querySelectorAll(".leitura-corpo p");
+    paragrafos.forEach((p, i) => {
+      p.classList.toggle("lendo", i === indice);
+      p.classList.toggle("lido", i < indice);
+    });
+    if (paragrafos[indice]) paragrafos[indice].scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function lendo() {
+    return Boolean(atual && atual.dado.tipo === "leitura");
   }
 
   /** Mostra o cartão na frente do anel; o anterior, se houver, desce para a fileira. */
@@ -78,5 +132,11 @@ const Cartoes = (() => {
     while (fileira.children.length > NA_FILEIRA) fileira.firstElementChild.remove();
   }
 
-  return { mostrar, guardar };
+  return {
+    mostrar,
+    guardar,
+    marcarParagrafo,
+    lendo,
+    set aoEscolher(fn) { aoEscolher = fn; },
+  };
 })();

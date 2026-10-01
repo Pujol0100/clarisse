@@ -232,6 +232,13 @@ def test_cabecalhos_de_seguranca(cliente):
     assert "microphone=(self)" in cabecalhos["permissions-policy"]
 
 
+def test_fotos_das_noticias_do_g1_podem_aparecer_e_nada_mais_de_fora(cliente):
+    politica = cliente.get("/").headers["content-security-policy"]
+
+    assert "img-src 'self' data: https://*.glbimg.com;" in politica
+    assert politica.count("glbimg") == 1
+
+
 def _cabecalhos_ws(origem=ORIGEM, chave=CHAVE):
     """O cliente de teste manda Host "testserver" e nenhum cookie no WebSocket; o navegador manda os dois."""
     cabecalhos = {"Host": "127.0.0.1:8765", "Origin": origem}
@@ -420,6 +427,22 @@ def test_resposta_leva_o_cartao_para_a_tela(logado, partes):
     assert resposta["cartao"] == cartao
     assert corpo["cartao"] == cartao
     assert all("figura" not in e for e in publicados)
+
+
+def test_leitura_fala_por_paragrafo_e_cada_trecho_diz_qual_paragrafo_acender(logado, partes):
+    _, agente, _, _, eventos = partes
+    cartao = {"tipo": "leitura", "titulo": "Título da matéria", "paragrafos": ["Primeiro parágrafo.", "Segundo parágrafo."]}
+    agente.proxima = Resposta("Título da matéria.\n\nPrimeiro parágrafo.\n\nSegundo parágrafo.", cartao=cartao)
+    fila = eventos.assinar()
+
+    logado.post("/api/mensagem", json={"texto": "lê a primeira"})
+
+    falar = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert [(e["legenda"], e["paragrafo"]) for e in falar] == [
+        ("Título da matéria.", None), ("Primeiro parágrafo.", 0), ("Segundo parágrafo.", 1),
+    ]
+    assert {e["total"] for e in falar} == {3}
+    assert [e["parte"] for e in falar] == [0, 1, 2]
 
 
 async def test_aviso_aparece_num_cartao_com_o_titulo_de_quem_avisou(tmp_path):

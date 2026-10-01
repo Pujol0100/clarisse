@@ -163,7 +163,7 @@ function receberTrecho(e) {
   const audio = new Audio(e.audio);
   audio.preload = "auto";
   audio.muted = !tenhoAVoz;
-  falaAtual.trechos[e.parte] = { audio, legenda: e.legenda };
+  falaAtual.trechos[e.parte] = { audio, legenda: e.legenda, paragrafo: e.paragrafo };
   if (!falaAtual.tocando) tocarProximo();
 }
 
@@ -176,8 +176,14 @@ async function tocarProximo() {
   const parte = fala.proximo;
   trecho.audio.addEventListener("playing", () => {
     if (falaAtual !== fala) return;
-    mostrarLegenda(trecho.legenda);
     if (parte === 0) soltarTexto(fala.id);
+    // Lendo uma matéria, o próprio bloco mostra o texto: acende o parágrafo em vez da legenda.
+    if (Cartoes.lendo()) {
+      mostrarLegenda(null);
+      if (trecho.paragrafo != null) Cartoes.marcarParagrafo(trecho.paragrafo);
+    } else {
+      mostrarLegenda(trecho.legenda);
+    }
   }, { once: true });
   trecho.audio.addEventListener("ended", () => {
     if (falaAtual !== fala) return;
@@ -409,6 +415,11 @@ function relogio() {
 
 /* ---------- início ---------- */
 
+Cartoes.aoEscolher = (numero) => {
+  liberarSom();
+  pedirAVoz();
+  enviarTexto(`lê a notícia ${numero}`);
+};
 Nucleo.nivel = nivelDoSom;
 Nucleo.grupos(GRUPOS);
 Nucleo.iniciar(document.getElementById("nucleo"));
