@@ -78,3 +78,15 @@ def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path
     assert servidor["args"] == ["-m", "clarisse.mcp_servidor"]
     assert servidor["env"]["CLARISSE_PORTA"] == "8765"
     assert (Path(servidor["env"]["PYTHONPATH"]) / "clarisse" / "mcp_servidor.py").is_file()
+
+
+def test_notas_do_obsidian_so_entram_com_o_cofre_configurado(cadastros, executor, tmp_path):
+    cofre = tmp_path / "cofre"
+    cofre.mkdir()
+
+    sem = montar_registro(Ajustes(_env_file=None, pasta_dados=tmp_path), cadastros, executor, httpx.AsyncClient(), Delegacoes(_avisar))
+    com = montar_registro(
+        Ajustes(_env_file=None, pasta_dados=tmp_path, cofre_de_notas=cofre), cadastros, executor, httpx.AsyncClient(), Delegacoes(_avisar),
+    )
+
+    assert set(com.nomes()) - set(sem.nomes()) == {"buscar_nas_notas", "ler_nota"}

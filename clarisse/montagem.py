@@ -20,6 +20,7 @@ from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
+from clarisse.ferramentas.notas import ferramentas_de_notas
 from clarisse.ferramentas.outlook import ferramentas_do_outlook
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
@@ -123,6 +124,9 @@ def montar_registro(
         *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
         *ferramentas_do_github(executor, cadastros),
     ]
+    cofre = ajustes.cofre_de_notas.expanduser() if ajustes.cofre_de_notas else None
+    if cofre and cofre.is_dir():
+        ferramentas += ferramentas_de_notas(cofre)
     for ferramenta in ferramentas:
         if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:
             registro.registrar(ferramenta)
