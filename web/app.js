@@ -242,7 +242,7 @@ let fonteDoMicrofone = null;
 
 function rotularMicrofone(gravando) {
   elementos.falar.setAttribute("aria-pressed", String(gravando));
-  elementos.falarRotulo.textContent = gravando ? "Ouvindo · aperte de novo para enviar" : "Ctrl+Alt+C para falar";
+  elementos.falarRotulo.textContent = gravando ? "Ouvindo · aperte de novo para enviar" : "Insert para falar";
 }
 
 async function alternarMicrofone() {

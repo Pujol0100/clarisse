@@ -138,7 +138,7 @@ Opcional, uma vez só:
 
 ```bash
 scripts/instalar-no-menu.sh    # põe a Clarisse no menu de aplicativos
-scripts/instalar-atalho.sh     # Ctrl+Alt+C liga e desliga o microfone, com qualquer janela na frente
+scripts/instalar-atalho.sh     # a tecla Insert liga e desliga o microfone, com qualquer janela na frente
 scripts/instalar-teclado-virtual.sh   # ydotool e wl-clipboard, para colar texto e apertar atalhos (pede senha)
 ```
 
@@ -162,7 +162,7 @@ scripts/ligar.sh
 Ela confere o ambiente, liga o Ollama se precisar e abre a página. Na primeira vez,
 clique em qualquer lugar da página e autorize o microfone.
 
-- **Falar:** `Ctrl+Alt+C` de qualquer lugar, a barra de espaço com a página em foco,
+- **Falar:** a tecla `Insert` de qualquer lugar, a barra de espaço com a página em foco,
   ou o botão no canto inferior direito. Aperta, fala, aperta de novo para enviar.
 - **Escolher numa lista** (manchetes, e-mails, notas): diga o número ou clique no item.
   O cartão de escolha fica na tela até o próximo cartão chegar.
