@@ -81,7 +81,13 @@ def ferramentas_de_notas(cofre: Path) -> list[Ferramenta]:
             conteudo = normalizar(nota.read_text(encoding="utf-8", errors="ignore"))
             if not all(p in titulo or p in conteudo for p in palavras):
                 continue
-            pontos = sum(5 for p in palavras if p in titulo) + sum(conteudo.count(p) for p in palavras)
+            # O termo inteiro no nome ou no texto pesa mais; palavra solta conta pouco, para "smart" de
+            # "Smart Compass" repetido não ganhar de uma nota que fala de "smart anchor".
+            termo = "-".join(palavras)
+            pontos = (
+                10 * sum(p in titulo for p in palavras) + 20 * (termo in titulo)
+                + 5 * min(conteudo.count(termo), 10) + sum(min(conteudo.count(p), 3) for p in palavras)
+            )
             pontuadas.append((pontos, nota.stat().st_mtime, nota))
         pontuadas.sort(key=lambda t: (t[0], t[1]), reverse=True)
         ultimas[:] = [nota for _, _, nota in pontuadas[:_ACHADAS]]

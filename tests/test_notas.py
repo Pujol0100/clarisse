@@ -74,3 +74,14 @@ async def test_nota_fora_da_lista(cofre):
     await _chamar(ferramentas, "buscar_nas_notas", termo="smart anchor")
 
     assert await _chamar(ferramentas, "ler_nota", numero=4) == "Não tenho a nota 4. A lista tem 2."
+
+
+async def test_termo_inteiro_junto_vale_mais_que_palavras_soltas_repetidas(tmp_path):
+    cofre = tmp_path / "cofre"
+    cofre.mkdir()
+    (cofre / "empresa.md").write_text("Smart Compass. " * 30 + "Âncora fica em outro lugar: anchor.\n", encoding="utf-8")
+    (cofre / "compliance-app.md").write_text("O smart anchor guarda os contratos. Deploy do smart anchor é manual.\n", encoding="utf-8")
+
+    resposta = await _chamar(_ferramentas(cofre), "buscar_nas_notas", termo="smart anchor")
+
+    assert [i["titulo"] for i in resposta.cartao["itens"]] == ["compliance-app", "empresa"]
