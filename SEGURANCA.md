@@ -78,12 +78,32 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **Não existe ferramenta de tecla livre.** Colar texto pede confirmação mostrando o
   texto e a janela, e não aperta Enter; os atalhos são uma lista fechada
   (`clarisse/ferramentas/janelas.py`), e fechar aba ou janela pede confirmação.
+- **Claude desligado por padrão** (`CLARISSE_USAR_CLAUDE=false`, desde 01/10/2026): as
+  ferramentas que mandam pedido ao Claude nem são registradas; ficam abrir o Claude na
+  tela e ler a resposta dele, que não mandam nada.
+- **Conectores só leem.** Agenda e e-mail: `GET` no Microsoft Graph com o token da conta
+  Microsoft do GNOME (`clarisse/microsoft.py`), pedido por D-Bus a cada vez que vence e
+  usado só no cabeçalho, nunca em log nem no modelo. GitHub: `gh search prs` e
+  `gh pr checks`. Dokploy: `project.all` (só nome, identificador e situação de cada
+  aplicação) e `deployment.all`, com a chave de leitura que o Claude Code já usa; nada
+  lê variável de ambiente. Notas: arquivos `.md` do cofre, fora da pasta `.obsidian`.
+- **Texto escrito por terceiros não passa pelo modelo.** Lista de e-mails, corpo do
+  e-mail, matéria, nota, título de PR e de deploy são falados direto pelo sistema
+  (`Retorno(na_integra=True)`), para um e-mail não virar instrução. O que fica no
+  histórico da conversa é encurtado a 300 letras.
+- **Imagens de fora só do servidor de fotos da Globo** (`img-src https://*.glbimg.com`
+  na política de segurança da página), para a foto das matérias do g1.
 
 ## Riscos aceitos
 
 - **Texto da resposta vai para a Microsoft** (voz do edge-tts), o pedido
   delegado vai para a Anthropic, e o nome da cidade vai para o Open-Meteo. Não use a Clarisse para ditar dado sensível de
   cliente enquanto a voz não for 100% local.
+- **E-mail e matéria lidos vão para a Microsoft** para virar voz, como toda fala.
+  O e-mail já está na Microsoft (Outlook); a matéria é pública.
+- **Qualquer programa da sua sessão consegue pedir o token da conta Microsoft** ao
+  GNOME, como a Clarisse pede. Isso já era assim antes dela; a Clarisse só lê.
+- **Lembretes ficam em texto aberto** em `dados/lembretes.json`, fora do git.
 - **Qualquer programa rodando como o seu usuário** consegue ler a chave em
   `~/.config/clarisse/chave` — o mesmo programa já poderia executar comandos
   sozinho, então a chave não protege contra ele.
