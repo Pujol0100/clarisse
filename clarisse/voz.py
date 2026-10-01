@@ -60,6 +60,24 @@ def dividir_em_trechos(texto: str) -> list[str]:
     return trechos
 
 
+_PALAVRA = r"[^\W_]+"
+_SEPARADOR = r"\s+(?:ponto|tra[cç]o|h[ií]fen|underline|underscore)\s+"
+_ENDERECO_FALADO = re.compile(
+    rf"\b({_PALAVRA}(?:{_SEPARADOR}{_PALAVRA})*)\s+arroba\s+({_PALAVRA}(?:\s+ponto\s+{_PALAVRA})+)\b", re.IGNORECASE,
+)
+_SIMBOLOS = {"ponto": ".", "traco": "-", "traço": "-", "hifen": "-", "hífen": "-", "underline": "_", "underscore": "_"}
+
+
+def enderecos_falados(texto: str) -> str:
+    """'fulano arroba empresa ponto com ponto br' vira 'fulano@empresa.com.br'. Só o que tem forma de
+    endereço: 'ponto de vista' e 'o símbolo arroba' ficam como estão."""
+    def escrever(achado: re.Match) -> str:
+        partes = re.split(r"\s+", achado.group(0))
+        return "".join("@" if p.lower() == "arroba" else _SIMBOLOS.get(p.lower(), p) for p in partes).lower()
+
+    return _ENDERECO_FALADO.sub(escrever, texto)
+
+
 class Transcritor:
     def __init__(self, carregar: Callable[[], object], dicas: list[str]):
         self._carregar = carregar
@@ -77,7 +95,7 @@ class Transcritor:
         segmentos, _ = self._modelo.transcribe(
             io.BytesIO(audio), language="pt", hotwords=self._dicas or None, vad_filter=True, beam_size=5,
         )
-        return " ".join(s.text.strip() for s in segmentos).strip()
+        return enderecos_falados(" ".join(s.text.strip() for s in segmentos).strip())
 
 
 def carregar_whisper(modelo: str, dispositivo: str):

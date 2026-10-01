@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from clarisse.voz import Locutor, Transcritor, texto_para_fala
+from clarisse.voz import Locutor, Transcritor, enderecos_falados, texto_para_fala
 
 
 @dataclass
@@ -130,3 +130,27 @@ def test_trechos_ja_saem_limpos_para_a_fala():
 
     assert dividir_em_trechos("Rode:\n\n```bash\nls\n```\n\nPronto.") == ["Rode: Trecho de código.", "Pronto."]
     assert dividir_em_trechos("   ") == []
+
+
+@pytest.mark.parametrize("falado,escrito", [
+    ("manda para fulano arroba smartcompass ponto com ponto br", "manda para fulano@smartcompass.com.br"),
+    ("Escreve para Vinicius ponto Pujol arroba Smartcompass ponto com ponto br.", "Escreve para vinicius.pujol@smartcompass.com.br."),
+    ("o e-mail é ana underline souza arroba gmail ponto com", "o e-mail é ana_souza@gmail.com"),
+    ("suporte traço ti arroba empresa ponto com", "suporte-ti@empresa.com"),
+    ("do meu ponto de vista está ok", "do meu ponto de vista está ok"),
+    ("o símbolo arroba fica no meio", "o símbolo arroba fica no meio"),
+    ("já veio certo: ana@x.com", "já veio certo: ana@x.com"),
+])
+def test_endereco_de_email_falado_vira_escrito(falado, escrito):
+    assert enderecos_falados(falado) == escrito
+
+
+class WhisperDoEmail(WhisperFalso):
+    def transcribe(self, audio, **opcoes):
+        return iter([Segmento(" Escreve para ana arroba x ponto com")]), None
+
+
+async def test_transcricao_ja_sai_com_o_endereco_escrito():
+    transcritor = Transcritor(carregar=WhisperDoEmail, dicas=[])
+
+    assert await transcritor.transcrever(b"audio") == "Escreve para ana@x.com"
