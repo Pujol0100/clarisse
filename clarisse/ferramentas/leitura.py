@@ -7,7 +7,7 @@ from pydantic import Field
 
 from clarisse.config import normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
-from clarisse.figuras import MENSAGEM, Retorno
+from clarisse.cartoes import Retorno
 
 PASTA_DAS_CONVERSAS = Path.home() / ".claude" / "projects"
 
@@ -84,13 +84,13 @@ def ferramentas_de_leitura(executor, pasta_das_conversas: Path = PASTA_DAS_CONVE
         texto = ultima_resposta(conversa)
         if not texto:
             return "A última pergunta dessa conversa ainda não tem resposta do Claude."
-        return Retorno(texto, figura=MENSAGEM, na_integra=True)
+        return Retorno(texto, na_integra=True)
 
     return [
         Ferramenta(
             "ler_resposta_do_claude",
             "Lê em voz alta, na íntegra, a última resposta do Claude Code: da conversa mais recente, ou da "
             "conversa que o usuário disser o nome. Use para 'lê o que o Claude respondeu', 'lê a última resposta'.",
-            ArgsLeitura, ler_resposta_do_claude, figura=MENSAGEM,
+            ArgsLeitura, ler_resposta_do_claude, grupo="claude",
         )
     ]

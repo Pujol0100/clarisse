@@ -3,7 +3,7 @@ import os
 
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
 from clarisse.ferramentas.processos import Resultado
-from clarisse.figuras import Retorno
+from clarisse.cartoes import Retorno
 
 
 def _linha(tipo, conteudo, **extra):

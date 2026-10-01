@@ -464,37 +464,50 @@ async def test_garantia_do_claude_nao_dispara_depois_de_uma_acao_confirmada(novo
     assert pedidos_ao_claude == []
 
 
-async def test_resposta_traz_a_figura_da_ferramenta_executada(novo_agente, registro):
-    async def hora(args):
-        return "São 14h05."
-
-    registro.registrar(Ferramenta("hora", "hora", Argumentos, hora, figura="relogio"))
-    modelo = ModeloFalso(chamada("hora"), texto("São 14h05."))
-
-    resposta = await novo_agente(modelo).responder("que horas são?")
-
-    assert resposta.figura == "relogio"
+async def _hora(args):
+    return "São 14h05."
 
 
-async def test_figura_calculada_pela_ferramenta_ganha_da_fixa_e_o_texto_vai_ao_modelo(novo_agente, registro):
-    from clarisse.figuras import Retorno
+async def test_evento_da_ferramenta_diz_o_grupo_que_acende_na_tela(novo_agente, registro, eventos):
+    registro.registrar(Ferramenta("hora", "hora", Argumentos, _hora, grupo="sistema"))
+    fila = eventos.assinar()
+
+    await novo_agente(ModeloFalso(chamada("hora"), texto("São 14h05."))).responder("que horas são?")
+
+    publicados = [fila.get_nowait() for _ in range(fila.qsize())]
+    assert [(e["grupo"], e["situacao"]) for e in publicados if e["tipo"] == "ferramenta"] == [
+        ("sistema", "iniciada"), ("sistema", "concluida"),
+    ]
+
+
+async def test_cartao_da_ferramenta_vai_na_resposta_e_so_o_texto_vai_ao_modelo(novo_agente, registro):
+    from clarisse.cartoes import Retorno
 
     async def tempo(args):
-        return Retorno("Chuva forte amanhã.", figura="chuva")
+        return Retorno("Chuva forte amanhã.", cartao={"tipo": "clima", "titulo": "Clima"})
 
-    registro.registrar(Ferramenta("tempo", "tempo", Argumentos, tempo, figura="sol"))
+    registro.registrar(Ferramenta("tempo", "tempo", Argumentos, tempo, grupo="clima"))
     modelo = ModeloFalso(chamada("tempo"), texto("Vai chover."))
 
     resposta = await novo_agente(modelo).responder("vai chover?")
 
-    assert resposta.figura == "chuva"
+    assert resposta.cartao == {"tipo": "clima", "titulo": "Clima"}
     assert _mensagens_de_ferramenta(modelo.recebidas[1]) == ["Chuva forte amanhã."]
 
 
-async def test_conversa_sem_ferramenta_nao_tem_figura(novo_agente):
+async def test_ferramenta_sem_cartao_ganha_cartao_de_texto_com_a_resposta_falada(novo_agente, registro):
+    registro.registrar(Ferramenta("hora", "hora", Argumentos, _hora, grupo="sistema"))
+    modelo = ModeloFalso(chamada("hora"), texto("São duas e cinco da tarde."))
+
+    resposta = await novo_agente(modelo).responder("que horas são?")
+
+    assert resposta.cartao == {"tipo": "texto", "titulo": "Sistema", "texto": "São duas e cinco da tarde."}
+
+
+async def test_conversa_sem_ferramenta_nao_tem_cartao(novo_agente):
     resposta = await novo_agente(ModeloFalso(texto("Oi!"))).responder("oi")
 
-    assert resposta.figura is None
+    assert resposta.cartao is None
 
 
 async def test_chamada_escrita_como_texto_ganha_segunda_chance(novo_agente, executadas):
@@ -582,7 +595,7 @@ async def test_sem_a_ferramenta_de_etapas_o_encadeado_vai_ao_modelo(novo_agente)
 
 
 async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(registro, eventos, auditoria):
-    from clarisse.figuras import Retorno
+    from clarisse.cartoes import Retorno
 
     longo = "Primeiro parágrafo da resposta do Claude.\n\nSegundo parágrafo, com mais detalhes."
 
@@ -601,7 +614,7 @@ async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(r
 
 @pytest.fixture
 def leituras(registro):
-    from clarisse.figuras import Retorno
+    from clarisse.cartoes import Retorno
 
     class ArgsLeitura(Argumentos):
         conversa: str | None = None

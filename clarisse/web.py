@@ -19,7 +19,6 @@ from starlette.websockets import WebSocketClose
 
 from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
-from clarisse.figuras import MENSAGEM
 from clarisse.voz import dividir_em_trechos
 
 log = logging.getLogger(__name__)
@@ -107,7 +106,7 @@ def _nova_fala() -> str:
     return uuid.uuid4().hex
 
 
-async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = None, fala: str | None = None) -> str | None:
+async def _falar(eventos: Eventos, locutor, texto: str, fala: str | None = None) -> str | None:
     """Fala em trechos: o primeiro sai assim que fica pronto e os outros são gerados enquanto ele toca.
     Cada trecho leva a legenda; o texto na tela espera a fala `fala` começar."""
     fala = fala or _nova_fala()
@@ -126,7 +125,7 @@ async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = Non
             await eventos.estado(Estado.FALANDO)
         await eventos.publicar({
             "tipo": "falar", "fala": fala, "parte": parte, "total": len(trechos),
-            "audio": url, "legenda": trecho, "figura": figura,
+            "audio": url, "legenda": trecho,
         })
         primeiro = primeiro or url
     return primeiro
@@ -137,7 +136,7 @@ def criar_anunciador(eventos: Eventos, locutor) -> Callable[[str], Awaitable[Non
     async def anunciar(frase: str) -> None:
         fala = _nova_fala()
         await eventos.publicar({"tipo": "resposta", "fala": fala, "texto": frase, "aguardando_confirmacao": True})
-        await _falar(eventos, locutor, frase, figura=MENSAGEM, fala=fala)
+        await _falar(eventos, locutor, frase, fala=fala)
 
     return anunciar
 
@@ -145,8 +144,9 @@ def criar_anunciador(eventos: Eventos, locutor) -> Callable[[str], Awaitable[Non
 def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[None]]:
     async def avisar(titulo: str, texto: str) -> None:
         fala = _nova_fala()
-        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto})
-        await _falar(eventos, locutor, f"Do {titulo}: {texto}", figura=MENSAGEM, fala=fala)
+        cartao = {"tipo": "texto", "titulo": titulo, "texto": texto}
+        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto, "cartao": cartao})
+        await _falar(eventos, locutor, f"Do {titulo}: {texto}", fala=fala)
 
     return avisar
 
@@ -183,15 +183,15 @@ def criar_app(
         fala = _nova_fala()
         await eventos.publicar({
             "tipo": "resposta", "fala": fala, "texto": resposta.texto,
-            "aguardando_confirmacao": resposta.aguardando_confirmacao,
+            "aguardando_confirmacao": resposta.aguardando_confirmacao, "cartao": resposta.cartao,
         })
-        audio = await _falar(eventos, locutor, resposta.texto, figura=resposta.figura, fala=fala)
+        audio = await _falar(eventos, locutor, resposta.texto, fala=fala)
         return {
             "texto": resposta.texto,
             "audio": audio,
             "aguardando_confirmacao": resposta.aguardando_confirmacao,
             "parar": False,
-            "figura": resposta.figura,
+            "cartao": resposta.cartao,
         }
 
     @app.get("/", response_class=HTMLResponse)

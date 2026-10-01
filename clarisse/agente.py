@@ -10,7 +10,7 @@ from datetime import datetime
 from clarisse.auditoria import Auditoria
 from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Estado, Eventos
-from clarisse.figuras import Retorno
+from clarisse.cartoes import Retorno, cartao_de_texto
 from clarisse.ferramentas.registro import Registro
 from clarisse.ferramentas.sistema import data_por_extenso
 from clarisse.llm import ErroDoModelo
@@ -64,7 +64,7 @@ class Resposta:
     texto: str
     parar: bool = False
     aguardando_confirmacao: bool = False
-    figura: str | None = None
+    cartao: dict | None = None
 
 
 class Agente:
@@ -96,13 +96,16 @@ class Agente:
         self._conversas: list[list[dict]] = []
         self._pendente: tuple[Decisao, list[dict], int] | None = None
         self._trava = asyncio.Lock()
-        self._figura: str | None = None
+        # Da conversa em andamento: o cartão que a ferramenta montou e o grupo da última ferramenta.
+        self._cartao: dict | None = None
+        self._grupo: str | None = None
         self._na_integra: str | None = None
 
     async def responder(self, fala: str) -> Resposta:
         async with self._trava:
             fala = fala.strip()
-            self._figura = None
+            self._cartao = None
+            self._grupo = None
             self._na_integra = None
             if pede_para_parar(fala):
                 self._pendente = None
@@ -198,33 +201,30 @@ class Agente:
             frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
             if not (self._confirmacoes and await self._confirmacoes.pedir(f"O Claude quer: {frase}")):
                 return "O usuário não confirmou; não fiz isso."
-        mensagem, figura = await self._rodar(decisao)
-        if figura:
-            await self._eventos.publicar({"tipo": "figura", "figura": figura})
+        mensagem, _ = await self._rodar(decisao)
         await self._eventos.estado(Estado.PARADA)
         return mensagem["content"]
 
     async def _executar(self, decisao: Decisao) -> dict:
-        mensagem, figura = await self._rodar(decisao)
-        self._figura = figura or self._figura
+        mensagem, cartao = await self._rodar(decisao)
+        self._cartao = cartao or self._cartao
+        self._grupo = decisao.ferramenta.grupo
         return mensagem
 
-    async def _rodar(self, decisao: Decisao) -> tuple[dict, str | None]:
-        nome = decisao.ferramenta.nome
-        figura = None
+    async def _rodar(self, decisao: Decisao) -> tuple[dict, dict | None]:
+        nome, grupo = decisao.ferramenta.nome, decisao.ferramenta.grupo
+        cartao = None
         await self._eventos.estado(Estado.EXECUTANDO)
-        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": "iniciada"})
+        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "grupo": grupo, "situacao": "iniciada"})
         inicio = time.monotonic()
         try:
             resultado = await asyncio.wait_for(decisao.ferramenta.executar(decisao.args), self._timeout)
             situacao = "concluida"
             if isinstance(resultado, Retorno):
-                figura = resultado.figura or decisao.ferramenta.figura
+                cartao = resultado.cartao
                 if resultado.na_integra:
                     self._na_integra = resultado.texto
                 resultado = resultado.texto
-            else:
-                figura = decisao.ferramenta.figura
         except Exception as erro:
             log.exception("ferramenta %s falhou", nome)
             resultado = f"Erro ao executar {nome}: {erro}"
@@ -236,8 +236,8 @@ class Agente:
             situacao="ok" if situacao == "concluida" else "erro",
             duracao_ms=round((time.monotonic() - inicio) * 1000),
         )
-        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": situacao})
-        return _mensagem_de_ferramenta(nome, resultado), figura
+        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "grupo": grupo, "situacao": situacao})
+        return _mensagem_de_ferramenta(nome, resultado), cartao
 
     def _historico(self) -> list[dict]:
         return [mensagem for conversa in self._conversas for mensagem in conversa]
@@ -245,7 +245,8 @@ class Agente:
     def _concluir(self, mensagens: list[dict], inicio: int, texto: str, aguardando: bool = False) -> Resposta:
         conversa = [_encurtar(m) for m in mensagens[inicio:]] + [{"role": "assistant", "content": texto}]
         self._conversas = [*self._conversas, conversa][-_CONVERSAS_LEMBRADAS:]
-        return Resposta(texto, aguardando_confirmacao=aguardando, figura=self._figura)
+        cartao = self._cartao or (cartao_de_texto(self._grupo, texto) if self._grupo else None)
+        return Resposta(texto, aguardando_confirmacao=aguardando, cartao=cartao)
 
 
 def _encurtar(mensagem: dict) -> dict:

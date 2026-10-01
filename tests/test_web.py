@@ -407,26 +407,29 @@ def _eventos_publicados(fila):
     return publicados
 
 
-def test_fala_leva_a_figura_da_resposta_para_a_tela(logado, partes):
+def test_resposta_leva_o_cartao_para_a_tela(logado, partes):
     _, agente, _, _, eventos = partes
-    agente.proxima = Resposta("Amanhã chove em Campinas.", figura="chuva")
+    cartao = {"tipo": "clima", "titulo": "Clima", "temp": "18°"}
+    agente.proxima = Resposta("Amanhã chove em Campinas.", cartao=cartao)
     fila = eventos.assinar()
 
     corpo = logado.post("/api/mensagem", json={"texto": "vai chover amanhã?"}).json()
 
-    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
-    assert falar["figura"] == "chuva"
-    assert corpo["figura"] == "chuva"
+    publicados = _eventos_publicados(fila)
+    [resposta] = [e for e in publicados if e["tipo"] == "resposta"]
+    assert resposta["cartao"] == cartao
+    assert corpo["cartao"] == cartao
+    assert all("figura" not in e for e in publicados)
 
 
-async def test_aviso_do_claude_aparece_como_balao_de_mensagem(tmp_path):
+async def test_aviso_aparece_num_cartao_com_o_titulo_de_quem_avisou(tmp_path):
     eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
     fila = eventos.assinar()
 
     await criar_avisador(eventos, locutor)("omni-api", "O build passou.")
 
-    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
-    assert falar["figura"] == "mensagem"
+    [aviso] = [e for e in _eventos_publicados(fila) if e["tipo"] == "aviso"]
+    assert aviso["cartao"] == {"tipo": "texto", "titulo": "omni-api", "texto": "O build passou."}
 
 
 class ExternasFalsas:

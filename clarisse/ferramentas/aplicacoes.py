@@ -265,12 +265,12 @@ def ferramentas_de_aplicacoes(
             "abrir",
             "Abre o que o usuário pedir pelo nome: programa instalado, sistema da empresa na internet ou projeto da "
             "máquina (que roda local). Use para 'abre o X'. Se o usuário disser 'site' ou 'local', preencha onde.",
-            ArgsAbrir, abrir, risco=risco_de_abrir, descrever=confirmar_abrir,
+            ArgsAbrir, abrir, risco=risco_de_abrir, descrever=confirmar_abrir, grupo="navegador",
         ),
         Ferramenta(
             "rodar_aplicacao",
             "Roda na máquina um projeto de programação (npm run dev), em terminais visíveis, e abre o site "
             "no navegador quando ele responder. Use para 'roda', 'sobe', 'inicia local' ou 'abre no Chrome' um projeto.",
-            ArgsRodar, rodar_aplicacao, risco=risco, descrever=confirmar,
+            ArgsRodar, rodar_aplicacao, risco=risco, descrever=confirmar, grupo="codigo",
         )
     ]
