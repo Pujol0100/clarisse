@@ -65,6 +65,10 @@ const Cartoes = (() => {
       cartao.append(ul, el("p", "cartao-dica", "Diga o número ou clique para eu ler."));
     },
     leitura(cartao, dado) {
+      const voltar = el("button", "leitura-voltar", "← Voltar à lista");
+      voltar.type = "button";
+      voltar.addEventListener("click", () => aoVoltar());
+      cartao.append(voltar);
       if (dado.imagem) {
         const foto = el("img", "leitura-foto");
         foto.alt = "";
@@ -90,6 +94,7 @@ const Cartoes = (() => {
   }
 
   let aoEscolher = () => {};
+  let aoVoltar = () => {};
 
   /** Na leitura de uma matéria: acende o parágrafo que está sendo lido e apaga os anteriores. */
   function marcarParagrafo(indice) {
@@ -149,5 +154,6 @@ const Cartoes = (() => {
     marcarParagrafo,
     lendo,
     set aoEscolher(fn) { aoEscolher = fn; },
+    set aoVoltar(fn) { aoVoltar = fn; },
   };
 })();

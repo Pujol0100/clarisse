@@ -425,6 +425,13 @@ Cartoes.aoEscolher = (pedido, numero) => {
   pedirAVoz();
   enviarTexto(`${pedido} ${numero}`);
 };
+// Para a leitura na hora e mostra a lista de novo, como dizer "volta para a lista".
+Cartoes.aoVoltar = () => {
+  liberarSom();
+  pedirAVoz();
+  pararDeFalar();
+  enviarTexto("volta para a lista");
+};
 Nucleo.nivel = nivelDoSom;
 Nucleo.grupos(GRUPOS);
 Nucleo.iniciar(document.getElementById("nucleo"));

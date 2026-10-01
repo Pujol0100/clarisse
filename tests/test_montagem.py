@@ -24,7 +24,7 @@ LOCAIS = {
     "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir",
     "consultar_agenda", "emails_nao_lidos", "ler_email",
     "prs_abertas", "situacao_da_pr", "situacao_do_sistema",
-    "lembrar", "listar_lembretes", "cancelar_lembrete",
+    "lembrar", "listar_lembretes", "cancelar_lembrete", "voltar_para_a_lista",
 }
 DELEGAM_AO_CLAUDE = {
     "pedir_ao_claude", "criar_compromisso",

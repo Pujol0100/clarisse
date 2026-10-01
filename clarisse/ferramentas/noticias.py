@@ -5,12 +5,13 @@ título de vídeo relacionado, crédito de foto e etiquetas. Parágrafo de maté
 em ponto. O resto fica de fora."""
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import httpx
 from pydantic import Field
 
-from clarisse.cartoes import Retorno
+from clarisse.cartoes import Retorno, UltimaEscolha
 from clarisse.config import normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 
@@ -32,6 +33,7 @@ _MINIMO_DE_PALAVRAS = 6
 @dataclass
 class Noticia:
     titulo: str
+    link: str
     subtitulo: str
     imagem: str | None
     paragrafos: list[str]
@@ -56,6 +58,7 @@ def _noticias_do_feed(conteudo: bytes) -> list[Noticia]:
         midia = item.find("media:content", _NS)
         noticias.append(Noticia(
             titulo=titulo,
+            link=(item.findtext("link") or "").strip(),
             subtitulo=(item.findtext("atom:subtitle", "", _NS) or "").strip(),
             imagem=midia.get("url") if midia is not None else None,
             paragrafos=paragrafos_da_materia("".join(descricao.itertext())) if descricao is not None else [],
@@ -69,6 +72,7 @@ def _com_ponto(frase: str) -> str:
 
 class ArgsNoticias(Argumentos):
     tema: str | None = Field(None, max_length=60, description="Tema opcional: " + ", ".join(FEEDS))
+    ler_titulos: bool = Field(False, description="true só se o usuário pedir para ouvir os títulos das manchetes")
 
 
 class ArgsLerNoticia(Argumentos):
@@ -76,8 +80,13 @@ class ArgsLerNoticia(Argumentos):
     assunto: str | None = Field(None, max_length=80, description="Palavras do título, se o usuário disser o assunto")
 
 
-def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
+def ferramentas_de_noticias(
+    cliente: httpx.AsyncClient,
+    abrir: Callable[[str], Awaitable[None]] | None = None,
+    escolhas: UltimaEscolha | None = None,
+) -> list[Ferramenta]:
     ultimas: dict = {"tema": None, "noticias": []}
+    escolhas = escolhas or UltimaEscolha()
 
     async def buscar(tema_pedido: str | None) -> str | None:
         tema = normalizar(tema_pedido) if tema_pedido else "geral"
@@ -98,16 +107,21 @@ def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
         if falha := await buscar(args.tema):
             return falha
         tema, noticias = ultimas["tema"], ultimas["noticias"]
-        lista = " | ".join(f"{i}. {n.titulo}" for i, n in enumerate(noticias, 1))
-        texto = (
-            f"Manchetes de {tema} no g1: {lista}. Diga as manchetes com o número e pergunte se o usuário quer "
-            "que você leia alguma; ele escolhe pelo número."
-        )
-        cartao = {
-            "tipo": "escolha", "titulo": "Notícias", "canto": tema, "pedido": "lê a notícia",
-            "itens": [{"numero": i, "titulo": n.titulo} for i, n in enumerate(noticias, 1)],
-        }
-        return Retorno(texto, cartao=cartao)
+        pergunta = "Qual você quer que eu leia? Diga o número."
+        if args.ler_titulos:
+            lista = " ".join(f"{i}, {_com_ponto(n.titulo)}" for i, n in enumerate(noticias, 1))
+            texto = f"Manchetes de {tema}: {lista} {pergunta}"
+        else:
+            texto = f"Separei {len(noticias)} manchetes de {tema} na tela. {pergunta}"
+        itens = []
+        for i, n in enumerate(noticias, 1):
+            item = {"numero": i, "titulo": n.titulo}
+            if not n.paragrafos:
+                item["detalhe"] = "sem texto · abre no site"
+            itens.append(item)
+        cartao = {"tipo": "escolha", "titulo": "Notícias", "canto": tema, "pedido": "lê a notícia", "itens": itens}
+        escolhas.guardar(cartao)
+        return Retorno(texto, cartao=cartao, na_integra=True)
 
     async def ler_noticia(args: ArgsLerNoticia) -> Retorno | str:
         if not ultimas["noticias"] and (falha := await buscar(None)):
@@ -126,7 +140,11 @@ def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
         else:
             return "Diga o número ou o assunto da notícia."
         if not noticia.paragrafos:
-            return "Essa notícia não veio com o texto no feed do g1. Posso abrir no navegador, se quiser."
+            # Vídeo, galeria ou página de jogo: não há matéria escrita nem no feed nem na página.
+            if abrir and noticia.link:
+                await abrir(noticia.link)
+                return "Essa notícia não tem texto para eu ler; é vídeo, fotos ou página de jogo. Abri no navegador."
+            return "Essa notícia não tem texto para eu ler; é vídeo, fotos ou página de jogo."
         texto = "\n\n".join([_com_ponto(noticia.titulo), *noticia.paragrafos])
         cartao = {
             "tipo": "leitura", "rotulo": "Notícia", "titulo": noticia.titulo, "subtitulo": noticia.subtitulo, "imagem": noticia.imagem,

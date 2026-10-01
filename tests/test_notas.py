@@ -40,7 +40,7 @@ async def test_busca_poe_primeiro_a_nota_com_o_termo_no_nome_e_ignora_a_pasta_do
 
     assert [i["titulo"] for i in resposta.cartao["itens"]] == ["smart-anchor", "omni"]
     assert resposta.cartao["tipo"] == "escolha" and resposta.cartao["pedido"] == "lê a nota"
-    assert resposta.texto == "Achei 2 notas: 1, smart-anchor. 2, omni. Para eu ler uma, diga o número."
+    assert resposta.texto == "Achei 2 notas sobre Smart Anchor; estão na tela. Qual você quer que eu leia? Diga o número."
     assert resposta.na_integra
 
 

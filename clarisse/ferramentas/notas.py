@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from clarisse.cartoes import Retorno
+from clarisse.cartoes import Retorno, UltimaEscolha
 from clarisse.config import normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 
@@ -70,8 +70,9 @@ class ArgsLerNota(Argumentos):
     numero: int = Field(ge=1, le=_ACHADAS, description="Número da nota na última busca")
 
 
-def ferramentas_de_notas(cofre: Path) -> list[Ferramenta]:
+def ferramentas_de_notas(cofre: Path, escolhas: UltimaEscolha | None = None) -> list[Ferramenta]:
     ultimas: list[Path] = []
+    escolhas = escolhas or UltimaEscolha()
 
     async def buscar_nas_notas(args: ArgsBusca) -> Retorno | str:
         palavras = [p for p in normalizar(args.termo).split("-") if p]
@@ -93,13 +94,14 @@ def ferramentas_de_notas(cofre: Path) -> list[Ferramenta]:
         ultimas[:] = [nota for _, _, nota in pontuadas[:_ACHADAS]]
         if not ultimas:
             return f"Não achei nada sobre {args.termo} nas notas."
-        lista = " ".join(f"{i}, {n.stem}." for i, n in enumerate(ultimas, 1))
-        texto = f"Achei {len(ultimas)} nota{'s' if len(ultimas) > 1 else ''}: {lista} Para eu ler uma, diga o número."
+        quantas = f"{len(ultimas)} nota{'s' if len(ultimas) > 1 else ''}"
+        texto = f"Achei {quantas} sobre {args.termo}; estão na tela. Qual você quer que eu leia? Diga o número."
         cartao = {
             "tipo": "escolha", "titulo": "Notas", "canto": args.termo, "pedido": "lê a nota",
             "itens": [{"numero": i, "titulo": n.stem, "detalhe": str(n.parent.relative_to(cofre))}
                       for i, n in enumerate(ultimas, 1)],
         }
+        escolhas.guardar(cartao)
         return Retorno(texto, cartao=cartao, na_integra=True)
 
     async def ler_nota(args: ArgsLerNota) -> Retorno | str:

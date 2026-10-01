@@ -32,3 +32,13 @@ class Retorno:
 
 def cartao_de_texto(grupo: str, texto: str) -> dict:
     return {"tipo": "texto", "titulo": GRUPOS.get(grupo, "Clarisse"), "texto": texto}
+
+
+class UltimaEscolha:
+    """A última lista para escolher (manchetes, e-mails, notas), para voltar a ela depois de ler um item."""
+
+    def __init__(self):
+        self.cartao: dict | None = None
+
+    def guardar(self, cartao: dict) -> None:
+        self.cartao = cartao

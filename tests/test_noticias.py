@@ -13,9 +13,14 @@ def _rss(*titulos: str) -> str:
     return f"<?xml version='1.0' encoding='UTF-8'?><rss version='2.0'><channel><title>g1</title>{itens}</channel></rss>"
 
 
-def _montar(responder):
+def _montar(responder, abertos=None, escolhas=None):
     cliente = httpx.AsyncClient(transport=httpx.MockTransport(responder))
-    return {f.nome: f for f in ferramentas_de_noticias(cliente)}
+
+    async def abrir(endereco):
+        if abertos is not None:
+            abertos.append(endereco)
+
+    return {f.nome: f for f in ferramentas_de_noticias(cliente, abrir=abrir, escolhas=escolhas)}
 
 
 def _feed_de_exemplo(pedidos=None):
@@ -38,11 +43,10 @@ async def test_devolve_as_cinco_primeiras_manchetes_do_feed_geral():
         pedidos.append(str(pedido.url))
         return httpx.Response(200, text=_rss(*[f"Manchete {i}" for i in range(1, 9)]))
 
-    resposta = (await _chamar(_montar(responder), "noticias_do_dia")).texto
+    resposta = await _chamar(_montar(responder), "noticias_do_dia")
 
     assert pedidos == [FEEDS["geral"]]
-    assert "Manchete 1" in resposta and "Manchete 5" in resposta
-    assert "Manchete 6" not in resposta
+    assert [i["titulo"] for i in resposta.cartao["itens"]] == [f"Manchete {i}" for i in range(1, 6)]
 
 
 async def test_tema_escolhe_o_feed_sem_acento_e_caixa():
@@ -77,18 +81,35 @@ async def test_falha_de_rede_vira_mensagem():
     assert "não consegui" in resposta.lower()
 
 
-async def test_manchetes_vem_numeradas_no_cartao_e_no_texto():
+async def test_manchetes_vao_para_a_tela_e_ela_so_pergunta_qual_ler():
     resposta = await _chamar(_montar(_feed_de_exemplo()), "noticias_do_dia", tema="tecnologia")
 
+    assert resposta.na_integra
+    assert resposta.texto == "Separei 3 manchetes de tecnologia na tela. Qual você quer que eu leia? Diga o número."
     assert resposta.cartao["tipo"] == "escolha"
     assert resposta.cartao["canto"] == "tecnologia"
     assert resposta.cartao["pedido"] == "lê a notícia"
-    assert resposta.cartao["itens"][:2] == [
+    assert resposta.cartao["itens"] == [
         {"numero": 1, "titulo": "Cidade fictícia testa ônibus sem motorista no centro"},
         {"numero": 2, "titulo": "Aplicativo de mensagens fictício ganha nomes de usuário"},
+        {"numero": 3, "titulo": "Galeria de fotos de exemplo sem texto", "detalhe": "sem texto · abre no site"},
     ]
-    assert "1. Cidade fictícia testa ônibus" in resposta.texto
-    assert "número" in resposta.texto
+
+
+async def test_le_os_titulos_so_quando_pedido():
+    resposta = await _chamar(_montar(_feed_de_exemplo()), "noticias_do_dia", tema="tecnologia", ler_titulos=True)
+
+    assert resposta.texto.startswith("Manchetes de tecnologia: 1, Cidade fictícia testa ônibus sem motorista no centro. 2, ")
+    assert resposta.texto.endswith("Qual você quer que eu leia? Diga o número.")
+
+
+async def test_a_lista_fica_guardada_para_voltar_a_ela():
+    from clarisse.cartoes import UltimaEscolha
+
+    escolhas = UltimaEscolha()
+    resposta = await _chamar(_montar(_feed_de_exemplo(), escolhas=escolhas), "noticias_do_dia")
+
+    assert escolhas.cartao == resposta.cartao
 
 
 def test_materia_fica_so_com_os_paragrafos_de_frase():
@@ -158,10 +179,12 @@ async def test_numero_fora_da_lista_avisa_quantas_tem():
     assert resposta == "Não tenho a notícia 9. A lista tem 3."
 
 
-async def test_noticia_sem_texto_no_feed_avisa_em_vez_de_ler_vazio():
-    ferramentas = _montar(_feed_de_exemplo())
+async def test_noticia_sem_texto_abre_no_navegador_em_vez_de_ler_vazio():
+    abertos = []
+    ferramentas = _montar(_feed_de_exemplo(), abertos)
     await _chamar(ferramentas, "noticias_do_dia")
 
     resposta = await _chamar(ferramentas, "ler_noticia", numero=3)
 
-    assert resposta == "Essa notícia não veio com o texto no feed do g1. Posso abrir no navegador, se quiser."
+    assert resposta == "Essa notícia não tem texto para eu ler; é vídeo, fotos ou página de jogo. Abri no navegador."
+    assert abertos == ["https://g1.globo.com/tecnologia/noticia/2026/10/01/galeria.ghtml"]

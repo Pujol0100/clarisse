@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from pydantic import Field
 
-from clarisse.cartoes import Retorno
+from clarisse.cartoes import Retorno, UltimaEscolha
 from clarisse.config import normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 from clarisse.microsoft import FUSO, SemContaMicrosoft
@@ -68,12 +68,19 @@ class ArgsAgenda(Argumentos):
     periodo: str | None = Field("hoje", max_length=40, description="hoje, amanhã, depois de amanhã ou semana")
 
 
+class ArgsNaoLidos(Argumentos):
+    ler_titulos: bool = Field(False, description="true só se o usuário pedir para ouvir remetente e assunto")
+
+
 class ArgsLerEmail(Argumentos):
     numero: int = Field(ge=1, le=_NA_LISTA, description="Número do e-mail na última lista de não lidos")
 
 
-def ferramentas_do_outlook(conta, agora: Callable[[], datetime] = datetime.now) -> list[Ferramenta]:
+def ferramentas_do_outlook(
+    conta, agora: Callable[[], datetime] = datetime.now, escolhas: UltimaEscolha | None = None,
+) -> list[Ferramenta]:
     ultimos: list[dict] = []
+    escolhas = escolhas or UltimaEscolha()
 
     async def consultar_agenda(args: ArgsAgenda) -> Retorno | str:
         periodo = _periodo(args.periodo)
@@ -106,7 +113,7 @@ def ferramentas_do_outlook(conta, agora: Callable[[], datetime] = datetime.now) 
         cartao = {"tipo": "lista", "titulo": "Agenda", "canto": nome.lower() if periodo != "semana" else "semana", "itens": itens}
         return Retorno(texto, cartao=cartao)
 
-    async def emails_nao_lidos(args: Argumentos) -> Retorno | str:
+    async def emails_nao_lidos(args: ArgsNaoLidos) -> Retorno | str:
         try:
             caixa = await conta.get("/me/mailFolders/inbox", {"$select": "unreadItemCount"})
             dados = await conta.get(
@@ -120,15 +127,20 @@ def ferramentas_do_outlook(conta, agora: Callable[[], datetime] = datetime.now) 
         total = caixa.get("unreadItemCount", len(ultimos))
         if not ultimos:
             return Retorno("Nenhum e-mail não lido na caixa de entrada.", na_integra=True)
-        falados = " ".join(
-            f"{i}, de {_remetente(m)}: {m.get('subject') or 'sem assunto'}." for i, m in enumerate(ultimos[:_FALADOS], 1)
-        )
-        texto = f"Você tem {total} e-mails não lidos. Os mais recentes: {falados} Para eu ler um, diga o número."
+        pergunta = "Qual você quer que eu leia? Diga o número."
+        if args.ler_titulos:
+            falados = " ".join(
+                f"{i}, de {_remetente(m)}: {m.get('subject') or 'sem assunto'}." for i, m in enumerate(ultimos[:_FALADOS], 1)
+            )
+            texto = f"Você tem {total} e-mails não lidos. Os mais recentes: {falados} {pergunta}"
+        else:
+            texto = f"Você tem {total} e-mails não lidos. Os {len(ultimos)} mais recentes estão na tela. {pergunta}"
         cartao = {
             "tipo": "escolha", "titulo": "E-mail", "canto": f"{total} não lidos", "pedido": "lê o e-mail",
             "itens": [{"numero": i, "titulo": m.get("subject") or "sem assunto", "detalhe": _remetente(m)}
                       for i, m in enumerate(ultimos, 1)],
         }
+        escolhas.guardar(cartao)
         return Retorno(texto, cartao=cartao, na_integra=True)
 
     async def ler_email(args: ArgsLerEmail) -> Retorno | str:
@@ -157,7 +169,7 @@ def ferramentas_do_outlook(conta, agora: Callable[[], datetime] = datetime.now) 
         Ferramenta(
             "emails_nao_lidos",
             "Lista os e-mails não lidos da caixa de entrada do Outlook. Use para 'tenho e-mail?', 'e-mails novos'.",
-            Argumentos, emails_nao_lidos, grupo="email",
+            ArgsNaoLidos, emails_nao_lidos, grupo="email",
         ),
         Ferramenta(
             "ler_email",

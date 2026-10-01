@@ -16,7 +16,9 @@ from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
+from clarisse.cartoes import UltimaEscolha
 from clarisse.ferramentas.dokploy import ferramentas_do_dokploy
+from clarisse.ferramentas.escolhas import ferramentas_de_escolha
 from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
@@ -103,6 +105,10 @@ def montar_registro(
         return carregar_sites(ajustes.pasta_config)
 
     raizes = sorted({pasta.parent for pasta in cadastros.projetos.values()})
+    escolhas = UltimaEscolha()
+
+    async def abrir_no_navegador(endereco: str) -> None:
+        await executor.iniciar(["xdg-open", endereco])
 
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
@@ -127,16 +133,17 @@ def montar_registro(
             mcp_navegador=_config_do_navegador(),
             mcp_clarisse=_config_da_clarisse(ajustes.porta),
         ),
-        *ferramentas_de_noticias(http),
+        *ferramentas_de_noticias(http, abrir=abrir_no_navegador, escolhas=escolhas),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
-        *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
+        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas),
         *ferramentas_do_github(executor, cadastros),
         *ferramentas_do_dokploy(http, _paineis_do_dokploy),
         *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),
+        *ferramentas_de_escolha(escolhas),
     ]
     cofre = ajustes.cofre_de_notas.expanduser() if ajustes.cofre_de_notas else None
     if cofre and cofre.is_dir():
-        ferramentas += ferramentas_de_notas(cofre)
+        ferramentas += ferramentas_de_notas(cofre, escolhas=escolhas)
     for ferramenta in ferramentas:
         if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:
             registro.registrar(ferramenta)
