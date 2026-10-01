@@ -217,7 +217,7 @@ body::after {
 
 .cartao-titulo span:last-child { color: var(--texto-suave); }
 
-.cartao-texto {
+.texto-do-cartao {
   margin: 12px 0 0;
   font-size: 17px;
   line-height: 1.45;
@@ -264,7 +264,7 @@ body::after {
   font-variant-numeric: tabular-nums;
 }
 
-.cartao-texto { max-height: 40vh; overflow-y: auto; }
+.texto-do-cartao { max-height: 40vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--linha) transparent; }
 
 .cartao-dica { margin: 10px 0 0; font-size: 14px; color: var(--texto-suave); }
 
@@ -340,8 +340,12 @@ body::after {
   left: calc((100vw - var(--chat)) / 2);
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
-  max-width: calc(94vw - var(--chat) - 360px);
+  /* Uma linha só: o cartão que não cabe inteiro desce para a segunda linha, que fica escondida. */
+  max-width: calc(100vw - var(--chat) - 2 * 270px);
+  max-height: 64px;
   overflow: hidden;
   transform: translateX(-50%);
   transition: left 450ms ease;
@@ -424,7 +428,7 @@ body.com-chat .botao-escrever,
 
 .aviso-som {
   position: fixed;
-  bottom: 74px;
+  top: 104px;
   left: calc((100vw - var(--chat)) / 2);
   z-index: 6;
   margin: 0;

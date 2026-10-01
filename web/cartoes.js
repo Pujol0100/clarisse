@@ -39,7 +39,7 @@ const Cartoes = (() => {
       cartao.append(ul);
     },
     texto(cartao, dado) {
-      cartao.append(el("p", "cartao-texto", dado.texto));
+      cartao.append(el("p", "texto-do-cartao", dado.texto));
     },
     // Lista numerada para escolher (manchetes, e-mails): clicar num item é como dizer "lê a notícia 2".
     escolha(cartao, dado) {
@@ -83,7 +83,7 @@ const Cartoes = (() => {
   function resumoDe(dado) {
     if (dado.resumo) return dado.resumo;
     if (dado.tipo === "clima") return `${dado.temp} · ${dado.cond}`;
-    if (dado.tipo === "lista") return `${(dado.itens || []).length} itens`;
+    if (dado.tipo === "lista") return dado.canto || ((dado.itens || []).length === 1 ? "1 item" : `${(dado.itens || []).length} itens`);
     if (dado.tipo === "escolha") return dado.canto || `${(dado.itens || []).length} itens`;
     if (dado.tipo === "leitura") return dado.titulo;
     return dado.texto || "";
@@ -138,8 +138,9 @@ const Cartoes = (() => {
     setTimeout(() => cartao.remove(), 650);
     const mini = el("div", "mini");
     mini.append(el("div", "mini-titulo", dado.titulo || ""), el("div", "mini-texto", resumoDe(dado)));
-    fileira.append(mini);
-    while (fileira.children.length > NA_FILEIRA) fileira.firstElementChild.remove();
+    // O mais novo entra à esquerda: se faltar espaço, some o mais antigo, à direita.
+    fileira.prepend(mini);
+    while (fileira.children.length > NA_FILEIRA) fileira.lastElementChild.remove();
   }
 
   return {
