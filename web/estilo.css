@@ -274,6 +274,9 @@ body::after {
 .lista li.clicavel:focus-visible { background: var(--dourado-fundo); outline: none; }
 .lista li.escolhida { background: rgba(201, 168, 76, 0.24); }
 
+.escolha-texto { display: flex; flex-direction: column; }
+.escolha-detalhe { font-size: 13px; color: var(--texto-suave); }
+
 /* matéria escolhida: o cartão vira bloco de leitura */
 .cartao.cartao-leitura { width: min(720px, calc(92vw - var(--chat))); max-height: calc(100vh - 210px); margin-top: -20px; }
 

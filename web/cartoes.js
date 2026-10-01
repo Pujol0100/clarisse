@@ -41,26 +41,28 @@ const Cartoes = (() => {
     texto(cartao, dado) {
       cartao.append(el("p", "cartao-texto", dado.texto));
     },
-    // Manchetes numeradas: clicar numa pede a leitura dela, como dizer "lê a notícia 2".
-    noticias(cartao, dado) {
+    // Lista numerada para escolher (manchetes, e-mails): clicar num item é como dizer "lê a notícia 2".
+    escolha(cartao, dado) {
       const ul = el("ul", "lista");
       for (const item of dado.itens || []) {
         const li = el("li", "clicavel");
         li.dataset.numero = item.numero;
         li.tabIndex = 0;
         li.setAttribute("role", "button");
-        li.append(el("span", "marca-item", String(item.numero).padStart(2, "0")), el("span", null, item.titulo));
+        const texto = el("span", "escolha-texto", item.titulo);
+        if (item.detalhe) texto.append(el("span", "escolha-detalhe", item.detalhe));
+        li.append(el("span", "marca-item", String(item.numero).padStart(2, "0")), texto);
         ul.append(li);
       }
       const escolher = (e) => {
         const li = e.target.closest("li[data-numero]");
         if (!li || (e.type === "keydown" && e.key !== "Enter")) return;
         li.classList.add("escolhida");
-        aoEscolher(Number(li.dataset.numero));
+        aoEscolher(dado.pedido, Number(li.dataset.numero));
       };
       ul.addEventListener("click", escolher);
       ul.addEventListener("keydown", escolher);
-      cartao.append(ul, el("p", "cartao-dica", "Diga o número ou clique na manchete para eu ler."));
+      cartao.append(ul, el("p", "cartao-dica", "Diga o número ou clique para eu ler."));
     },
     leitura(cartao, dado) {
       if (dado.imagem) {
@@ -82,7 +84,7 @@ const Cartoes = (() => {
     if (dado.resumo) return dado.resumo;
     if (dado.tipo === "clima") return `${dado.temp} · ${dado.cond}`;
     if (dado.tipo === "lista") return `${(dado.itens || []).length} itens`;
-    if (dado.tipo === "noticias") return `${(dado.itens || []).length} manchetes`;
+    if (dado.tipo === "escolha") return dado.canto || `${(dado.itens || []).length} itens`;
     if (dado.tipo === "leitura") return dado.titulo;
     return dado.texto || "";
   }
@@ -100,10 +102,10 @@ const Cartoes = (() => {
     if (paragrafos[indice]) paragrafos[indice].scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
-  /** Fim da fala: o cartão desce para a fileira, menos o de manchetes, que espera a escolha
+  /** Fim da fala: o cartão desce para a fileira, menos o de escolha, que espera a pessoa escolher
       até o próximo cartão chegar. */
   function encerrar() {
-    if (atual && atual.dado.tipo !== "noticias") guardar();
+    if (atual && atual.dado.tipo !== "escolha") guardar();
   }
 
   function lendo() {
@@ -117,8 +119,8 @@ const Cartoes = (() => {
     const cartao = el("article", `cartao cartao-${dado.tipo}`);
     for (let i = 0; i < 4; i++) cartao.append(el("i"));
     const titulo = el("div", "cartao-titulo");
-    // Na leitura, o título da matéria já vem grande no corpo; o cabeçalho diz só de onde ela é.
-    const cabecalho = dado.tipo === "leitura" ? "Notícia" : dado.titulo || "";
+    // Na leitura, o título já vem grande no corpo; o cabeçalho diz só o que é e de onde vem.
+    const cabecalho = dado.tipo === "leitura" ? dado.rotulo || "" : dado.titulo || "";
     titulo.append(el("span", null, cabecalho), el("span", null, dado.canto || dado.fonte || ""));
     cartao.append(titulo);
     montar(cartao, dado);

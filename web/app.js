@@ -14,6 +14,7 @@ const NOMES_DOS_ESTADOS = {
 const GRUPOS = [
   { grupo: "clima", rotulo: "Clima" },
   { grupo: "agenda", rotulo: "Agenda" },
+  { grupo: "email", rotulo: "E-mail" },
   { grupo: "noticias", rotulo: "Notícias" },
   { grupo: "navegador", rotulo: "Navegador" },
   { grupo: "claude", rotulo: "Claude" },
@@ -415,10 +416,10 @@ function relogio() {
 
 /* ---------- início ---------- */
 
-Cartoes.aoEscolher = (numero) => {
+Cartoes.aoEscolher = (pedido, numero) => {
   liberarSom();
   pedirAVoz();
-  enviarTexto(`lê a notícia ${numero}`);
+  enviarTexto(`${pedido} ${numero}`);
 };
 Nucleo.nivel = nivelDoSom;
 Nucleo.grupos(GRUPOS);

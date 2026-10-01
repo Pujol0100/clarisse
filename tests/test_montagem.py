@@ -22,9 +22,10 @@ LOCAIS = {
     "abrir_claude_na_tela", "ler_resposta_do_claude",
     "noticias_do_dia", "ler_noticia", "previsao_do_tempo",
     "trazer_para_frente", "digitar_texto", "apertar_atalho", "rodar_aplicacao", "abrir",
+    "consultar_agenda", "emails_nao_lidos", "ler_email",
 }
 DELEGAM_AO_CLAUDE = {
-    "pedir_ao_claude", "consultar_agenda", "criar_compromisso",
+    "pedir_ao_claude", "criar_compromisso",
     "mandar_para_conversa_do_claude", "fazer_no_navegador", "fazer_em_etapas",
 }
 

@@ -17,7 +17,6 @@ from clarisse.ferramentas.sistema import data_por_extenso
 log = logging.getLogger(__name__)
 
 FERRAMENTAS_DE_LEITURA = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
-_LER_AGENDA = "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
 _CRIAR_EVENTO = "mcp__claude_ai_Microsoft_365__outlook_create_event"
 _BUSCAR_PESSOAS = "mcp__claude_ai_Microsoft_365__search_people"
 _PARA_VOZ = (
@@ -160,9 +159,6 @@ def ferramentas_do_claude(
         projeto=campo_projeto(cadastros, "Projeto, se o pedido for sobre um", obrigatorio=False),
     )
 
-    class ArgsAgenda(Argumentos):
-        periodo: str = Field("hoje", max_length=100, description="Período, como o usuário falou")
-
     class ArgsCompromisso(Argumentos):
         titulo: str = Field(max_length=200, description="Título do compromisso")
         quando: str = Field(max_length=100, description="Data e hora como o usuário falou")
@@ -195,13 +191,6 @@ def ferramentas_do_claude(
         pedido = f"{args.pedido}\n\n{_PESQUISE}"
         delegacoes.iniciar(titulo, rodar_claude(executor, pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout, teto_usd))
         return "Pedi ao Claude. Aviso quando ele terminar."
-
-    async def consultar_agenda(args: ArgsAgenda) -> str:
-        pedido = (
-            f"Hoje é {data_por_extenso(agora())}. Liste meus compromissos de {args.periodo} "
-            "com horário e título, usando a busca de calendário."
-        )
-        return await rodar_claude(executor, pedido, _pasta_neutra(), [_LER_AGENDA], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
 
     async def criar_compromisso(args: ArgsCompromisso) -> str:
         pedido = (
@@ -301,7 +290,6 @@ def ferramentas_do_claude(
             "empresas, pessoas, cotações, resultados de jogos e fatos de hoje.",
             ArgsPedido, pedir_ao_claude, grupo="claude",
         ),
-        Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda, grupo="agenda"),
         Ferramenta(
             "criar_compromisso", "Cria um compromisso ou lembrete na agenda.", ArgsCompromisso, criar_compromisso,
             risco=Risco.CONFIRMAR, descrever=confirmar_compromisso, grupo="agenda",

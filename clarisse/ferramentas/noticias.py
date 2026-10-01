@@ -104,7 +104,7 @@ def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
             "que você leia alguma; ele escolhe pelo número."
         )
         cartao = {
-            "tipo": "noticias", "titulo": "Notícias", "canto": tema,
+            "tipo": "escolha", "titulo": "Notícias", "canto": tema, "pedido": "lê a notícia",
             "itens": [{"numero": i, "titulo": n.titulo} for i, n in enumerate(noticias, 1)],
         }
         return Retorno(texto, cartao=cartao)
@@ -129,7 +129,7 @@ def ferramentas_de_noticias(cliente: httpx.AsyncClient) -> list[Ferramenta]:
             return "Essa notícia não veio com o texto no feed do g1. Posso abrir no navegador, se quiser."
         texto = "\n\n".join([_com_ponto(noticia.titulo), *noticia.paragrafos])
         cartao = {
-            "tipo": "leitura", "titulo": noticia.titulo, "subtitulo": noticia.subtitulo, "imagem": noticia.imagem,
+            "tipo": "leitura", "rotulo": "Notícia", "titulo": noticia.titulo, "subtitulo": noticia.subtitulo, "imagem": noticia.imagem,
             "fonte": f"g1 · {ultimas['tema']}", "paragrafos": noticia.paragrafos,
         }
         return Retorno(texto, cartao=cartao, na_integra=True)

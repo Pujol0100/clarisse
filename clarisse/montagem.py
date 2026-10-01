@@ -19,6 +19,7 @@ from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
+from clarisse.ferramentas.outlook import ferramentas_do_outlook
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
 from clarisse.ferramentas.registro import Registro
@@ -26,6 +27,7 @@ from clarisse.sites import carregar_sites, manter_sites_atualizados
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
+from clarisse.microsoft import ContaMicrosoft
 from clarisse.voz import Locutor, Transcritor, carregar_whisper
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
@@ -76,7 +78,7 @@ def _config_da_clarisse(porta: int) -> Path:
 # e ler a resposta dele ficam, porque não mandam nada.
 DELEGAM_AO_CLAUDE = {
     "pedir_ao_claude", "fazer_em_etapas", "fazer_no_navegador",
-    "mandar_para_conversa_do_claude", "consultar_agenda", "criar_compromisso",
+    "mandar_para_conversa_do_claude", "criar_compromisso",
 }
 
 
@@ -117,6 +119,7 @@ def montar_registro(
         ),
         *ferramentas_de_noticias(http),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
+        *ferramentas_do_outlook(ContaMicrosoft(executor, http)),
     ]
     for ferramenta in ferramentas:
         if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:

@@ -80,8 +80,9 @@ async def test_falha_de_rede_vira_mensagem():
 async def test_manchetes_vem_numeradas_no_cartao_e_no_texto():
     resposta = await _chamar(_montar(_feed_de_exemplo()), "noticias_do_dia", tema="tecnologia")
 
-    assert resposta.cartao["tipo"] == "noticias"
+    assert resposta.cartao["tipo"] == "escolha"
     assert resposta.cartao["canto"] == "tecnologia"
+    assert resposta.cartao["pedido"] == "lê a notícia"
     assert resposta.cartao["itens"][:2] == [
         {"numero": 1, "titulo": "Cidade fictícia testa ônibus sem motorista no centro"},
         {"numero": 2, "titulo": "Aplicativo de mensagens fictício ganha nomes de usuário"},
@@ -115,6 +116,7 @@ async def test_le_a_noticia_pelo_numero_da_ultima_lista():
     assert resposta.na_integra
     assert resposta.cartao == {
         "tipo": "leitura",
+        "rotulo": "Notícia",
         "titulo": "Cidade fictícia testa ônibus sem motorista no centro",
         "subtitulo": "Teste dura três meses e usa duas linhas de exemplo.",
         "imagem": "https://s2-g1.glbimg.com/exemplo/onibus.jpg",
