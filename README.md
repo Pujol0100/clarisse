@@ -34,11 +34,14 @@ O visual partiu de dois vídeos de assistentes estilo Jarvis; o protótipo está
 |---|---|
 | "que horas são?" | Diz a hora e a data |
 | "vai chover amanhã?", "como está o tempo em São Paulo?" | Previsão pelo Open-Meteo, em °C e km/h, com cartão dos três dias; sem cidade, usa a sua (`CLARISSE_CIDADE`) |
-| "me dá as notícias de tecnologia" | Mostra as manchetes do g1 numeradas e pergunta se você quer que ela leia alguma |
-| "lê a segunda", "lê a do WhatsApp" (ou clicar na manchete) | O cartão vira um bloco com foto, título e a matéria inteira, que ela lê com o parágrafo da vez aceso; "para" interrompe |
+| "me dá as notícias de tecnologia" | Mostra as manchetes do g1 numeradas na tela e só pergunta qual você quer que ela leia |
+| "lê os títulos" | Lê os títulos da lista que está na tela (manchetes, e-mails, notas) |
+| "lê a segunda", "lê a do WhatsApp" (ou clicar na manchete) | O cartão vira um bloco com foto, título e a matéria inteira, que ela lê com o parágrafo da vez aceso; "para" interrompe. Vídeo, galeria ou página de jogo (sem texto) abre no navegador |
+| "volta para a lista" (ou o botão Voltar à lista) | Para de ler e mostra a lista de novo |
 | "o que eu tenho na agenda hoje?", "e amanhã?", "e na semana?" | Lê o Outlook pela conta Microsoft do GNOME e mostra os horários |
-| "tenho e-mail não lido?" | Fala quantos são e os 5 mais recentes (remetente e assunto); o cartão lista 10 |
-| "lê o e-mail 2" (ou clicar nele) | Lê o e-mail inteiro, sem o histórico da conversa citado embaixo |
+| "tenho e-mail não lido?" | Fala quantos são e mostra os 10 mais recentes; "de quem são?" lê remetente e assunto |
+| "lê o e-mail 2" (ou clicar nele) | Abre o e-mail na tela e lê inteiro, sem o histórico da conversa citado embaixo |
+| "escreve um e-mail para a Ana Souza dizendo que a proposta chega amanhã", "manda um e-mail para fulano arroba empresa ponto com…" | Acha o endereço nos seus contatos (ou usa o que você ditou), escreve, mostra na tela, salva nos rascunhos do Outlook e pergunta "Deseja enviar?". Só envia com o seu "sim"; com nome ambíguo, pergunta quem é |
 | "quais PRs minhas estão abertas?", "tem PR para eu revisar?" | Consulta o GitHub pelo `gh` |
 | "o CI da PR 9 da clarisse passou?" | Diz quantas checagens passaram, falharam ou estão rodando |
 | "o omni-app está no ar?" | Situação no Dokploy e como foi o último deploy |
@@ -164,6 +167,8 @@ clique em qualquer lugar da página e autorize o microfone.
 
 - **Falar:** a tecla `Insert` de qualquer lugar, a barra de espaço com a página em foco,
   ou o botão no canto inferior direito. Aperta, fala, aperta de novo para enviar.
+- **Endereço de e-mail falado:** "fulano arroba empresa ponto com ponto br" já sai escrito
+  como `fulano@empresa.com.br` ("traço" vira `-`, "underline" vira `_`).
 - **Escolher numa lista** (manchetes, e-mails, notas): diga o número ou clique no item.
   O cartão de escolha fica na tela até o próximo cartão chegar.
 - **Escrever:** botão Escrever, no canto inferior esquerdo. O chat também mostra a
@@ -198,7 +203,8 @@ uv run pytest
 - O modelo, a transcrição, a auditoria, as notas do Obsidian e os lembretes ficam na máquina.
 - **O texto da resposta vai para a Microsoft** para virar voz (edge-tts), inclusive
   o e-mail ou a matéria que ela lê.
-- A agenda e o e-mail são lidos no Microsoft Graph com o acesso da conta do GNOME, só leitura.
+- A agenda e o e-mail são lidos no Microsoft Graph com o acesso da conta do GNOME. A única
+  escrita é o e-mail que você pediu: rascunho, e envio só depois do seu "sim".
 - O GitHub é lido pelo `gh`; o Dokploy, com a chave de leitura que o Claude Code já usa.
 - As notícias vêm do feed do g1; as fotos das matérias, do servidor de imagens da Globo.
 - A previsão do tempo consulta o Open-Meteo (gratuito para uso pessoal, sem conta).
@@ -211,7 +217,7 @@ Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
 
 - Acordar com a palavra "Clarisse" (em agosto nenhum motor gratuito acertou isso em
   português; fica para uma medição nova).
-- Criar compromisso na agenda sem o Claude.
+- Criar compromisso na agenda sem o Claude (a conta do GNOME permite; não foi feito).
 - Pesquisar na internet sem o Claude.
 - Escolher o contato no WhatsApp: ela cola o texto na conversa que estiver aberta
   (não existe API oficial para conta pessoal).

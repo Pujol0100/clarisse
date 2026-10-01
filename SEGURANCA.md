@@ -81,7 +81,12 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **Claude desligado por padrão** (`CLARISSE_USAR_CLAUDE=false`, desde 01/10/2026): as
   ferramentas que mandam pedido ao Claude nem são registradas; ficam abrir o Claude na
   tela e ler a resposta dele, que não mandam nada.
-- **Conectores só leem.** Agenda e e-mail: `GET` no Microsoft Graph com o token da conta
+- **Conectores só leem, menos o e-mail que o usuário pede.** Escrever e-mail cria um
+  rascunho (`POST /me/messages`) e o envio (`/send`) é uma ferramenta de risco "confirmar":
+  só vai depois do "sim" falado, decidido por palavra e não pelo modelo (prova por mutação em
+  01/10/2026). Destinatário por nome: se casar com mais de uma pessoa nos contatos, não escreve
+  e pergunta. O texto é escrito pelo modelo local numa chamada sem ferramentas.
+- **Leitura:** agenda e e-mail: `GET` no Microsoft Graph com o token da conta
   Microsoft do GNOME (`clarisse/microsoft.py`), pedido por D-Bus a cada vez que vence e
   usado só no cabeçalho, nunca em log nem no modelo. GitHub: `gh search prs` e
   `gh pr checks`. Dokploy: `project.all` (só nome, identificador e situação de cada
