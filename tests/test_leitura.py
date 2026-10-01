@@ -118,3 +118,68 @@ async def test_projeto_que_nao_esta_cadastrado_diz_os_cadastrados(executor, tmp_
     resultado = await f.executar(f.argumentos(projeto="financeiro"))
 
     assert "financeiro" in resultado and "omni-api" in resultado
+
+
+async def test_pelo_projeto_acha_a_conversa_aberta_na_pasta_geral_que_mexeu_nele(executor, tmp_path, cadastros):
+    projeto = cadastros.projetos["omni-api"]
+    geral = tmp_path / "projects" / "-home-x-PROGRAMASSMART"
+    leu_o_projeto = [
+        _linha("user", "olha o omni"),
+        _linha("assistant", [{"type": "tool_use", "name": "Read", "input": {"file_path": f"{projeto}/src/main.ts"}}]),
+        _linha("assistant", [{"type": "text", "text": "O main.ts do omni está certo."}]),
+    ]
+    _gravar(geral / "do-omni.jsonl", leu_o_projeto, idade=600)
+    _gravar(geral / "de-outro.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Outra coisa."}])])
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="omni-api"))
+
+    assert resultado.texto == "O main.ts do omni está certo."
+
+
+async def test_conversa_numa_worktree_do_projeto_tambem_conta(executor, tmp_path, cadastros):
+    geral = tmp_path / "projects" / "-home-x-PROGRAMASSMART"
+    na_worktree = [
+        _linha("user", "segue"),
+        _linha("assistant", [{"type": "tool_use", "name": "Bash", "input": {"command": "cd ~/.config/superpowers/worktrees/omni-api/minha-branch && git status"}}]),
+        _linha("assistant", [{"type": "text", "text": "Feito na worktree."}]),
+    ]
+    _gravar(geral / "worktree.jsonl", na_worktree)
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="omni-api"))
+
+    assert resultado.texto == "Feito na worktree."
+
+
+async def test_conversa_que_so_cita_o_caminho_num_texto_nao_conta_como_do_projeto(executor, tmp_path, cadastros):
+    projeto = cadastros.projetos["omni-api"]
+    geral = tmp_path / "projects" / "-home-x-PROGRAMASSMART"
+    _gravar(geral / "mexeu.jsonl", [
+        _linha("user", "p"),
+        _linha("assistant", [{"type": "tool_use", "name": "Edit", "input": {"file_path": f"{projeto}/a.ts"}}]),
+        _linha("assistant", [{"type": "text", "text": "Mexi no omni."}]),
+    ], idade=600)
+    _gravar(geral / "so-citou.jsonl", [
+        _linha("user", f"o projeto fica em {projeto}/"),
+        _linha("user", [{"type": "tool_result", "content": f"{projeto}/x.ts"}]),
+        _linha("assistant", [{"type": "text", "text": f"Anotei {projeto}/ e mais nada."}]),
+    ])
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="omni-api"))
+
+    assert resultado.texto == "Mexi no omni."
+
+
+async def test_conversa_que_estava_dentro_da_pasta_do_projeto_conta(executor, tmp_path, cadastros):
+    projeto = cadastros.projetos["omni-api"]
+    _gravar(tmp_path / "projects" / "-home-x-PROGRAMASSMART" / "entrou.jsonl", [
+        _linha("user", "p", cwd=f"{projeto}/src"),
+        _linha("assistant", [{"type": "text", "text": "Estava dentro do omni."}], cwd=f"{projeto}/src"),
+    ])
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="omni-api"))
+
+    assert resultado.texto == "Estava dentro do omni."

@@ -11,6 +11,8 @@ from clarisse.ferramentas.projetos import projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
 
 PASTA_DAS_CONVERSAS = Path.home() / ".claude" / "projects"
+# Para achar a conversa de um projeto, olha só as mais recentes: cada uma pode ter vários MB.
+_CONVERSAS_OLHADAS = 30
 
 
 def _eh_pergunta(linha: dict) -> bool:
@@ -57,6 +59,29 @@ class ArgsLeitura(Argumentos):
     )
 
 
+def _mexeu_no_projeto(conversa: Path, marcas: tuple[str, ...]) -> bool:
+    """Conta só a pasta onde o Claude estava e o que as ferramentas dele usaram; citar o caminho num
+    texto ou receber o caminho num resultado não faz da conversa uma conversa do projeto."""
+    texto = conversa.read_text(encoding="utf-8", errors="ignore")
+    for bruta in texto.splitlines():
+        if not any(m in bruta for m in marcas):
+            continue
+        try:
+            linha = json.loads(bruta)
+        except json.JSONDecodeError:
+            continue
+        if any(m in f"{linha.get('cwd') or ''}/" for m in marcas):
+            return True
+        if linha.get("type") != "assistant":
+            continue
+        for item in (linha.get("message") or {}).get("content") or []:
+            if isinstance(item, dict) and item.get("type") == "tool_use":
+                entrada = json.dumps(item.get("input"), ensure_ascii=False)
+                if any(m in entrada for m in marcas):
+                    return True
+    return False
+
+
 def _mais_recente(conversas: list[Path]) -> Path | None:
     return max(conversas, key=lambda c: c.stat().st_mtime) if conversas else None
 
@@ -67,12 +92,22 @@ def ferramentas_de_leitura(
     cadastros = cadastros or Cadastros()
 
     def achar_pelo_projeto(nome: str) -> Path | str:
+        """A conversa mais recente do projeto: aberta na pasta dele, ou aberta noutra pasta (quase sempre a
+        pasta geral dos projetos) mas que mexeu em arquivos dele ou de uma worktree dele."""
         chave = cadastros.achar_projeto(nome)
         if chave is None:
             return projeto_desconhecido(cadastros, nome)
-        pasta = pasta_das_conversas / _pasta_do_projeto(str(cadastros.projetos[chave]))
-        conversa = _mais_recente(list(pasta.glob("*.jsonl")) if pasta.is_dir() else [])
-        return conversa or f"Não achei conversa do Claude no projeto {chave}."
+        caminho = cadastros.projetos[chave]
+        propria = pasta_das_conversas / _pasta_do_projeto(str(caminho))
+        marcas = (f"{caminho}/", f"/worktrees/{caminho.name}/")
+        recentes = sorted(
+            pasta_das_conversas.glob("*/*.jsonl") if pasta_das_conversas.is_dir() else [],
+            key=lambda c: c.stat().st_mtime, reverse=True,
+        )[:_CONVERSAS_OLHADAS]
+        for conversa in recentes:
+            if conversa.parent == propria or _mexeu_no_projeto(conversa, marcas):
+                return conversa
+        return f"Não achei conversa do Claude no projeto {chave}."
 
     async def achar_pelo_nome(nome: str) -> Path | str:
         listagem = await executor.executar(["claude", "agents", "--json"], timeout=30)
