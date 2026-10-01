@@ -3,7 +3,7 @@
 A lista de e-mails é falada pelo sistema, sem passar pelo modelo: assunto de e-mail é escrito por
 qualquer um e não pode virar instrução. O mesmo vale para o corpo, lido na íntegra."""
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -77,11 +77,7 @@ def _paragrafos_do_texto(texto: str) -> list[str]:
 
 class ArgsEscreverEmail(Argumentos):
     para: str = Field(min_length=2, max_length=120, description="Nome da pessoa ou endereço de e-mail, como o usuário disse")
-    assunto: str = Field(min_length=1, max_length=150, description="Assunto curto do e-mail")
-    texto: str = Field(
-        min_length=1, max_length=4000,
-        description="O e-mail inteiro já escrito, em português, educado, com saudação e despedida, a partir do que o usuário pediu",
-    )
+    sobre: str = Field(min_length=2, max_length=1000, description="O que o e-mail deve dizer, com as palavras do usuário")
 
 
 class ArgsLerEmail(Argumentos):
@@ -90,7 +86,9 @@ class ArgsLerEmail(Argumentos):
 
 def ferramentas_do_outlook(
     conta, agora: Callable[[], datetime] = datetime.now, escolhas: UltimaEscolha | None = None,
+    redigir: Callable[[str, str, str | None], Awaitable[tuple[str, str]]] | None = None,
 ) -> list[Ferramenta]:
+    """`redigir(sobre, para, assinatura)` escreve (assunto, texto) do e-mail; sem ele, não há escrita."""
     ultimos: list[dict] = []
     escolhas = escolhas or UltimaEscolha()
     rascunho: dict = {}
@@ -191,20 +189,22 @@ def ferramentas_do_outlook(
             quem = await destinatario(args.para)
             if isinstance(quem, str):
                 return quem
+            eu = await conta.get("/me", {"$select": "givenName"})
+            assunto, corpo = await redigir(args.sobre, quem.get("name") or quem["address"], eu.get("givenName"))
             criado = await conta.post("/me/messages", {
-                "subject": args.assunto,
-                "body": {"contentType": "Text", "content": args.texto},
+                "subject": assunto,
+                "body": {"contentType": "Text", "content": corpo},
                 "toRecipients": [{"emailAddress": quem}],
             })
         except (SemContaMicrosoft, httpx.HTTPError) as erro:
             return str(erro) if isinstance(erro, SemContaMicrosoft) else f"Não consegui escrever o e-mail agora: {type(erro).__name__}."
         rascunho.clear()
-        rascunho.update(id=criado["id"], assunto=args.assunto, endereco=quem["address"])
+        rascunho.update(id=criado["id"], assunto=assunto, endereco=quem["address"])
         nome = f"{quem['name']} ({quem['address']})" if quem.get("name") else quem["address"]
-        texto = (f"Escrevi o e-mail para {nome}, com o assunto {args.assunto}. Está na tela e salvo nos rascunhos. "
+        texto = (f"Escrevi o e-mail para {nome}, com o assunto {assunto}. Está na tela e salvo nos rascunhos. "
                  "Deseja enviar? Se não, ele fica nos rascunhos.")
-        cartao = {"tipo": "leitura", "rotulo": "E-mail para enviar", "titulo": args.assunto, "subtitulo": f"Para {nome}",
-                  "imagem": None, "fonte": "rascunho no Outlook", "paragrafos": _paragrafos_do_texto(args.texto)}
+        cartao = {"tipo": "leitura", "rotulo": "E-mail para enviar", "titulo": assunto, "subtitulo": f"Para {nome}",
+                  "imagem": None, "fonte": "rascunho no Outlook", "paragrafos": _paragrafos_do_texto(corpo)}
         return Retorno(texto, cartao=cartao, na_integra=True, confirmar_depois=("enviar_email", {}))
 
     def confirmar_envio(args: Argumentos) -> str:

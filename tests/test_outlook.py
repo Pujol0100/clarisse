@@ -16,7 +16,7 @@ class ContaFalsa:
         self.pedidos.append((caminho, parametros, cabecalhos or {}))
         if self.falhar:
             raise self.falhar
-        return self.respostas[caminho]
+        return self.respostas.get(caminho, {})
 
     async def post(self, caminho, corpo):
         self.escritos.append((caminho, corpo))
@@ -24,6 +24,7 @@ class ContaFalsa:
 
 
 QUINTA = datetime(2026, 10, 1, 8, 0)
+TEXTO = "Oi, Ana.\n\nSegue a proposta revisada.\n\nAbraço,\nVinicius"
 
 
 def _evento(assunto, inicio, fim, **extra):
@@ -31,8 +32,12 @@ def _evento(assunto, inicio, fim, **extra):
             "isAllDay": False, "isCancelled": False, **extra}
 
 
+async def _redator_falso(sobre, para, assinatura):
+    return "Proposta", TEXTO
+
+
 def _ferramentas(conta):
-    return {f.nome: f for f in ferramentas_do_outlook(conta, agora=lambda: QUINTA)}
+    return {f.nome: f for f in ferramentas_do_outlook(conta, agora=lambda: QUINTA, redigir=_redator_falso)}
 
 
 async def _chamar(ferramentas, nome, **argumentos):
@@ -174,13 +179,11 @@ async def test_cada_email_da_lista_diz_como_ser_falado_se_pedirem_os_titulos():
     ]
 
 
-TEXTO = "Oi, Ana.\n\nSegue a proposta revisada.\n\nAbraço,\nVinicius"
-
 
 async def test_escreve_para_o_endereco_salva_rascunho_mostra_e_pergunta_se_envia():
     conta = ContaFalsa({})
 
-    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="ana@x.com", assunto="Proposta", texto=TEXTO)
+    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="ana@x.com", sobre="a proposta revisada")
 
     [(caminho, corpo)] = conta.escritos
     assert caminho == "/me/messages"
@@ -199,7 +202,7 @@ async def test_escreve_para_um_nome_achando_o_endereco_nos_contatos():
         {"displayName": "Ana Souza", "scoredEmailAddresses": [{"address": "ana.souza@empresa.com"}]},
     ]}})
 
-    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Ana Souza", assunto="Oi", texto="Oi.")
+    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Ana Souza", sobre="oi")
 
     assert conta.pedidos[0][1]["$search"] == '"Ana Souza"'
     assert conta.escritos[0][1]["toRecipients"] == [{"emailAddress": {"address": "ana.souza@empresa.com", "name": "Ana Souza"}}]
@@ -212,7 +215,7 @@ async def test_nome_que_casa_com_varias_pessoas_pergunta_e_nao_escreve():
         {"displayName": "Ana Lima", "scoredEmailAddresses": [{"address": "ana.lima@empresa.com"}]},
     ]}})
 
-    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Ana", assunto="Oi", texto="Oi.")
+    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Ana", sobre="oi")
 
     assert resposta == ("Achei mais de uma pessoa: Ana Souza (ana.souza@empresa.com), Ana Lima (ana.lima@empresa.com). "
                         "Para qual delas?")
@@ -222,7 +225,7 @@ async def test_nome_que_casa_com_varias_pessoas_pergunta_e_nao_escreve():
 async def test_nome_que_nao_esta_nos_contatos_pede_o_endereco():
     conta = ContaFalsa({"/me/people": {"value": []}})
 
-    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Fulano", assunto="Oi", texto="Oi.")
+    resposta = await _chamar(_ferramentas(conta), "escrever_email", para="Fulano", sobre="oi")
 
     assert resposta == "Não achei Fulano nos seus contatos. Diga o endereço do e-mail."
     assert conta.escritos == []
@@ -231,7 +234,7 @@ async def test_nome_que_nao_esta_nos_contatos_pede_o_endereco():
 async def test_envia_o_rascunho_que_acabou_de_ser_escrito():
     conta = ContaFalsa({})
     ferramentas = _ferramentas(conta)
-    await _chamar(ferramentas, "escrever_email", para="ana@x.com", assunto="Proposta", texto="Oi.")
+    await _chamar(ferramentas, "escrever_email", para="ana@x.com", sobre="a proposta")
     enviar = ferramentas["enviar_email"]
 
     frase = enviar.frase_de_confirmacao(enviar.argumentos())

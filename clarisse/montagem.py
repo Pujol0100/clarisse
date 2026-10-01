@@ -34,6 +34,7 @@ from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.microsoft import ContaMicrosoft
+from clarisse.redator import redigir_email
 from clarisse.voz import Locutor, Transcritor, carregar_whisper
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
@@ -106,6 +107,10 @@ def montar_registro(
 
     raizes = sorted({pasta.parent for pasta in cadastros.projetos.values()})
     escolhas = UltimaEscolha()
+    redator = ClienteOllama(httpx.AsyncClient(base_url=ajustes.ollama_url), ajustes.modelo)
+
+    async def redigir(sobre: str, para: str, assinatura: str | None) -> tuple[str, str]:
+        return await redigir_email(redator, sobre, para, assinatura)
 
     async def abrir_no_navegador(endereco: str) -> None:
         await executor.iniciar(["xdg-open", endereco])
@@ -135,7 +140,7 @@ def montar_registro(
         ),
         *ferramentas_de_noticias(http, abrir=abrir_no_navegador, escolhas=escolhas),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
-        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas),
+        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas, redigir=redigir),
         *ferramentas_do_github(executor, cadastros),
         *ferramentas_do_dokploy(http, _paineis_do_dokploy),
         *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),
