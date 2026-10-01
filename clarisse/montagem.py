@@ -96,7 +96,7 @@ def montar_registro(
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
-        *ferramentas_de_leitura(executor),
+        *ferramentas_de_leitura(executor, cadastros=cadastros),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
             raizes=raizes,

@@ -29,9 +29,13 @@ def _gravar(caminho, linhas, idade=0):
     os.utime(caminho, (1_800_000_000 - idade, 1_800_000_000 - idade))
 
 
-def _ferramenta(executor, tmp_path):
-    [f] = ferramentas_de_leitura(executor, pasta_das_conversas=tmp_path / "projects")
+def _ferramenta(executor, tmp_path, cadastros=None):
+    [f] = ferramentas_de_leitura(executor, pasta_das_conversas=tmp_path / "projects", cadastros=cadastros)
     return f
+
+
+def _pasta_das_conversas_do(caminho):
+    return "".join(c if c.isalnum() else "-" for c in str(caminho))
 
 
 async def test_le_na_integra_o_que_o_claude_respondeu_depois_da_ultima_pergunta(executor, tmp_path):
@@ -84,3 +88,33 @@ async def test_sem_nenhuma_conversa(executor, tmp_path):
     resultado = await f.executar(f.argumentos())
 
     assert "não achei" in resultado.lower()
+
+
+async def test_pelo_projeto_le_a_conversa_mais_recente_dele(executor, tmp_path, cadastros):
+    pasta = tmp_path / "projects" / _pasta_das_conversas_do(cadastros.projetos["omni-api"])
+    resposta = lambda texto: [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": texto}])]  # noqa: E731
+    _gravar(pasta / "velha.jsonl", resposta("Do omni, velha."), idade=900)
+    _gravar(pasta / "nova.jsonl", resposta("Do omni, nova."), idade=300)
+    _gravar(tmp_path / "projects" / "-home-x-outro" / "mais-nova.jsonl", resposta("De outro projeto."))
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="Omni API"))
+
+    assert resultado.texto == "Do omni, nova."
+    assert executor.executados == []
+
+
+async def test_projeto_sem_conversa_do_claude_avisa(executor, tmp_path, cadastros):
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="omni-api"))
+
+    assert resultado == "Não achei conversa do Claude no projeto omni-api."
+
+
+async def test_projeto_que_nao_esta_cadastrado_diz_os_cadastrados(executor, tmp_path, cadastros):
+    f = _ferramenta(executor, tmp_path, cadastros)
+
+    resultado = await f.executar(f.argumentos(projeto="financeiro"))
+
+    assert "financeiro" in resultado and "omni-api" in resultado
