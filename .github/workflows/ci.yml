@@ -12,7 +12,7 @@ jobs:
   testes:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --frozen
       - run: uv run pytest
@@ -20,7 +20,7 @@ jobs:
   dependencias:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv export --format requirements-txt --no-hashes --no-dev --frozen > requisitos.txt
       - run: uvx pip-audit -r requisitos.txt
@@ -28,7 +28,7 @@ jobs:
   segredos:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 git /repo --redact
