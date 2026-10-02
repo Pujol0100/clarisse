@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 import pytest
@@ -164,13 +165,17 @@ class PipelineFalso:
 
     def __init__(self):
         self.chamadas = []
+        self.threads = []
         self.vozes = {"pf_dora": np.full(4, 1.0, dtype="float32"), "af_bella": np.full(4, 3.0, dtype="float32")}
 
     def load_voice(self, nome):
         return self.vozes[nome]
 
     def __call__(self, texto, voice, speed):
+        import threading
+
         self.chamadas.append((texto, voice, speed))
+        self.threads.append(threading.get_ident())
         for _ in range(2):
             yield None, None, np.zeros(2400, dtype="float32")
 
@@ -194,3 +199,13 @@ async def test_voz_local_mistura_as_vozes_da_receita_e_grava_mp3(tmp_path):
 def test_receita_de_voz_escrita_errado_e_recusada_ao_ligar(receita):
     with pytest.raises(ValueError):
         gerar_local(receita, 1.0, carregar=PipelineFalso)
+
+
+async def test_toda_fala_e_gerada_na_mesma_thread(tmp_path):
+    # O PyTorch cria um grupo de trabalhadores por thread: uma thread nova a cada frase lotava o processador.
+    pipeline = PipelineFalso()
+    gerar = gerar_local("pf_dora*1", 1.0, carregar=lambda: pipeline)
+
+    await asyncio.gather(*(gerar(f"frase {i}", tmp_path / f"{i}.mp3") for i in range(6)))
+
+    assert len(set(pipeline.threads)) == 1

@@ -84,7 +84,7 @@ navegador (anel e cartões)                  servidor local (127.0.0.1:8765)
 │ microfone            │ ─── áudio ───► │ transcrição: faster-whisper      │
 │ anel + constelação   │ ◄── eventos ── │ agente ─► Ollama (Gemma 4 e4b)   │
 │ cartões e fileira    │ ◄── cartões ── │   └─► segurança ─► ferramentas   │
-│ voz da Clarisse      │ ◄── mp3 ────── │ voz: edge-tts                    │
+│ voz da Clarisse      │ ◄── mp3 ────── │ voz: Kokoro (na máquina)         │
 └──────────────────────┘                └──────────────────────────────────┘
 atalho do GNOME ─► scripts/alternar-escuta.sh ─► liga/desliga o microfone
 ```
@@ -112,6 +112,7 @@ As escolhas foram medidas, não supostas:
 - [Ollama](https://ollama.com) com o modelo `gemma4:e4b-it-qat`.
 - Placa de vídeo com pelo menos 6 GB é recomendada; a transcrição roda no processador.
 - Chrome ou Firefox, para a tela e o microfone.
+- `espeak-ng` do sistema, que a voz usa para pronunciar: `sudo apt install espeak-ng`.
 - Para a agenda e o e-mail: a conta Microsoft 365 ligada em Configurações → Contas on-line.
 - Para o GitHub: o `gh` instalado e logado.
 - Para mexer nas janelas: a extensão [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
@@ -182,7 +183,8 @@ Ajustes ficam em `.env`; veja `.env.example`. Os principais:
 | `CLARISSE_CIDADE` | Cidade da previsão do tempo quando você não diz uma |
 | `CLARISSE_COFRE_DE_NOTAS` | Pasta do cofre do Obsidian; sem ela, não há busca nas notas |
 | `CLARISSE_USAR_CLAUDE` | `true` volta a mandar pedidos ao Claude (padrão: desligado) |
-| `CLARISSE_MODELO`, `CLARISSE_VOZ` | Modelo local e voz |
+| `CLARISSE_MODELO` | Modelo local |
+| `CLARISSE_VOZ`, `CLARISSE_VOZ_VELOCIDADE` | Receita da voz do Kokoro (padrão `pf_dora*0.8+af_bella*0.2`, a Dora com 20% de Bella) e velocidade |
 
 ### Calendário do Linux
 
@@ -201,8 +203,8 @@ uv run pytest
 ## Privacidade
 
 - O modelo, a transcrição, a auditoria, as notas do Obsidian e os lembretes ficam na máquina.
-- **O texto da resposta vai para a Microsoft** para virar voz (edge-tts), inclusive
-  o e-mail ou a matéria que ela lê.
+- **A voz é gerada na máquina** (Kokoro): nada do que ela fala sai do notebook. Na primeira
+  vez, o modelo de voz (~330 MB) é baixado do Hugging Face.
 - A agenda e o e-mail são lidos no Microsoft Graph com o acesso da conta do GNOME. A única
   escrita é o e-mail que você pediu: rascunho, e envio só depois do seu "sim".
 - O GitHub é lido pelo `gh`; o Dokploy, com a chave de leitura que o Claude Code já usa.
@@ -223,7 +225,6 @@ Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
   (não existe API oficial para conta pessoal).
 - Clicar com o mouse em outros programas: ela traz janelas, cola texto e aperta
   atalhos, mas não clica.
-- Voz 100% offline.
 
 ## Licença
 

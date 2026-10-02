@@ -4,9 +4,9 @@ import asyncio
 import ctypes.util
 import io
 import re
-import threading
 import uuid
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +14,8 @@ import soundfile
 
 Gerador = Callable[[str, Path], Awaitable[None]]
 _TAXA_DO_KOKORO = 24000
+# Medido em 02/10/2026 (24 núcleos): com 4 a voz sai em ~1 s por frase e não sufoca o resto da máquina.
+_THREADS_DA_VOZ = 4
 _PARTE_DA_RECEITA = re.compile(r"^([a-z]{2}_[a-z]+)\*(\d+(?:\.\d+)?)$")
 
 
@@ -41,29 +43,33 @@ def carregar_kokoro():
     EspeakWrapper.set_library(biblioteca)
     EspeakWrapper.set_data_path(None)
 
+    import torch
     from kokoro import KPipeline
 
+    torch.set_num_threads(_THREADS_DA_VOZ)
     return KPipeline(lang_code="p", repo_id="hexgrad/Kokoro-82M")
 
 
 def gerar_local(receita: str, velocidade: float, carregar: Callable[[], object] = carregar_kokoro) -> Gerador:
-    """Voz do Kokoro, no processador. O modelo carrega no primeiro uso; a receita é conferida já."""
+    """Voz do Kokoro, no processador. O modelo carrega no primeiro uso; a receita é conferida já.
+
+    Toda frase é gerada na mesma thread: o PyTorch cria um grupo de trabalhadores por thread, e uma
+    thread nova a cada frase lotava o processador (5,4 s por frase em vez de ~1 s, 02/10/2026)."""
     partes = receita_da_voz(receita)
     estado: dict = {}
-    trava = threading.Lock()
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="voz")
 
     def sintetizar(texto: str, destino: Path) -> None:
-        with trava:
-            if "pipeline" not in estado:
-                pipeline = carregar()
-                estado["pipeline"] = pipeline
-                estado["voz"] = sum(peso * pipeline.load_voice(nome) for nome, peso in partes)
-            pedacos = [np.asarray(audio) for _, _, audio in estado["pipeline"](texto, voice=estado["voz"], speed=velocidade)]
+        if "pipeline" not in estado:
+            pipeline = carregar()
+            estado["pipeline"] = pipeline
+            estado["voz"] = sum(peso * pipeline.load_voice(nome) for nome, peso in partes)
+        pedacos = [np.asarray(audio) for _, _, audio in estado["pipeline"](texto, voice=estado["voz"], speed=velocidade)]
         audio = np.concatenate(pedacos) if pedacos else np.zeros(_TAXA_DO_KOKORO // 10, dtype="float32")
         soundfile.write(destino, audio, _TAXA_DO_KOKORO, format="MP3")
 
     async def gerar(texto: str, destino: Path) -> None:
-        await asyncio.to_thread(sintetizar, texto, destino)
+        await asyncio.get_running_loop().run_in_executor(executor, sintetizar, texto, destino)
 
     return gerar
 

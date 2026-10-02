@@ -18,7 +18,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 2 | Limpar secrets do Git | feito | gitleaks no CI (`.github/workflows/ci.yml`). Varredura de 29/09/2026 em todo o histórico: 2 achados, ambos o mesmo token falso usado como exemplo nos testes do filtro de segredos antigo, registrados em `.gitleaksignore` (junto com a primeira versão deste arquivo, que citava o exemplo) |
 | 3 | Public Key DB (chaves públicas vs. privadas de banco) | não se aplica | Sem banco de dados |
 | 4 | Ativar RLS (Row Level Security) | não se aplica | Sem banco e sem múltiplos usuários |
-| 5 | Criptografia de dados | feito | A chave de sessão vem de `secrets.token_urlsafe(32)` (`clarisse/montagem.py`) e é comparada em tempo constante (`secrets.compare_digest`, `clarisse/web.py`). Chamadas externas (g1, Microsoft, Anthropic) em HTTPS com verificação de certificado padrão. Nada sensível guardado em repouso além da auditoria local |
+| 5 | Criptografia de dados | feito | A chave de sessão vem de `secrets.token_urlsafe(32)` (`clarisse/montagem.py`) e é comparada em tempo constante (`secrets.compare_digest`, `clarisse/web.py`). Chamadas externas (g1, Microsoft Graph, Anthropic, Hugging Face para baixar o modelo de voz uma vez) em HTTPS com verificação de certificado padrão. Nada sensível guardado em repouso além da auditoria local |
 | 6 | Auth server-side | feito | `Portaria` em `clarisse/web.py`: toda rota `/api/*`, `/audio/*` e o WebSocket exigem a chave da sessão (cookie ou cabeçalho `X-Clarisse-Chave`). A chave nasce a cada início e é gravada em `~/.config/clarisse/chave` com permissão 600 para o script do atalho |
 | 7 | Restringir acessos (authorization / IDOR) | feito | Um usuário só. Documentação automática do FastAPI desligada (`docs_url=None`, `openapi_url=None`). Áudio servido só com nome gerado pelo sistema (32 hexadecimais + `.mp3`) |
 | 8 | Bloquear Mass Assignment | feito | Entrada da API e argumentos de ferramenta em modelos Pydantic com `extra="forbid"` (`clarisse/web.py`, `clarisse/ferramentas/registro.py`) |
@@ -34,7 +34,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 18 | Add security headers | feito | CSP sem `unsafe-inline`/`unsafe-eval` com `frame-ancestors 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (só microfone), `Cache-Control: no-store` — `Portaria` em `clarisse/web.py`. Sem CORS: só a própria origem |
 | 19 | Forçar HTTPS | não se aplica | Servidor só em `127.0.0.1`; o tráfego não sai da máquina. Chamadas externas já são HTTPS |
 | 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
-| 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache, exceto `edge-tts`, **LGPL-3.0**, usada como biblioteca sem modificação — leitura técnica; a decisão final é do jurídico |
+| 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache (Kokoro e o modelo de voz são Apache-2.0). O pronunciador que o Kokoro usa é **GPL-3.0**: `phonemizer-fork` (biblioteca Python, sem modificação) e o `espeak-ng` do sistema, carregado pela biblioteca compartilhada — leitura técnica; a decisão final é do jurídico |
 | 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração), e cada troca da conversa uma linha em `dados/conversa.jsonl`. Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
 | 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Dois servidores MCP, cada um só para o seu Claude, com `--strict-mcp-config` e `--tools` restrito: o Playwright (`@playwright/mcp`, versão fixa 0.0.83, Apache-2.0) nas tarefas no navegador, que pedem confirmação e proíbem enviar, comprar, apagar ou alterar; e o da própria Clarisse (`clarisse/mcp_servidor.py`, SDK `mcp` 2.2.0, MIT) nas tarefas em etapas, que só repassa chamadas para a avaliação e a confirmação da Clarisse |
 
@@ -101,11 +101,9 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 
 ## Riscos aceitos
 
-- **Texto da resposta vai para a Microsoft** (voz do edge-tts), o pedido
-  delegado vai para a Anthropic, e o nome da cidade vai para o Open-Meteo. Não use a Clarisse para ditar dado sensível de
-  cliente enquanto a voz não for 100% local.
-- **E-mail e matéria lidos vão para a Microsoft** para virar voz, como toda fala.
-  O e-mail já está na Microsoft (Outlook); a matéria é pública.
+- **A voz é 100% local desde 02/10/2026** (Kokoro, no processador): o que a Clarisse fala,
+  inclusive e-mail, matéria e resposta do Claude lida, não sai mais da máquina. Com o Claude
+  ligado, o pedido delegado vai para a Anthropic; o nome da cidade vai para o Open-Meteo.
 - **Qualquer programa da sua sessão consegue pedir o token da conta Microsoft** ao
   GNOME, como a Clarisse pede. Isso já era assim antes dela; a Clarisse só lê.
 - **Lembretes ficam em texto aberto** em `dados/lembretes.json`, fora do git.
@@ -125,9 +123,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   (e os atalhos) dependem do "sim" falado; as de leitura e abrir site/programa rodam
   sem pergunta.
 - **Ler a resposta do Claude** abre, só para leitura, as conversas que o Claude Code
-  grava em `~/.claude/projects/` e fala a última resposta. O texto vai para a
-  Microsoft para virar voz, como toda fala da Clarisse: resposta com dado sensível de
-  cliente sai da máquina se for lida.
+  grava em `~/.claude/projects/` e fala a última resposta, com a voz local.
 - **Perguntas sobre o mundo vão para a Anthropic** e o Claude pesquisa na web.
 - **Instalar dependências executa código de terceiros** (scripts de instalação dos
   pacotes npm), como quando o usuário roda `npm ci` à mão. Autorizado pelo usuário em
