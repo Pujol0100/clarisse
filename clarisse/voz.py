@@ -1,10 +1,59 @@
-"""Voz para texto (faster-whisper, local) e texto para voz (edge-tts, serviço da Microsoft)."""
+"""Voz para texto (faster-whisper, local) e texto para voz (Microsoft: edge-tts, gratuito, ou o
+serviço de voz do Azure com chave, que tem mais vozes, como a Brenda)."""
 import asyncio
 import io
+import logging
 import re
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from xml.sax.saxutils import escape
+
+import httpx
+
+log = logging.getLogger(__name__)
+
+Gerador = Callable[[str, Path], Awaitable[None]]
+
+
+def gerar_azure(http: httpx.AsyncClient, chave: str, regiao: str, voz: str, velocidade: str) -> Gerador:
+    """Voz do Azure AI Speech (faixa gratuita de 500 mil letras por mês em 02/10/2026). A chave só vai no cabeçalho."""
+    endereco = f"https://{regiao}.tts.speech.microsoft.com/cognitiveservices/v1"
+
+    async def gerar(texto: str, destino: Path) -> None:
+        ssml = (f"<speak version='1.0' xml:lang='pt-BR'><voice name='{voz}'>"
+                f"<prosody rate='{velocidade}'>{escape(texto)}</prosody></voice></speak>")
+        resposta = await http.post(endereco, content=ssml.encode(), timeout=20, headers={
+            "Ocp-Apim-Subscription-Key": chave,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+            "User-Agent": "clarisse",
+        })
+        resposta.raise_for_status()
+        destino.write_bytes(resposta.content)
+
+    return gerar
+
+
+def gerar_edge(voz: str, velocidade: str) -> Gerador:
+    async def gerar(texto: str, destino: Path) -> None:
+        import edge_tts
+
+        await edge_tts.Communicate(texto, voz, rate=velocidade).save(str(destino))
+
+    return gerar
+
+
+def com_reserva(principal: Gerador, reserva: Gerador) -> Gerador:
+    """Se a voz principal falhar (limite do mês, rede), fala com a reserva em vez de ficar muda."""
+    async def gerar(texto: str, destino: Path) -> None:
+        try:
+            await principal(texto, destino)
+        except Exception:
+            log.exception("a voz principal falhou; usando a reserva")
+            await reserva(texto, destino)
+
+    return gerar
 
 _LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _URL = re.compile(r"https?://\S+")
@@ -114,15 +163,8 @@ class Locutor:
         guardar: int = 20,
     ):
         self._pasta = pasta
-        self._gerar = gerar or self._edge_tts
-        self._voz = voz
-        self._velocidade = velocidade
+        self._gerar = gerar or gerar_edge(voz, velocidade)
         self._guardar = guardar
-
-    async def _edge_tts(self, texto: str, destino: Path) -> None:
-        import edge_tts
-
-        await edge_tts.Communicate(texto, self._voz, rate=self._velocidade).save(str(destino))
 
     async def sintetizar(self, texto: str) -> Path:
         self._pasta.mkdir(parents=True, exist_ok=True)

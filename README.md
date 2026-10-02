@@ -182,7 +182,8 @@ Ajustes ficam em `.env`; veja `.env.example`. Os principais:
 | `CLARISSE_CIDADE` | Cidade da previsão do tempo quando você não diz uma |
 | `CLARISSE_COFRE_DE_NOTAS` | Pasta do cofre do Obsidian; sem ela, não há busca nas notas |
 | `CLARISSE_USAR_CLAUDE` | `true` volta a mandar pedidos ao Claude (padrão: desligado) |
-| `CLARISSE_MODELO`, `CLARISSE_VOZ` | Modelo local e voz |
+| `CLARISSE_MODELO`, `CLARISSE_VOZ` | Modelo local e voz gratuita |
+| `CLARISSE_AZURE_CHAVE`, `CLARISSE_AZURE_REGIAO` | Chave e região do serviço de voz do Azure: com elas, ela fala com a `CLARISSE_VOZ_AZURE` (padrão: Brenda) e a voz gratuita vira reserva |
 
 ### Calendário do Linux
 
@@ -201,8 +202,8 @@ uv run pytest
 ## Privacidade
 
 - O modelo, a transcrição, a auditoria, as notas do Obsidian e os lembretes ficam na máquina.
-- **O texto da resposta vai para a Microsoft** para virar voz (edge-tts), inclusive
-  o e-mail ou a matéria que ela lê.
+- **O texto da resposta vai para a Microsoft** para virar voz (edge-tts, ou o Azure com a
+  chave), inclusive o e-mail ou a matéria que ela lê.
 - A agenda e o e-mail são lidos no Microsoft Graph com o acesso da conta do GNOME. A única
   escrita é o e-mail que você pediu: rascunho, e envio só depois do seu "sim".
 - O GitHub é lido pelo `gh`; o Dokploy, com a chave de leitura que o Claude Code já usa.
