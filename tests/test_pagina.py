@@ -47,6 +47,15 @@ def test_confirmar_e_cancelar_ficam_dentro_do_chat():
     assert 'id="confirmar"' in chat and 'id="cancelar"' in chat
 
 
+def test_nucleo_mostra_o_logo_da_smart_no_lugar_do_globo():
+    nucleo = (WEB / "nucleo.js").read_text(encoding="utf-8")
+    logo = WEB / "logo-smart.png"
+
+    assert "/static/logo-smart.png" in nucleo
+    assert "desenharGlobo" not in nucleo
+    assert logo.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def test_cores_da_marca_na_pagina():
     css = (WEB / "estilo.css").read_text(encoding="utf-8").lower()
 
