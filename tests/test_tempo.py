@@ -102,13 +102,15 @@ def test_descricao_avisa_o_modelo_da_cidade_padrao():
     assert "Curitiba" not in sem_padrao.descricao
 
 
-@pytest.mark.parametrize("dia,figura", [(None, "nuvem"), ("agora", "nuvem"), ("hoje", "trovoada"), ("amanhã", "chuva"), ("depois de amanhã", "sol")])
-async def test_figura_segue_o_dia_perguntado(dia, figura):
+async def test_cartao_mostra_agora_em_destaque_e_os_tres_dias():
     f = _montar(_responder_normal([]))
 
-    resposta = await f.executar(f.argumentos(cidade="Curitiba", dia=dia))
+    resposta = await f.executar(f.argumentos(cidade="Curitiba", dia="amanhã"))
 
-    assert resposta.figura == figura
+    assert resposta.cartao == {
+        "tipo": "clima", "titulo": "Clima", "canto": "Curitiba", "temp": "24°", "cond": "Nublado",
+        "dias": [["Hoje", "15°", "30°", "91%"], ["Amanhã", "19°", "27°", "60%"], ["Quinta", "13°", "23°", "0%"]],
+    }
 
 
 def test_dia_fora_da_lista_e_invalido():

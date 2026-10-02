@@ -8,7 +8,7 @@ import httpx
 from pydantic import Field
 
 from clarisse.ferramentas.registro import Argumentos, Ferramenta
-from clarisse.figuras import Retorno, figura_do_tempo
+from clarisse.cartoes import Retorno
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +31,10 @@ _CONDICOES = {
 
 def _graus(valor: float) -> str:
     return f"{math.floor(valor + 0.5)} °C"
+
+
+def _grau_curto(valor: float) -> str:
+    return f"{math.floor(valor + 0.5)}°"
 
 
 def _condicao(codigo: int) -> str:
@@ -82,16 +86,25 @@ def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) 
             f"sensação de {_graus(agora['apparent_temperature'])}, {_condicao(agora['weather_code'])}, "
             f"vento de {math.floor(agora['wind_speed_10m'] + 0.5)} km/h."
         ]
+        cartao = {
+            "tipo": "clima", "titulo": "Clima", "canto": lugar["name"],
+            "temp": _grau_curto(agora["temperature_2m"]), "cond": _condicao(agora["weather_code"]).capitalize(),
+            "dias": [],
+        }
         for i, dia in enumerate(dias["time"]):
-            rotulo = ["Hoje", "Amanhã"][i] if i < 2 else _DIAS[date.fromisoformat(dia).weekday()].capitalize()
+            nome_do_dia = _DIAS[date.fromisoformat(dia).weekday()]
+            rotulo = ["Hoje", "Amanhã"][i] if i < 2 else nome_do_dia.capitalize()
             partes.append(
                 f"{rotulo}: mínima de {_graus(dias['temperature_2m_min'][i])} e máxima de "
                 f"{_graus(dias['temperature_2m_max'][i])}, {_condicao(dias['weather_code'][i])}, "
                 f"{dias['precipitation_probability_max'][i]}% de chance de chuva."
             )
-        indice = {"hoje": 0, "amanhã": 1, "depois de amanhã": 2}.get(args.dia or "agora")
-        codigo = agora["weather_code"] if indice is None else dias["weather_code"][indice]
-        return Retorno(" ".join(partes), figura=figura_do_tempo(codigo))
+            cartao["dias"].append([
+                ["Hoje", "Amanhã"][i] if i < 2 else nome_do_dia.split("-")[0].capitalize(),
+                _grau_curto(dias["temperature_2m_min"][i]), _grau_curto(dias["temperature_2m_max"][i]),
+                f"{dias['precipitation_probability_max'][i]}%",
+            ])
+        return Retorno(" ".join(partes), cartao=cartao)
 
     descricao = (
         "Consulta o tempo agora e a previsão de hoje, amanhã e depois. Use sempre que perguntarem de clima, "
@@ -106,5 +119,6 @@ def ferramentas_do_tempo(cliente: httpx.AsyncClient, cidade_padrao: str | None) 
             descricao,
             ArgsTempo,
             previsao_do_tempo,
+            grupo="clima",
         )
     ]

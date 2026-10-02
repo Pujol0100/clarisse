@@ -1,42 +1,50 @@
-"""A página de verdade (pasta web/): rosto holográfico, drones e o que ela precisa carregar."""
-import json
+"""A página de verdade (pasta web/): anel com a constelação de ferramentas, cartões e escrita opcional."""
 import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 
+def _pagina():
+    return (WEB / "index.html").read_text(encoding="utf-8")
+
+
 def _scripts_da_pagina():
-    return re.findall(r'<script src="/static/([^"]+)"', (WEB / "index.html").read_text(encoding="utf-8"))
+    return re.findall(r'<script src="/static/([^"]+)"', _pagina())
 
 
-def test_pagina_carrega_a_malha_antes_do_rosto_e_o_rosto_antes_do_app():
+def test_pagina_carrega_nucleo_e_cartoes_antes_do_app_e_nada_do_rosto():
     scripts = _scripts_da_pagina()
 
-    assert {"malha-rosto.js", "rosto.js", "enxame.js", "app.js"} <= set(scripts)
-    assert scripts.index("malha-rosto.js") < scripts.index("rosto.js") < scripts.index("app.js")
-    assert scripts.index("enxame.js") < scripts.index("app.js")
+    assert {"nucleo.js", "cartoes.js", "app.js"} <= set(scripts)
+    assert scripts.index("nucleo.js") < scripts.index("app.js")
+    assert scripts.index("cartoes.js") < scripts.index("app.js")
+    assert not {"rosto.js", "malha-rosto.js", "enxame.js"} & set(scripts)
+    assert not any((WEB / nome).exists() for nome in ("rosto.js", "malha-rosto.js", "enxame.js"))
 
 
-def test_pagina_tem_onde_desenhar_o_rosto():
-    assert '<canvas id="rosto"' in (WEB / "index.html").read_text(encoding="utf-8")
+def test_pagina_tem_o_canvas_do_nucleo_e_os_lugares_dos_cartoes():
+    pagina = _pagina()
+
+    assert '<canvas id="nucleo"' in pagina
+    for id_ in ("palco-cartao", "fileira", "legenda", "voce", "estado"):
+        assert f'id="{id_}"' in pagina
 
 
-def test_malha_do_rosto_esta_completa():
-    texto = (WEB / "malha-rosto.js").read_text(encoding="utf-8")
-    malha = json.loads(re.search(r"const MALHA_DO_ROSTO = (\{.*\});", texto, re.S).group(1))
+def test_escrever_e_opcional_e_o_chat_comeca_fechado():
+    pagina = _pagina()
 
-    assert len(malha["v"]) == 468
-    assert len(malha["f"]) == 898
-    assert all(0 <= k < 468 for triangulo in malha["f"] for k in triangulo)
+    assert re.search(r'<button[^>]+id="escrever"[^>]+aria-expanded="false"', pagina)
+    assert re.search(r'<aside[^>]+id="chat"', pagina)
+    assert "com-chat" not in re.search(r"<body[^>]*>", pagina).group(0)
+    assert pagina.index('id="chat"') < pagina.index('id="formulario"') < pagina.index('id="texto"')
 
 
-def test_licenca_do_mediapipe_acompanha_a_malha():
-    texto = (WEB / "malha-rosto.js").read_text(encoding="utf-8")
-    licenca = WEB / "licencas" / "mediapipe-LICENSE.txt"
+def test_confirmar_e_cancelar_ficam_dentro_do_chat():
+    pagina = _pagina()
+    chat = re.search(r'<aside[^>]+id="chat"[\s\S]*?</aside>', pagina).group(0)
 
-    assert "Apache" in texto and "licencas/mediapipe-LICENSE.txt" in texto
-    assert "Apache License" in licenca.read_text(encoding="utf-8")
+    assert 'id="confirmar"' in chat and 'id="cancelar"' in chat
 
 
 def test_cores_da_marca_na_pagina():
@@ -47,24 +55,16 @@ def test_cores_da_marca_na_pagina():
 
 
 def test_scripts_so_procuram_elementos_que_existem_na_pagina():
-    pagina = (WEB / "index.html").read_text(encoding="utf-8")
-    ids = set(re.findall(r'id="([^"]+)"', pagina))
+    ids = set(re.findall(r'id="([^"]+)"', _pagina()))
 
     for script in _scripts_da_pagina():
         procurados = set(re.findall(r'getElementById\("([^"]+)"\)', (WEB / script).read_text(encoding="utf-8")))
         assert procurados <= ids, f"{script} procura {sorted(procurados - ids)}, que não existe na página"
 
 
-def test_conversa_fica_num_painel_ao_lado_da_clarisse_como_historico():
-    pagina = (WEB / "index.html").read_text(encoding="utf-8")
-
-    assert re.search(r'<main class="palco">[\s\S]*</main>\s*<aside class="painel"', pagina)
-    assert re.search(r'<section class="conversa" id="conversa" role="log"', pagina)
-    assert pagina.index('id="conversa"') < pagina.index('id="formulario"')
-
-
-def test_mensagens_do_chat_sao_criadas_como_texto_e_nunca_como_html():
-    app = (WEB / "app.js").read_text(encoding="utf-8")
-
-    assert "innerHTML" not in app
-    assert "textContent" in app
+def test_textos_de_fora_sao_criados_como_texto_e_nunca_como_html():
+    for script in _scripts_da_pagina():
+        codigo = (WEB / script).read_text(encoding="utf-8")
+        assert "innerHTML" not in codigo, script
+        assert "insertAdjacentHTML" not in codigo, script
+    assert "textContent" in (WEB / "cartoes.js").read_text(encoding="utf-8")

@@ -232,6 +232,13 @@ def test_cabecalhos_de_seguranca(cliente):
     assert "microphone=(self)" in cabecalhos["permissions-policy"]
 
 
+def test_fotos_das_noticias_do_g1_podem_aparecer_e_nada_mais_de_fora(cliente):
+    politica = cliente.get("/").headers["content-security-policy"]
+
+    assert "img-src 'self' data: https://*.glbimg.com;" in politica
+    assert politica.count("glbimg") == 1
+
+
 def _cabecalhos_ws(origem=ORIGEM, chave=CHAVE):
     """O cliente de teste manda Host "testserver" e nenhum cookie no WebSocket; o navegador manda os dois."""
     cabecalhos = {"Host": "127.0.0.1:8765", "Origin": origem}
@@ -407,26 +414,45 @@ def _eventos_publicados(fila):
     return publicados
 
 
-def test_fala_leva_a_figura_da_resposta_para_a_tela(logado, partes):
+def test_resposta_leva_o_cartao_para_a_tela(logado, partes):
     _, agente, _, _, eventos = partes
-    agente.proxima = Resposta("Amanhã chove em Campinas.", figura="chuva")
+    cartao = {"tipo": "clima", "titulo": "Clima", "temp": "18°"}
+    agente.proxima = Resposta("Amanhã chove em Campinas.", cartao=cartao)
     fila = eventos.assinar()
 
     corpo = logado.post("/api/mensagem", json={"texto": "vai chover amanhã?"}).json()
 
-    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
-    assert falar["figura"] == "chuva"
-    assert corpo["figura"] == "chuva"
+    publicados = _eventos_publicados(fila)
+    [resposta] = [e for e in publicados if e["tipo"] == "resposta"]
+    assert resposta["cartao"] == cartao
+    assert corpo["cartao"] == cartao
+    assert all("figura" not in e for e in publicados)
 
 
-async def test_aviso_do_claude_aparece_como_balao_de_mensagem(tmp_path):
+def test_leitura_fala_por_paragrafo_e_cada_trecho_diz_qual_paragrafo_acender(logado, partes):
+    _, agente, _, _, eventos = partes
+    cartao = {"tipo": "leitura", "titulo": "Título da matéria", "paragrafos": ["Primeiro parágrafo.", "Segundo parágrafo."]}
+    agente.proxima = Resposta("Título da matéria.\n\nPrimeiro parágrafo.\n\nSegundo parágrafo.", cartao=cartao)
+    fila = eventos.assinar()
+
+    logado.post("/api/mensagem", json={"texto": "lê a primeira"})
+
+    falar = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert [(e["legenda"], e["paragrafo"]) for e in falar] == [
+        ("Título da matéria.", None), ("Primeiro parágrafo.", 0), ("Segundo parágrafo.", 1),
+    ]
+    assert {e["total"] for e in falar} == {3}
+    assert [e["parte"] for e in falar] == [0, 1, 2]
+
+
+async def test_aviso_aparece_num_cartao_com_o_titulo_de_quem_avisou(tmp_path):
     eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
     fila = eventos.assinar()
 
     await criar_avisador(eventos, locutor)("omni-api", "O build passou.")
 
-    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
-    assert falar["figura"] == "mensagem"
+    [aviso] = [e for e in _eventos_publicados(fila) if e["tipo"] == "aviso"]
+    assert aviso["cartao"] == {"tipo": "texto", "titulo": "omni-api", "texto": "O build passou."}
 
 
 class ExternasFalsas:
@@ -535,3 +561,14 @@ async def test_aviso_e_pergunta_do_claude_tambem_esperam_a_fala(tmp_path):
     for tipo in ("aviso", "resposta"):
         [texto] = [e for e in publicados if e["tipo"] == tipo]
         assert texto["fala"] in {e["fala"] for e in publicados if e["tipo"] == "falar"}
+
+
+async def test_aviso_pode_ter_o_texto_falado_proprio(tmp_path):
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("Lembrete", "ligar para o financeiro", falar="Lembrete: ligar para o financeiro.")
+
+    assert locutor.textos == ["Lembrete: ligar para o financeiro."]
+    [aviso] = [e for e in _eventos_publicados(fila) if e["tipo"] == "aviso"]
+    assert aviso["falado"] == "Lembrete: ligar para o financeiro."

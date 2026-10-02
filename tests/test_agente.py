@@ -464,37 +464,50 @@ async def test_garantia_do_claude_nao_dispara_depois_de_uma_acao_confirmada(novo
     assert pedidos_ao_claude == []
 
 
-async def test_resposta_traz_a_figura_da_ferramenta_executada(novo_agente, registro):
-    async def hora(args):
-        return "São 14h05."
-
-    registro.registrar(Ferramenta("hora", "hora", Argumentos, hora, figura="relogio"))
-    modelo = ModeloFalso(chamada("hora"), texto("São 14h05."))
-
-    resposta = await novo_agente(modelo).responder("que horas são?")
-
-    assert resposta.figura == "relogio"
+async def _hora(args):
+    return "São 14h05."
 
 
-async def test_figura_calculada_pela_ferramenta_ganha_da_fixa_e_o_texto_vai_ao_modelo(novo_agente, registro):
-    from clarisse.figuras import Retorno
+async def test_evento_da_ferramenta_diz_o_grupo_que_acende_na_tela(novo_agente, registro, eventos):
+    registro.registrar(Ferramenta("hora", "hora", Argumentos, _hora, grupo="sistema"))
+    fila = eventos.assinar()
+
+    await novo_agente(ModeloFalso(chamada("hora"), texto("São 14h05."))).responder("que horas são?")
+
+    publicados = [fila.get_nowait() for _ in range(fila.qsize())]
+    assert [(e["grupo"], e["situacao"]) for e in publicados if e["tipo"] == "ferramenta"] == [
+        ("sistema", "iniciada"), ("sistema", "concluida"),
+    ]
+
+
+async def test_cartao_da_ferramenta_vai_na_resposta_e_so_o_texto_vai_ao_modelo(novo_agente, registro):
+    from clarisse.cartoes import Retorno
 
     async def tempo(args):
-        return Retorno("Chuva forte amanhã.", figura="chuva")
+        return Retorno("Chuva forte amanhã.", cartao={"tipo": "clima", "titulo": "Clima"})
 
-    registro.registrar(Ferramenta("tempo", "tempo", Argumentos, tempo, figura="sol"))
+    registro.registrar(Ferramenta("tempo", "tempo", Argumentos, tempo, grupo="clima"))
     modelo = ModeloFalso(chamada("tempo"), texto("Vai chover."))
 
     resposta = await novo_agente(modelo).responder("vai chover?")
 
-    assert resposta.figura == "chuva"
+    assert resposta.cartao == {"tipo": "clima", "titulo": "Clima"}
     assert _mensagens_de_ferramenta(modelo.recebidas[1]) == ["Chuva forte amanhã."]
 
 
-async def test_conversa_sem_ferramenta_nao_tem_figura(novo_agente):
+async def test_ferramenta_sem_cartao_ganha_cartao_de_texto_com_a_resposta_falada(novo_agente, registro):
+    registro.registrar(Ferramenta("hora", "hora", Argumentos, _hora, grupo="sistema"))
+    modelo = ModeloFalso(chamada("hora"), texto("São duas e cinco da tarde."))
+
+    resposta = await novo_agente(modelo).responder("que horas são?")
+
+    assert resposta.cartao == {"tipo": "texto", "titulo": "Sistema", "texto": "São duas e cinco da tarde."}
+
+
+async def test_conversa_sem_ferramenta_nao_tem_cartao(novo_agente):
     resposta = await novo_agente(ModeloFalso(texto("Oi!"))).responder("oi")
 
-    assert resposta.figura is None
+    assert resposta.cartao is None
 
 
 async def test_chamada_escrita_como_texto_ganha_segunda_chance(novo_agente, executadas):
@@ -582,7 +595,7 @@ async def test_sem_a_ferramenta_de_etapas_o_encadeado_vai_ao_modelo(novo_agente)
 
 
 async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(registro, eventos, auditoria):
-    from clarisse.figuras import Retorno
+    from clarisse.cartoes import Retorno
 
     longo = "Primeiro parágrafo da resposta do Claude.\n\nSegundo parágrafo, com mais detalhes."
 
@@ -601,7 +614,7 @@ async def test_resultado_na_integra_vai_direto_para_a_voz_sem_o_modelo_resumir(r
 
 @pytest.fixture
 def leituras(registro):
-    from clarisse.figuras import Retorno
+    from clarisse.cartoes import Retorno
 
     class ArgsLeitura(Argumentos):
         conversa: str | None = None
@@ -634,3 +647,84 @@ async def test_pergunta_ao_claude_continua_indo_ao_claude(novo_agente, pedidos_a
 
     assert leituras == []
     assert pedidos_ao_claude == ["pergunta pro Claude o que é REST"]
+
+
+def test_prompt_sem_o_claude_manda_dizer_que_nao_sabe_em_vez_de_pesquisar():
+    from clarisse.agente import prompt_do_sistema
+
+    texto = prompt_do_sistema(
+        [], datetime(2026, 10, 1, 9, 0), ferramentas={"hora_e_data", "abrir_claude_na_tela", "ler_resposta_do_claude"},
+    )
+
+    assert "pedir_ao_claude" not in texto
+    assert "consultar_agenda" not in texto
+    assert "Você não tem acesso à internet para pesquisar" in texto
+    assert "ler_resposta_do_claude" in texto and "abrir_claude_na_tela" in texto
+
+
+def test_prompt_com_o_claude_manda_pesquisar_com_ele():
+    from clarisse.agente import prompt_do_sistema
+
+    texto = prompt_do_sistema(
+        [], datetime(2026, 10, 1, 9, 0), ferramentas={"pedir_ao_claude", "consultar_agenda", "abrir_claude_na_tela"},
+    )
+
+    assert "vão para pedir_ao_claude" in texto
+    assert "chama consultar_agenda" in texto
+    assert "não tem acesso à internet" not in texto
+
+
+async def test_agente_monta_o_prompt_com_as_ferramentas_que_existem(novo_agente):
+    modelo = ModeloFalso(texto("Não sei a cotação de hoje."))
+
+    await novo_agente(modelo).responder("quanto está o dólar?")
+
+    prompt = modelo.recebidas[0][0]["content"]
+    assert "Você não tem acesso à internet para pesquisar" in prompt
+
+
+@pytest.fixture
+def enviados():
+    return []
+
+
+@pytest.fixture
+def com_email(registro, enviados):
+    from clarisse.cartoes import Retorno
+
+    async def escrever(args):
+        return Retorno("Escrevi o e-mail para ana@x.com. Deseja enviar?", cartao={"tipo": "email"}, na_integra=True,
+                       confirmar_depois=("enviar", {}))
+
+    async def enviar(args):
+        enviados.append(1)
+        return Retorno("Enviei o e-mail para ana@x.com.", na_integra=True)
+
+    registro.registrar(Ferramenta("escrever", "escreve", Argumentos, escrever, grupo="email"))
+    registro.registrar(Ferramenta("enviar", "envia", Argumentos, enviar, risco=Risco.CONFIRMAR, grupo="email",
+                                  descrever=lambda a: "Envio? Confirma?"))
+    return registro
+
+
+async def test_depois_de_escrever_pergunta_e_so_envia_com_o_sim(novo_agente, com_email, enviados):
+    modelo = ModeloFalso(chamada("escrever"))
+    agente = novo_agente(modelo)
+
+    pergunta = await agente.responder("escreve um e-mail para a ana")
+    resposta = await agente.responder("sim")
+
+    assert pergunta.texto == "Escrevi o e-mail para ana@x.com. Deseja enviar?"
+    assert pergunta.aguardando_confirmacao and pergunta.cartao == {"tipo": "email"}
+    assert enviados == [1]
+    assert resposta.texto == "Enviei o e-mail para ana@x.com."
+    assert len(modelo.recebidas) == 1
+
+
+async def test_depois_de_escrever_o_nao_nao_envia(novo_agente, com_email, enviados):
+    agente = novo_agente(ModeloFalso(chamada("escrever")))
+
+    await agente.responder("escreve um e-mail para a ana")
+    resposta = await agente.responder("não")
+
+    assert enviados == []
+    assert resposta.texto == "Tudo bem, cancelei."

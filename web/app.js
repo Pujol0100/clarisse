@@ -1,23 +1,46 @@
 "use strict";
 
-// Parada ou falando, embaixo do rosto não aparece o estado: falando, aparece a legenda.
+// Parada ou falando, o topo não mostra estado: falando, o que ela diz aparece na legenda.
 const NOMES_DOS_ESTADOS = {
   idle: "",
-  listening: "Ouvindo…",
-  thinking: "Pensando…",
-  executing: "Fazendo…",
-  speaking: "",
+  listening: "Ouvindo",
+  thinking: "Pensando",
+  executing: "Consultando",
+  speaking: "Falando",
   error: "Algo falhou",
 };
+
+// Nós da constelação. Cada evento de ferramenta diz o grupo que acende.
+const GRUPOS = [
+  { grupo: "clima", rotulo: "Clima" },
+  { grupo: "agenda", rotulo: "Agenda" },
+  { grupo: "email", rotulo: "E-mail" },
+  { grupo: "noticias", rotulo: "Notícias" },
+  { grupo: "github", rotulo: "GitHub" },
+  { grupo: "notas", rotulo: "Notas" },
+  { grupo: "servidores", rotulo: "Servidores" },
+  { grupo: "lembretes", rotulo: "Lembretes" },
+  { grupo: "navegador", rotulo: "Navegador" },
+  { grupo: "claude", rotulo: "Claude" },
+  { grupo: "codigo", rotulo: "Código" },
+  { grupo: "janelas", rotulo: "Janelas" },
+  { grupo: "sistema", rotulo: "Sistema" },
+];
 
 const elementos = {
   corpo: document.body,
   estado: document.getElementById("estado"),
+  voce: document.getElementById("voce"),
+  legenda: document.getElementById("legenda"),
+  hora: document.getElementById("hora"),
   conversa: document.getElementById("conversa"),
   conversaVazia: document.getElementById("conversa-vazia"),
   confirmacao: document.getElementById("confirmacao"),
   avisoSom: document.getElementById("aviso-som"),
   falar: document.getElementById("falar"),
+  falarRotulo: document.getElementById("falar-rotulo"),
+  escrever: document.getElementById("escrever"),
+  fecharChat: document.getElementById("fechar-chat"),
   formulario: document.getElementById("formulario"),
   texto: document.getElementById("texto"),
 };
@@ -25,29 +48,20 @@ const elementos = {
 /* ---------- estado ---------- */
 
 let estadoAtual = "idle";
-let legendaAtual = null;
-
-function atualizarRotulo() {
-  const texto = legendaAtual || NOMES_DOS_ESTADOS[estadoAtual] || "";
-  elementos.estado.textContent = texto;
-  elementos.estado.classList.toggle("legenda", Boolean(legendaAtual));
-  elementos.estado.hidden = !texto;
-}
 
 function mudarEstado(estado) {
   estadoAtual = estado;
   elementos.corpo.dataset.estado = estado;
-  atualizarRotulo();
-  Enxame.estado(estado);
-  Rosto.estado(estado);
+  elementos.estado.textContent = NOMES_DOS_ESTADOS[estado] || "";
+  Nucleo.estado(estado);
 }
 
 function mostrarLegenda(texto) {
-  legendaAtual = texto;
-  atualizarRotulo();
+  if (texto) elementos.legenda.textContent = texto;
+  elementos.legenda.classList.toggle("visivel", Boolean(texto));
 }
 
-/* ---------- conversa: histórico em balões, desde que a página abriu ---------- */
+/* ---------- conversa: o que se disse aparece no topo e fica no chat ---------- */
 
 const LIMITE_DE_FALAS = 100;
 
@@ -65,11 +79,25 @@ function adicionarFala(quem, texto) {
 
 function mostrarVoce(texto) {
   adicionarFala("voce", texto);
+  elementos.voce.textContent = texto;
+  elementos.voce.classList.add("visivel");
+}
+
+function esconderVoce() {
+  elementos.voce.classList.remove("visivel");
 }
 
 function mostrarClarisse(texto, aguardandoConfirmacao = false) {
   adicionarFala("clarisse", texto);
   elementos.confirmacao.hidden = !aguardandoConfirmacao;
+}
+
+/* ---------- escrita opcional ---------- */
+
+function abrirChat(aberto) {
+  elementos.corpo.classList.toggle("com-chat", aberto);
+  elementos.escrever.setAttribute("aria-expanded", String(aberto));
+  if (aberto) setTimeout(() => elementos.texto.focus(), 300);
 }
 
 /* ---------- som ---------- */
@@ -94,7 +122,7 @@ function liberarSom() {
 document.addEventListener("pointerdown", liberarSom);
 
 function nivelDoSom() {
-  const analisador = estadoAtual === "listening" ? analisadorDoMicrofone : analisadorDaVoz;
+  const analisador = estadoAtual === "listening" ? analisadorDoMicrofone : estadoAtual === "speaking" ? analisadorDaVoz : null;
   if (!analisador) return 0;
   const amostras = new Uint8Array(analisador.fftSize);
   analisador.getByteTimeDomainData(amostras);
@@ -106,18 +134,9 @@ function nivelDoSom() {
   return Math.min(1, Math.sqrt(soma / amostras.length) * 4);
 }
 
-/* Figura na tela: os drones saem do rosto e formam a figura no meio; o rosto vai para o canto. */
-let figuraSemFala = null;
-
-function mostrarFigura(figura) {
-  clearTimeout(figuraSemFala);
-  Enxame.mostrar(figura);
-  Rosto.canto(Boolean(figura));
-}
-
 /* ---------- fala em trechos, com legenda ----------
    O servidor manda cada trecho assim que fica pronto. Eles tocam em fila, com o próximo já
-   carregado; o texto da resposta só entra no chat quando a voz começa. */
+   carregado; o texto e o cartão da resposta só aparecem quando a voz começa. */
 
 let falaAtual = null;
 const falasCanceladas = new Set();
@@ -144,13 +163,12 @@ function receberTrecho(e) {
   if (!falaAtual || falaAtual.id !== e.fala) {
     pararDeFalar(false);
     falaAtual = { id: e.fala, total: e.total, trechos: [], proximo: 0, tocando: null };
-    mostrarFigura(e.figura);
     mudarEstado("speaking");
   }
   const audio = new Audio(e.audio);
   audio.preload = "auto";
   audio.muted = !tenhoAVoz;
-  falaAtual.trechos[e.parte] = { audio, legenda: e.legenda };
+  falaAtual.trechos[e.parte] = { audio, legenda: e.legenda, paragrafo: e.paragrafo };
   if (!falaAtual.tocando) tocarProximo();
 }
 
@@ -163,8 +181,14 @@ async function tocarProximo() {
   const parte = fala.proximo;
   trecho.audio.addEventListener("playing", () => {
     if (falaAtual !== fala) return;
-    mostrarLegenda(trecho.legenda);
     if (parte === 0) soltarTexto(fala.id);
+    // Lendo uma matéria, o próprio bloco mostra o texto: acende o parágrafo em vez da legenda.
+    if (Cartoes.lendo()) {
+      mostrarLegenda(null);
+      if (trecho.paragrafo != null) Cartoes.marcarParagrafo(trecho.paragrafo);
+    } else {
+      mostrarLegenda(trecho.legenda);
+    }
   }, { once: true });
   trecho.audio.addEventListener("ended", () => {
     if (falaAtual !== fala) return;
@@ -182,11 +206,16 @@ async function tocarProximo() {
   }
 }
 
+function encerrarCena() {
+  mostrarLegenda(null);
+  esconderVoce();
+  Cartoes.encerrar();
+}
+
 function terminarFala(fala) {
   if (falaAtual !== fala) return;
   falaAtual = null;
-  mostrarLegenda(null);
-  mostrarFigura(null);
+  encerrarCena();
   mudarEstado("idle");
   fetch("/api/fim-da-fala", { method: "POST" });
 }
@@ -198,19 +227,23 @@ function pararDeFalar(avisarServidor = true) {
   falasCanceladas.add(fala.id);
   soltarTexto(fala.id);
   if (fala.tocando) fala.tocando.pause();
-  mostrarLegenda(null);
-  mostrarFigura(null);
+  encerrarCena();
   if (avisarServidor) {
     mudarEstado("idle");
     fetch("/api/fim-da-fala", { method: "POST" });
   }
 }
 
-/* ---------- microfone ---------- */
+/* ---------- microfone: aperta para gravar, aperta de novo para enviar ---------- */
 
 let gravador = null;
 let pedacos = [];
 let fonteDoMicrofone = null;
+
+function rotularMicrofone(gravando) {
+  elementos.falar.setAttribute("aria-pressed", String(gravando));
+  elementos.falarRotulo.textContent = gravando ? "Ouvindo · aperte de novo para enviar" : "Insert para falar";
+}
 
 async function alternarMicrofone() {
   liberarSom();
@@ -225,6 +258,7 @@ async function alternarMicrofone() {
   } catch {
     mudarEstado("error");
     mostrarClarisse("Não tenho acesso ao microfone. Libere o microfone para esta página nas permissões do navegador.");
+    mostrarLegenda("Não tenho acesso ao microfone. Use o botão Escrever enquanto isso.");
     return;
   }
   fonteDoMicrofone = contextoDeAudio.createMediaStreamSource(fluxo);
@@ -234,8 +268,8 @@ async function alternarMicrofone() {
   gravador.addEventListener("dataavailable", (e) => pedacos.push(e.data));
   gravador.addEventListener("stop", () => enviarGravacao(fluxo));
   gravador.start();
-  elementos.falar.setAttribute("aria-pressed", "true");
-  elementos.falar.querySelector(".botao-falar-rotulo").textContent = "Enviar";
+  rotularMicrofone(true);
+  esconderVoce();
   mudarEstado("listening");
 }
 
@@ -243,8 +277,7 @@ async function enviarGravacao(fluxo) {
   fluxo.getTracks().forEach((trilha) => trilha.stop());
   if (fonteDoMicrofone) fonteDoMicrofone.disconnect();
   fonteDoMicrofone = null;
-  elementos.falar.setAttribute("aria-pressed", "false");
-  elementos.falar.querySelector(".botao-falar-rotulo").textContent = "Falar";
+  rotularMicrofone(false);
   mudarEstado("thinking");
   const audio = new Blob(pedacos, { type: "audio/webm" });
   await chamar("/api/voz", { method: "POST", headers: { "Content-Type": "audio/webm" }, body: audio });
@@ -276,6 +309,7 @@ async function chamar(caminho, opcoes) {
   } catch {
     mudarEstado("error");
     mostrarClarisse("Não consegui falar com o servidor da Clarisse. Confira se ele está ligado e recarregue a página.");
+    mostrarLegenda("Não consegui falar com o servidor da Clarisse.");
     return null;
   }
 }
@@ -295,16 +329,23 @@ const tratadores = {
     if (!(ocupadaAqui && e.estado === "idle")) mudarEstado(e.estado);
   },
   // A frase entendida volta como fala_do_usuario; aqui só entra quando não se entendeu nada.
-  transcricao: (e) => { if (!e.texto) adicionarFala("aviso", "Não entendi o que foi dito. Tente de novo."); },
-  fala_do_usuario: (e) => mostrarVoce(e.texto),
-  resposta: (e) => esperarFala(e.fala, () => mostrarClarisse(e.texto, e.aguardando_confirmacao)),
-  aviso: (e) => esperarFala(e.fala, () => mostrarClarisse(`Do ${e.titulo}: ${e.texto}`)),
-  falar: receberTrecho,
-  figura: (e) => {
-    // Figura mandada pelo Claude das etapas, sem fala junto: fica alguns segundos e sai.
-    mostrarFigura(e.figura);
-    figuraSemFala = setTimeout(() => { if (!falaAtual) mostrarFigura(null); }, 8000);
+  transcricao: (e) => {
+    if (e.texto) return;
+    adicionarFala("aviso", "Não entendi o que foi dito. Tente de novo.");
+    mostrarLegenda("Não entendi o que foi dito. Tente de novo.");
+    setTimeout(() => { if (!falaAtual) mostrarLegenda(null); }, 4000);
   },
+  fala_do_usuario: (e) => mostrarVoce(e.texto),
+  resposta: (e) => esperarFala(e.fala, () => {
+    mostrarClarisse(e.texto, e.aguardando_confirmacao);
+    if (e.cartao) Cartoes.mostrar(e.cartao);
+  }),
+  aviso: (e) => esperarFala(e.fala, () => {
+    mostrarClarisse(e.falado || `Do ${e.titulo}: ${e.texto}`);
+    if (e.cartao) Cartoes.mostrar(e.cartao);
+  }),
+  falar: receberTrecho,
+  ferramenta: (e) => { if (e.grupo) Nucleo.acender(e.grupo, e.situacao === "iniciada"); },
   parar: () => pararDeFalar(),
   // O atalho de teclado chega a todas as abas; só a que tem a voz grava, senão o pedido iria duas vezes.
   escutar: () => { if (tenhoAVoz) alternarMicrofone(); },
@@ -355,6 +396,8 @@ document.addEventListener("pointerdown", pedirAVoz);
 document.addEventListener("keydown", pedirAVoz);
 
 elementos.falar.addEventListener("click", alternarMicrofone);
+elementos.escrever.addEventListener("click", () => abrirChat(!elementos.corpo.classList.contains("com-chat")));
+elementos.fecharChat.addEventListener("click", () => abrirChat(false));
 elementos.formulario.addEventListener("submit", (e) => {
   e.preventDefault();
   const texto = elementos.texto.value.trim();
@@ -371,17 +414,28 @@ document.addEventListener("keydown", (e) => {
   alternarMicrofone();
 });
 
-/* ---------- rosto e enxame ---------- */
-
-function moverABoca() {
-  Rosto.abertura(estadoAtual === "speaking" ? nivelDoSom() : 0);
-  requestAnimationFrame(moverABoca);
+function relogio() {
+  elementos.hora.textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-Rosto.iniciar(document.getElementById("rosto"));
-Enxame.nivel = nivelDoSom;
-Enxame.origem = () => Rosto.centro();
-Enxame.iniciar(document.getElementById("enxame"));
-requestAnimationFrame(moverABoca);
+/* ---------- início ---------- */
+
+Cartoes.aoEscolher = (pedido, numero) => {
+  liberarSom();
+  pedirAVoz();
+  enviarTexto(`${pedido} ${numero}`);
+};
+// Para a leitura na hora e mostra a lista de novo, como dizer "volta para a lista".
+Cartoes.aoVoltar = () => {
+  liberarSom();
+  pedirAVoz();
+  pararDeFalar();
+  enviarTexto("volta para a lista");
+};
+Nucleo.nivel = nivelDoSom;
+Nucleo.grupos(GRUPOS);
+Nucleo.iniciar(document.getElementById("nucleo"));
+relogio();
+setInterval(relogio, 15000);
 mudarEstado("idle");
 conectar();

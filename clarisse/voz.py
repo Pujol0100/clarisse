@@ -1,10 +1,77 @@
-"""Voz para texto (faster-whisper, local) e texto para voz (edge-tts, serviço da Microsoft)."""
+"""Voz para texto (faster-whisper) e texto para voz (Kokoro), as duas na máquina: nada do que a
+Clarisse ouve ou fala sai do notebook."""
 import asyncio
+import ctypes.util
 import io
 import re
 import uuid
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import numpy as np
+import soundfile
+
+Gerador = Callable[[str, Path], Awaitable[None]]
+_TAXA_DO_KOKORO = 24000
+# Medido em 02/10/2026 (24 núcleos): com 4 a voz sai em ~1 s por frase e não sufoca o resto da máquina.
+_THREADS_DA_VOZ = 4
+_PARTE_DA_RECEITA = re.compile(r"^([a-z]{2}_[a-z]+)\*(\d+(?:\.\d+)?)$")
+
+
+def receita_da_voz(receita: str) -> list[tuple[str, float]]:
+    """'pf_dora*0.8+af_bella*0.2' (Dora com 20% de Bella, escolhida em 02/10/2026) vira [(voz, peso)]."""
+    partes = []
+    for parte in receita.replace(" ", "").split("+"):
+        achado = _PARTE_DA_RECEITA.match(parte)
+        if not achado:
+            raise ValueError(f"receita de voz inválida: {receita!r} (exemplo: pf_dora*0.8+af_bella*0.2)")
+        partes.append((achado.group(1), float(achado.group(2))))
+    return partes
+
+
+def carregar_kokoro():
+    import misaki.espeak  # noqa: F401  aponta para o espeak embutido no espeakng-loader
+
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+    # O espeak embutido no espeakng-loader 0.2.x procura os dados num caminho da máquina onde foi
+    # compilado e ignora o caminho que recebe (02/10/2026). O do sistema funciona: apt install espeak-ng.
+    biblioteca = ctypes.util.find_library("espeak-ng")
+    if biblioteca is None:
+        raise RuntimeError("falta o espeak-ng do sistema: sudo apt install espeak-ng")
+    EspeakWrapper.set_library(biblioteca)
+    EspeakWrapper.set_data_path(None)
+
+    import torch
+    from kokoro import KPipeline
+
+    torch.set_num_threads(_THREADS_DA_VOZ)
+    return KPipeline(lang_code="p", repo_id="hexgrad/Kokoro-82M")
+
+
+def gerar_local(receita: str, velocidade: float, carregar: Callable[[], object] = carregar_kokoro) -> Gerador:
+    """Voz do Kokoro, no processador. O modelo carrega no primeiro uso; a receita é conferida já.
+
+    Toda frase é gerada na mesma thread: o PyTorch cria um grupo de trabalhadores por thread, e uma
+    thread nova a cada frase lotava o processador (5,4 s por frase em vez de ~1 s, 02/10/2026)."""
+    partes = receita_da_voz(receita)
+    estado: dict = {}
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="voz")
+
+    def sintetizar(texto: str, destino: Path) -> None:
+        if "pipeline" not in estado:
+            pipeline = carregar()
+            estado["pipeline"] = pipeline
+            estado["voz"] = sum(peso * pipeline.load_voice(nome) for nome, peso in partes)
+        pedacos = [np.asarray(audio) for _, _, audio in estado["pipeline"](texto, voice=estado["voz"], speed=velocidade)]
+        audio = np.concatenate(pedacos) if pedacos else np.zeros(_TAXA_DO_KOKORO // 10, dtype="float32")
+        soundfile.write(destino, audio, _TAXA_DO_KOKORO, format="MP3")
+
+    async def gerar(texto: str, destino: Path) -> None:
+        await asyncio.get_running_loop().run_in_executor(executor, sintetizar, texto, destino)
+
+    return gerar
 
 _LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _URL = re.compile(r"https?://\S+")
@@ -60,6 +127,24 @@ def dividir_em_trechos(texto: str) -> list[str]:
     return trechos
 
 
+_PALAVRA = r"[^\W_]+"
+_SEPARADOR = r"\s+(?:ponto|tra[cç]o|h[ií]fen|underline|underscore)\s+"
+_ENDERECO_FALADO = re.compile(
+    rf"\b({_PALAVRA}(?:{_SEPARADOR}{_PALAVRA})*)\s+arroba\s+({_PALAVRA}(?:\s+ponto\s+{_PALAVRA})+)\b", re.IGNORECASE,
+)
+_SIMBOLOS = {"ponto": ".", "traco": "-", "traço": "-", "hifen": "-", "hífen": "-", "underline": "_", "underscore": "_"}
+
+
+def enderecos_falados(texto: str) -> str:
+    """'fulano arroba empresa ponto com ponto br' vira 'fulano@empresa.com.br'. Só o que tem forma de
+    endereço: 'ponto de vista' e 'o símbolo arroba' ficam como estão."""
+    def escrever(achado: re.Match) -> str:
+        partes = re.split(r"\s+", achado.group(0))
+        return "".join("@" if p.lower() == "arroba" else _SIMBOLOS.get(p.lower(), p) for p in partes).lower()
+
+    return _ENDERECO_FALADO.sub(escrever, texto)
+
+
 class Transcritor:
     def __init__(self, carregar: Callable[[], object], dicas: list[str]):
         self._carregar = carregar
@@ -77,7 +162,7 @@ class Transcritor:
         segmentos, _ = self._modelo.transcribe(
             io.BytesIO(audio), language="pt", hotwords=self._dicas or None, vad_filter=True, beam_size=5,
         )
-        return " ".join(s.text.strip() for s in segmentos).strip()
+        return enderecos_falados(" ".join(s.text.strip() for s in segmentos).strip())
 
 
 def carregar_whisper(modelo: str, dispositivo: str):
@@ -87,24 +172,10 @@ def carregar_whisper(modelo: str, dispositivo: str):
 
 
 class Locutor:
-    def __init__(
-        self,
-        pasta: Path,
-        gerar: Callable[[str, Path], Awaitable[None]] | None = None,
-        voz: str = "pt-BR-ThalitaMultilingualNeural",
-        velocidade: str = "+10%",
-        guardar: int = 20,
-    ):
+    def __init__(self, pasta: Path, gerar: Gerador, guardar: int = 20):
         self._pasta = pasta
-        self._gerar = gerar or self._edge_tts
-        self._voz = voz
-        self._velocidade = velocidade
+        self._gerar = gerar
         self._guardar = guardar
-
-    async def _edge_tts(self, texto: str, destino: Path) -> None:
-        import edge_tts
-
-        await edge_tts.Communicate(texto, self._voz, rate=self._velocidade).save(str(destino))
 
     async def sintetizar(self, texto: str) -> Path:
         self._pasta.mkdir(parents=True, exist_ok=True)
