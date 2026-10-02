@@ -1,8 +1,10 @@
 "use strict";
 
-/* O núcleo da Clarisse: anel dourado com um globo de linhas girando, filamentos de energia que se
-   agitam com a voz, régua de HUD e, em volta, a constelação de ferramentas. Um nó acende enquanto
-   a ferramenta dele trabalha. Quando o chat abre à direita, o núcleo desliza para o espaço que sobra. */
+/* O núcleo da Clarisse: anel dourado com a bússola da Smart Compass no centro, filamentos de energia
+   que se agitam com a voz, régua de HUD e, em volta, a constelação de ferramentas. Um nó acende
+   enquanto a ferramenta dele trabalha. A bússola respira parada, gira enquanto a Clarisse pensa ou
+   executa e, ao terminar, assenta apontando para cima de novo, com o balanço de um ponteiro.
+   Quando o chat abre à direita, o núcleo desliza para o espaço que sobra. */
 
 const Nucleo = (() => {
   const MOVIMENTO_REDUZIDO = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -26,6 +28,25 @@ const Nucleo = (() => {
   let estadoAtual = "idle";
   let agitacao = 0.05, brilho = 0.55, giro = 0, chat = 0;
   let nos = [];
+
+  // O logo tem simetria de quarto de volta: assentar em qualquer múltiplo de 90° é apontar para cima.
+  const QUARTO = Math.PI / 2;
+  const GIRO_DA_BUSSOLA = 2.2;
+  let rumo = 0, rumoVel = 0, pouso = 0;
+  let logoDourado = null;
+  const logo = new Image();
+  logo.onload = () => {
+    const o = document.createElement("canvas");
+    o.width = logo.naturalWidth;
+    o.height = logo.naturalHeight;
+    const oc = o.getContext("2d");
+    oc.drawImage(logo, 0, 0);
+    oc.globalCompositeOperation = "source-in";
+    oc.fillStyle = rgba(OURO_CLARO, 1);
+    oc.fillRect(0, 0, o.width, o.height);
+    logoDourado = o;
+  };
+  logo.src = "/static/logo-smart.png";
 
   const filamentos = Array.from({ length: 9 }, (_, i) => ({
     f1: 2 + (i % 3), f2: 4 + ((i * 2) % 5), f3: 7 + (i % 2),
@@ -132,30 +153,18 @@ const Nucleo = (() => {
     }
   }
 
-  function desenharGlobo() {
-    const rg = raio * 0.58, inclina = -0.2;
-    const ci = Math.cos(inclina), si = Math.sin(inclina);
-    const projetar = (x, y, z) => [cx + x * rg, cy + (y * ci - z * si) * rg, y * si + z * ci];
-    const linha = (pontos) => {
-      for (let k = 1; k < pontos.length; k++) {
-        const [x0, y0, z0] = pontos[k - 1], [x1, y1, z1] = pontos[k];
-        c.strokeStyle = rgba(OURO_CLARO, ((z0 + z1) / 2 > 0 ? 0.32 : 0.07) * brilho);
-        c.beginPath();
-        c.moveTo(x0, y0);
-        c.lineTo(x1, y1);
-        c.stroke();
-      }
-    };
-    const ponto = (fi, lam) => projetar(Math.cos(fi) * Math.sin(lam), Math.sin(fi), Math.cos(fi) * Math.cos(lam));
-    c.lineWidth = 0.8;
-    for (let m = 0; m < 12; m++) {
-      const lam = (m / 12) * Math.PI + giro * 0.4;
-      linha(Array.from({ length: 41 }, (_, k) => ponto(-Math.PI / 2 + (k / 40) * Math.PI, lam)));
-    }
-    for (let p = 1; p < 8; p++) {
-      const fi = -Math.PI / 2 + (p / 8) * Math.PI;
-      linha(Array.from({ length: 61 }, (_, k) => ponto(fi, (k / 60) * Math.PI * 2)));
-    }
+  function desenharBussola(t, nivel) {
+    if (!logoDourado) return;
+    const lado = raio * 1.12;
+    const respiro = 0.88 + 0.12 * Math.sin(t * 1.3);
+    c.save();
+    c.translate(cx, cy);
+    c.rotate(rumo);
+    c.globalAlpha = Math.min(1, (0.45 + 0.55 * brilho) * respiro + nivel * 0.3);
+    c.shadowColor = rgba(OURO_CLARO, 0.8);
+    c.shadowBlur = 10 + 8 * respiro + nivel * 36;
+    c.drawImage(logoDourado, -lado / 2, -lado / 2, lado, lado);
+    c.restore();
   }
 
   function desenharAnel(nivel) {
@@ -226,6 +235,19 @@ const Nucleo = (() => {
 
   let antes = performance.now();
 
+  function moverBussola(dt) {
+    if (MOVIMENTO_REDUZIDO) return;
+    if (estadoAtual === "thinking" || estadoAtual === "executing") {
+      rumoVel += (GIRO_DA_BUSSOLA - rumoVel) * Math.min(1, dt * 2);
+      // Assenta no próximo quarto à frente, contando o embalo, para nunca voltar para trás.
+      pouso = Math.ceil((rumo + rumoVel * 0.5) / QUARTO) * QUARTO;
+    } else {
+      // Mola pouco amortecida: passa um pouco do ponto e volta, como ponteiro de bússola.
+      rumoVel += (-(rumo - pouso) * 18 - rumoVel * 4.5) * dt;
+    }
+    rumo += rumoVel * dt;
+  }
+
   function quadro(agora) {
     const dt = Math.min(0.05, (agora - antes) / 1000);
     antes = agora;
@@ -235,6 +257,7 @@ const Nucleo = (() => {
     brilho += (alvo.brilho - brilho) * dt * 3;
     giro += alvo.giro * dt * (MOVIMENTO_REDUZIDO ? 0.25 : 1);
     const nivel = MOVIMENTO_REDUZIDO ? 0 : api.nivel();
+    moverBussola(dt);
 
     const chatAlvo = document.body.classList.contains("com-chat") ? Math.min(LARGURA_DO_CHAT, largura * 0.4) : 0;
     if (Math.abs(chatAlvo - chat) > 0.5) {
@@ -245,7 +268,7 @@ const Nucleo = (() => {
     c.clearRect(0, 0, largura, altura);
     desenharPoeira();
     desenharConstelacao(agora / 1000, dt);
-    desenharGlobo();
+    desenharBussola(t, nivel);
     desenharAnel(nivel);
     desenharFilamentos(t, nivel);
     requestAnimationFrame(quadro);
