@@ -1,0 +1,34 @@
+[project]
+name = "clarisse"
+version = "0.1.0"
+description = "Assistente de voz local que conversa, executa ações na máquina e delega ao Claude"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "edge-tts>=7.2.8",
+    "fastapi>=0.141.1",
+    "faster-whisper>=1.2.1",
+    "httpx>=0.28.1",
+    "mcp>=1.20",
+    "psutil>=7.2.2",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv]
+package = false

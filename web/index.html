@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clarisse</title>
+  <link rel="preload" href="/static/fontes/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="/static/icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/estilo.css">
+  <script src="/static/enxame.js" defer></script>
+  <script src="/static/malha-rosto.js" defer></script>
+  <script src="/static/rosto.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body data-estado="idle">
+  <main class="palco">
+    <canvas id="enxame" aria-hidden="true"></canvas>
+    <canvas id="rosto" aria-hidden="true"></canvas>
+    <p id="estado" class="estado" role="status" aria-live="polite">Pronta</p>
+  </main>
+
+  <aside class="painel" aria-label="Conversa com a Clarisse">
+    <section class="conversa" id="conversa" role="log" aria-live="polite" aria-label="Conversa">
+      <p class="conversa-vazia" id="conversa-vazia">Fale ou escreva. A conversa aparece aqui.</p>
+    </section>
+
+    <div class="rodape-do-painel">
+      <div id="confirmacao" class="confirmacao" hidden>
+        <button type="button" id="confirmar" class="botao botao-sim">Confirmar</button>
+        <button type="button" id="cancelar" class="botao botao-nao">Cancelar</button>
+      </div>
+      <p id="aviso-som" class="aviso-som" hidden>Clique em qualquer lugar da página para liberar o som.</p>
+
+      <div class="controles">
+        <button type="button" id="falar" class="botao botao-falar" aria-pressed="false">
+          <span class="botao-falar-rotulo">Falar</span>
+        </button>
+        <form id="formulario" class="escrever" autocomplete="off">
+          <label for="texto" class="apenas-leitor">Escrever para a Clarisse</label>
+          <input id="texto" name="texto" maxlength="2000" placeholder="Ou escreva aqui e aperte Enter">
+        </form>
+        <p class="dica">A barra de espaço também liga e desliga o microfone.</p>
+      </div>
+    </div>
+  </aside>
+</body>
+</html>

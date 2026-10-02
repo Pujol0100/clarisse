@@ -1,0 +1,119 @@
+"""Voz para texto (faster-whisper, local) e texto para voz (edge-tts, serviço da Microsoft)."""
+import asyncio
+import io
+import re
+import uuid
+from collections.abc import Awaitable, Callable
+from pathlib import Path
+
+_LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_URL = re.compile(r"https?://\S+")
+_MARCAS_DE_LISTA = re.compile(r"^\s*(?:#+|[-*•]|\d+[.)])\s*")
+# Comando soletrado em voz alta não ajuda ninguém: o bloco vira um aviso.
+_BLOCO_DE_CODIGO = re.compile(r"```.*?```", re.DOTALL)
+_SEPARADOR_DE_TABELA = re.compile(r"^\s*\|?[\s:|-]*-{3,}[\s:|-]*$")
+
+
+def _linha_de_tabela(linha: str) -> str:
+    if not linha.strip().startswith("|"):
+        return linha
+    return ", ".join(celula.strip() for celula in linha.strip().strip("|").split("|") if celula.strip())
+
+
+def texto_para_fala(texto: str) -> str:
+    texto = _BLOCO_DE_CODIGO.sub("\nTrecho de código.\n", texto)
+    texto = _LINK_MARKDOWN.sub(r"\1", texto)
+    texto = _URL.sub("o link", texto)
+    texto = re.sub(r"[*_`]", "", texto)
+    frases = []
+    for linha in texto.splitlines():
+        if _SEPARADOR_DE_TABELA.match(linha):
+            continue
+        linha = _MARCAS_DE_LISTA.sub("", _linha_de_tabela(linha)).strip()
+        if linha:
+            frases.append(linha if linha[-1] in ".!?:;," else linha + ".")
+    falado = " ".join(frases)
+    if frases and not texto.rstrip().endswith((".", "!", "?")):
+        falado = falado[:-1]
+    return " ".join(falado.split())
+
+
+_FIM_DE_FRASE = re.compile(r"(?<=[.!?;])\s+")
+_TAMANHO_DO_TRECHO = 220
+
+
+def dividir_em_trechos(texto: str) -> list[str]:
+    """Texto já limpo para a fala, em trechos: a primeira frase sozinha, para a voz começar logo,
+    e as seguintes juntas até ~220 letras, sem cortar nenhuma frase ao meio."""
+    frases = [f for f in _FIM_DE_FRASE.split(texto_para_fala(texto)) if f]
+    if not frases:
+        return []
+    trechos, atual = [frases[0]], ""
+    for frase in frases[1:]:
+        if atual and len(atual) + 1 + len(frase) > _TAMANHO_DO_TRECHO:
+            trechos.append(atual)
+            atual = frase
+        else:
+            atual = f"{atual} {frase}".strip()
+    if atual:
+        trechos.append(atual)
+    return trechos
+
+
+class Transcritor:
+    def __init__(self, carregar: Callable[[], object], dicas: list[str]):
+        self._carregar = carregar
+        self._dicas = " ".join(dicas)
+        self._modelo = None
+        self._trava = asyncio.Lock()
+
+    async def transcrever(self, audio: bytes) -> str:
+        async with self._trava:
+            if self._modelo is None:
+                self._modelo = await asyncio.to_thread(self._carregar)
+            return await asyncio.to_thread(self._transcrever, audio)
+
+    def _transcrever(self, audio: bytes) -> str:
+        segmentos, _ = self._modelo.transcribe(
+            io.BytesIO(audio), language="pt", hotwords=self._dicas or None, vad_filter=True, beam_size=5,
+        )
+        return " ".join(s.text.strip() for s in segmentos).strip()
+
+
+def carregar_whisper(modelo: str, dispositivo: str):
+    from faster_whisper import WhisperModel
+
+    return WhisperModel(modelo, device=dispositivo, compute_type="int8" if dispositivo == "cpu" else "float16")
+
+
+class Locutor:
+    def __init__(
+        self,
+        pasta: Path,
+        gerar: Callable[[str, Path], Awaitable[None]] | None = None,
+        voz: str = "pt-BR-ThalitaMultilingualNeural",
+        velocidade: str = "+10%",
+        guardar: int = 20,
+    ):
+        self._pasta = pasta
+        self._gerar = gerar or self._edge_tts
+        self._voz = voz
+        self._velocidade = velocidade
+        self._guardar = guardar
+
+    async def _edge_tts(self, texto: str, destino: Path) -> None:
+        import edge_tts
+
+        await edge_tts.Communicate(texto, self._voz, rate=self._velocidade).save(str(destino))
+
+    async def sintetizar(self, texto: str) -> Path:
+        self._pasta.mkdir(parents=True, exist_ok=True)
+        destino = self._pasta / f"{uuid.uuid4().hex}.mp3"
+        await self._gerar(texto_para_fala(texto), destino)
+        self._apagar_antigos()
+        return destino
+
+    def _apagar_antigos(self) -> None:
+        audios = sorted(self._pasta.glob("*.mp3"), key=lambda p: p.stat().st_mtime_ns)
+        for antigo in audios[: -self._guardar]:
+            antigo.unlink(missing_ok=True)

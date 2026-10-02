@@ -1,22 +1,39 @@
-# Estado local da Clarisse - nunca versionar
-clarisse/fala.txt
-clarisse/pendente.txt
-clarisse/fila/
-clarisse/entrada/
-clarisse/controle.txt
-clarisse/emleitura.txt
-clarisse/selecao.txt
-clarisse/historico.txt
-clarisse/player.pid
-clarisse/atalhos.pid
-clarisse/clarisse.log
-clarisse/pending/
+# Segredos e configuração pessoal — nunca versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+config/*.json
+!config/*.exemplo.json
 
-# Audio gerado
+# Estado local da Clarisse: áudio, auditoria, logs
+dados/
+
+# Ambiente e caches Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Áudio gerado
 *.mp3
 *.wav
 
-# Backups de configuracao
+# Legado do Windows: estado local da versão antiga
+legado-windows/clarisse/fala.txt
+legado-windows/clarisse/pendente.txt
+legado-windows/clarisse/fila/
+legado-windows/clarisse/entrada/
+legado-windows/clarisse/controle.txt
+legado-windows/clarisse/emleitura.txt
+legado-windows/clarisse/selecao.txt
+legado-windows/clarisse/historico.txt
+legado-windows/clarisse/player.pid
+legado-windows/clarisse/atalhos.pid
+legado-windows/clarisse/clarisse.log
+legado-windows/clarisse/pending/
 *.bak
 settings.json.bak*
 
@@ -25,13 +42,9 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# Cache de ferramenta Python - nunca versionar
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# Medicoes: modelos e amostras baixados sob demanda
+# Medições: modelos, amostras e resultados brutos
 docs/medicoes/**/audio/
 docs/medicoes/**/audio_ativacao/
 docs/medicoes/**/modelos/
 docs/medicoes/**/venv/
+docs/medicoes/2026-09-28-roteador/resultado_*.json

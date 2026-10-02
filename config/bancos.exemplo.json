@@ -1,0 +1,4 @@
+{
+  "10.0.0.5:65432": {"nome": "desenvolvimento do meu-projeto", "producao": false},
+  "10.0.0.5:45432": {"nome": "produção do meu-projeto", "producao": true}
+}

@@ -1,263 +1,183 @@
-# voz-ao-claude
+# Clarisse
 
-**Clarisse** dá voz ao [Claude Code](https://claude.com/claude-code) no Windows. Quando o Claude termina uma resposta, ela dá um bipe curto — e fala em voz alta o que foi feito, os números que apareceram e o que ficou pendente **quando você apertar `Ctrl+Alt+L`**.
+Assistente de voz que roda no seu computador Linux. Você fala, ela entende com um
+modelo de linguagem **local**, executa a ação na máquina e responde falando. Quando
+a tarefa pede uma IA mais forte, ela passa o pedido para o
+[Claude Code](https://claude.com/claude-code) e fala o resultado quando fica pronto.
 
-O Claude Code já **ouve** você (voice mode). Este projeto fecha o outro lado: ele passa a **responder falando**.
+A cara dela é um rosto holográfico feito de trilhas de circuito douradas, nas cores
+da Smart Compass (preto, branco e dourado): olhos acesos que piscam, boca que abre com
+a voz, cabeça que segue o mouse, e trilhas que sobem da cabeça e descem do pescoço até
+a borda da tela, com pulsos de luz correndo por elas. Quando a resposta pede uma
+figura — sol, nuvem, chuva, trovoada, calendário, relógio, jornal, código ou balão de
+mensagem —, o rosto vai para o canto e "drones" de luz saem dele para desenhar a figura
+no meio. Quem escolhe a figura é o sistema, pela ferramenta usada e pelo dado, nunca o
+modelo. O rosto parte do modelo aberto de rosto do Google MediaPipe (Apache 2.0).
 
-## Por que isso existe
+A tela tem a Clarisse à esquerda e a conversa à direita, em balões, desde que a página
+foi aberta; em janela estreita, a conversa desce para baixo do rosto. A voz sai em
+trechos: a primeira frase é sintetizada sozinha, para ela começar a falar logo, e o que
+ela está dizendo aparece como legenda embaixo do rosto. A resposta entra no chat quando
+a voz começa.
 
-Nasceu de um problema concreto de acessibilidade: dificuldade de concentração para ler respostas longas na tela, levando a erros por não ler tudo — um valor conferido errado, um aviso ignorado, uma pendência que passou batido.
+> O código antigo, que dava voz ao Claude Code no Windows, está em
+> [`legado-windows/`](legado-windows/README.md).
 
-A solução não é ler a resposta inteira em voz alta. Isso é pior: TTS fala ~150 palavras/min e ninguém aguenta ouvir caminho de arquivo e bloco de código. A Clarisse fala **só o que não pode passar**:
+## O que ela faz
 
-- o resultado do que acabou de rodar;
-- o achado ou a conclusão — dito por inteiro, não anunciado;
-- o que ainda falta ou precisa da sua decisão;
-- valores, prazos e datas, ditos devagar;
-- avisos antes de qualquer ação irreversível;
-- quando o Claude para esperando sua permissão.
+| Você diz | Ela faz |
+|---|---|
+| "que horas são?" | Diz a hora e a data |
+| "abre o chrome", "fecha o chrome" | Abre ou fecha um aplicativo cadastrado (fechar pede confirmação) |
+| "quais programas estão abertos?" | Diz quais aplicativos cadastrados estão abertos |
+| "abre a pasta de downloads" | Abre a pasta (só dentro da sua pasta pessoal) |
+| "abre o github" | Abre o site no navegador |
+| "abaixa o volume pra trinta" | Ajusta o volume |
+| "abre o projeto omni api no VS Code" | Abre o projeto cadastrado no VS Code |
+| "roda um git status no omni api" | Roda e resume; `git pull` pede confirmação |
+| "me dá as notícias de economia" | Lê as manchetes do g1 |
+| "vai chover amanhã?", "como está o tempo em São Paulo?" | Previsão pelo Open-Meteo, em °C e km/h; sem cidade, usa a sua (`CLARISSE_CIDADE`) |
+| "o que eu tenho na agenda hoje?" | Pergunta ao Claude, que lê o seu calendário do Microsoft 365 |
+| "marca uma reunião com o João amanhã às três" | Pede confirmação e cria pelo Claude; o calendário do Linux é atualizado na hora |
+| "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
+| "pergunta pro Claude por que o build quebra" | Manda para o Claude em segundo plano e fala a resposta quando chega |
+| "manda pra conversa omni do Claude: roda os testes de novo" | Pede confirmação e entrega a mensagem numa conversa do Claude **já aberta** (dê nome à conversa com `/rename`) |
+| "vê no navegador quanto está o dólar hoje" | Pede confirmação e manda um Claude que só enxerga o navegador (Playwright, janela visível); ele lê e navega, mas não envia formulário, não compra e não altera nada |
+| "traz o VS Code pra frente", "coloca o WhatsApp na frente" | Traz para a frente uma janela já aberta, sem abrir outra |
+| "escreve bom dia equipe no WhatsApp" | Pede confirmação, traz a janela e cola o texto onde o cursor estiver; não aperta Enter |
+| "salva", "aperta enter", "desfaz", "fecha essa aba" | Aperta o atalho na janela pedida ou na da frente; fechar aba ou janela pede confirmação |
+| "marca uma reunião amanhã às 10 com o Bruno Santos" | Pede confirmação dizendo quem será convidado; o Claude acha a pessoa na empresa e **não cria** se o nome for ambíguo |
+| "abre a planilha de boletos", "abre o readme do smart anchor" | Procura o arquivo na pasta pessoal (nome e pasta; "planilha", "pdf", "documento" viram tipo) e abre; com vários, lista os 3 mais recentes |
+| "roda o smart anchor", "sobe o omni app" | Acha o projeto, abre um terminal por parte (`npm run dev` ou `start:dev`), instala as dependências antes se faltarem (`npm ci`) e abre o site quando responder; a confirmação diz qual banco o `.env` usa |
+| "o que é a Smart Compass?", "qual a cotação do dólar?" | Pede ao Claude, que pesquisa na internet, e fala a resposta |
+| "abre o kanban e depois me diz o tempo" (pedido com "e depois", "em seguida"…) | Vai inteiro para um Claude que usa as ferramentas da própria Clarisse, etapa por etapa; o que altera algo é perguntado pela voz ("O Claude quer: … Confirma?") |
+| "lê a última resposta do Claude", "lê a resposta da conversa clarisse" | Lê em voz alta, na íntegra, o que o Claude Code respondeu por último (conversa mais recente ou pelo nome); código vira "trecho de código" |
+| "para", "cancela" | Para na hora, sem passar pelo modelo |
 
-O detalhe e o código continuam na tela. O áudio é o resultado.
-
-**Resumo não é aviso.** A instrução no `CLAUDE.md` proíbe explicitamente frases ocas: nada de "encontrei um problema" sem dizer qual, ou "preciso da sua decisão" sem dizer qual. Se o resumo menciona algo que exige ação, o conteúdo vem na mesma frase.
-
-**Você decide a hora de ouvir.** Voz que dispara sozinha atropela quem está no meio de outra coisa — e se você a corta, perde o que ela ia dizer. Por isso o fim de uma resposta só emite um bipe; a fala sai no seu comando, e você pode pausá-la e retomá-la do mesmo ponto.
+Ações que alteram algo esperam o seu **"sim"** (ou o botão Confirmar). Qualquer
+outra resposta cancela.
 
 ## Como funciona
 
-Uma skill não produz som — skill é só texto de instrução. Quem produz som são **hooks**, que o Claude Code executa sozinho em pontos do ciclo de vida.
-
 ```
-você fala  ──►  Claude Code (voice mode)  ──►  Claude trabalha
-                                                     │
-                                    escreve o resumo em fala.txt
-                                                     │
-                                          hook Stop dispara
-                                                     │
-                              resumo entra na fila  ──►  🔔 bipe curto
-                                                     │
-                                          você aperta Ctrl+Alt+L
-                                                     │
-                       edge-tts gera o 1º pedaço ──► 🔊 Clarisse fala
-                                                     │
-                              o resto é gerado enquanto ela fala
+navegador (bola neural)                     servidor local (127.0.0.1:8765)
+┌──────────────────────┐   WebSocket    ┌──────────────────────────────────┐
+│ microfone            │ ─── áudio ───► │ transcrição: faster-whisper      │
+│ bola neural          │ ◄── eventos ── │ agente ─► Ollama (Gemma 4 e4b)   │
+│ voz da Clarisse      │ ◄── mp3 ────── │   └─► segurança ─► ferramentas   │
+└──────────────────────┘                │ voz: edge-tts                    │
+                                        └──────────────────────────────────┘
+atalho do GNOME ─► scripts/alternar-escuta.sh ─► liga/desliga o microfone
 ```
 
-| Peça | Papel |
-|---|---|
-| `clarisse/nucleo.ps1` | Núcleo compartilhado: config, saneamento do texto, segmentação, caixa de entrada, fila, controle do áudio |
-| `clarisse/clarisse.ps1` | Motor: gera o áudio e reproduz |
-| `clarisse/falar.py` | Sintetiza a fala em pedaços, em fluxo, para a voz começar quase na hora |
-| `clarisse/atalhos.ps1` | Escutador residente dos atalhos globais |
-| Hook `Stop` | Enfileira o resumo e bipa quando o Claude termina |
-| Hook `Notification` | **Fala** qual projeto parou pedindo permissão — ali o Claude está travado esperando você |
-| Hook `SessionStart` | Religa a voz e sobe o escutador a cada sessão nova |
-| `comandos/clarisse.md` | Slash command `/clarisse` |
-| `docs/INSTRUCOES-CLAUDE.md` | Bloco anexado ao seu `CLAUDE.md` que instrui o Claude a escrever o resumo |
+O modelo **não executa nada**. Ele só escolhe uma ferramenta de uma lista fechada;
+o sistema valida os argumentos, decide se precisa de confirmação, executa e registra.
 
-### Atalhos
+As escolhas foram medidas, não supostas:
 
-| Tecla | O que faz |
-|---|---|
-| `Ctrl+Alt+L` | Lê o resumo da fila — ou, com vários projetos esperando, anuncia quem são |
-| `Ctrl+Alt+J` | Passeia para o próximo projeto da fila, sem consumir nada |
-| `Ctrl+Alt+P` | Pausa a fala; aperte de novo e ela **retoma do mesmo ponto** |
-| `Ctrl+Alt+X` | Cancela a fala na hora — e o resumo **volta para a fila** |
-
-As quatro combinações são configuráveis. Elas funcionam com qualquer janela em foco — inclusive fora do terminal.
-
-Isso exige um processo residente: um `powershell.exe` oculto registra as teclas via `RegisterHotKey` do Win32 e dorme em `GetMessage`, sem consumir CPU. Ele **continua rodando depois que você fecha o Claude Code** — é o que faz o atalho responder a qualquer momento. `/clarisse status` mostra se ele está de pé e `/clarisse atalhos off` o encerra.
-
-A pausa é pausa de verdade, não um "matar e recomeçar": o reprodutor lê um arquivo de controle a cada 120 ms e usa `Pause()`/`Play()` do `MediaPlayer`.
-
-### A fala começa antes do áudio estar pronto
-
-Gerar o áudio inteiro antes de tocar a primeira nota custava **33 segundos de silêncio** num resumo de 1.500 caracteres — e o tempo cresce junto com o texto, então ampliar o limite da fala piorou isso sem ninguém perceber.
-
-O texto é cortado em pedaços e sintetizado **em fluxo**: a fala começa no primeiro pedaço enquanto o resto ainda está sendo gerado. Medido na mesma máquina, com o mesmo resumo: **33 s → 3 s**. Sintetizar é cerca de 3× mais rápido que falar, então depois do primeiro pedaço a geração corre na frente da voz e não engasga.
-
-O primeiro pedaço é deliberadamente curto, porque é ele que define a espera. Cortar demais também custa: cada pedaço é uma ida ao servidor de voz.
-
-O sinal de "pode tocar" é um arquivo-sentinela escrito **depois** de o mp3 ser fechado — a existência do mp3 não serve, porque um arquivo ainda em gravação abre no player com duração errada e corta a fala no meio. De brinde, `Ctrl+Alt+X` responde em 0,4 s, e um pedaço corrompido custa uma frase em vez do resumo inteiro.
-
-### Várias sessões abertas ao mesmo tempo
-
-Todas as sessões do Claude Code compartilham a mesma pasta `~/.claude/clarisse`, e o atalho é global no nível do sistema operacional — ele não tem como saber qual terminal você está olhando.
-
-Por isso cada sessão escreve o resumo na **sua própria caixa** — `entrada/<projeto>.txt` — em vez de num arquivo único. De lá eles vão para uma **fila** de leitura, e cada um é anunciado com a origem:
-
-> *"No projeto voz-ao-claude: rodei os vinte e sete testes e todos passaram. Tem mais um resumo esperando."*
-
-Nada é sobrescrito: se três sessões terminam juntas, os três resumos esperam a sua vez. A fila guarda 20 e descarta os mais antigos além disso.
-
-A ordem é a de chegada, e isso exigiu conserto: o nome do arquivo era o milissegundo mais um identificador aleatório, e o relógio do Windows tem granularidade grossa demais para separar duas escritas seguidas. Medido em 200 repetições, **34% dos pares caíam no mesmo milissegundo e a fila saía invertida em 22% das vezes** — quem desempatava era o identificador sorteado. Hoje um contador por milissegundo preserva a ordem.
-
-A origem vem do **nome do arquivo**, não de qual sessão disparou o hook. Por isso qualquer sessão que termine recolhe tudo que estiver parado, sempre com a atribuição certa — nenhum resumo fica preso esperando aquela sessão específica terminar de novo.
-
-Os pedidos de permissão também dizem de quem são: *"O projeto cadeia-sequencial precisa da sua permissão para continuar."*
-
-### Escolher qual projeto ouvir
-
-Com um projeto na fila, `Ctrl+Alt+L` lê e pronto. Com **vários**, ela primeiro anuncia quem está esperando:
-
-> *"Seis projetos esperando, vinte resumos: compliance app, velocímetro tokens, consultor financeiro, conciliação bancária, omni api, e mais um projeto. Selecionado: compliance app."*
-
-Daí `Ctrl+Alt+J` passeia pelos projetos (ela diz só o nome) e `Ctrl+Alt+L` confirma e lê. `/clarisse ler concil` vai direto ao projeto, aceitando nome parcial.
-
-**Passear não custa nada, e desistir também não.** O resumo só sai da fila quando a fala chega ao fim: cancelar no meio o devolve para a fila. Antes o arquivo era apagado no momento da entrega — caçar o resumo de um projeto específico destruía todos os que passavam na frente, e cancelar ao perceber que era o projeto errado perdia aquele resumo de vez.
-
-A frase da triagem é deliberadamente curta. Listar seis projetos com a contagem de cada um dava 334 caracteres, uns 25 segundos só para anunciar a lista — ouvir isso a cada leitura seria pior que o problema que a triagem resolve. Ela diz os totais e no máximo cinco nomes.
-
-Se preferir o comportamento antigo, `"triagem": false` no config faz `Ctrl+Alt+L` voltar a entregar direto o mais recente.
-
-`/clarisse status` mostra quantos resumos esperam e de quais projetos.
-
-Se o Claude não escrever o resumo, nada é falado — o sistema falha em silêncio, nunca fala lixo.
+- [`docs/medicoes/2026-09-28-roteador/`](docs/medicoes/2026-09-28-roteador/README.md):
+  por que o `gemma4:e4b-it-qat` (29 de 32 pedidos certos, 0,27 s, cabe inteiro em
+  8 GB de placa de vídeo).
+- [`docs/planos/2026-09-28-clarisse-assistente-local-design.md`](docs/planos/2026-09-28-clarisse-assistente-local-design.md):
+  o desenho e as decisões.
 
 ## Requisitos
 
-- Windows 10/11 com Windows PowerShell 5.1 (já vem no sistema)
-- Claude Code instalado
-- Python 3 ([python.org](https://www.python.org/downloads/) — o instalador acha sozinho)
-- Conexão com internet (a síntese neural é um serviço online)
-
-Reprodução usa `System.Windows.Media.MediaPlayer` do .NET Framework — sem `ffmpeg`, `mpv` ou qualquer player externo.
+- Linux com GNOME (testado no Ubuntu 26.04, Wayland) e PipeWire.
+- [uv](https://docs.astral.sh/uv/) — ele instala o Python 3.12 sozinho.
+- [Ollama](https://ollama.com) com o modelo `gemma4:e4b-it-qat`.
+- Placa de vídeo com pelo menos 6 GB é recomendada; a transcrição roda no processador.
+- Claude Code instalado e logado, para as tarefas delegadas ao Claude.
+- Chrome ou Firefox, para a tela e o microfone.
+- Node.js (`npx`), para as tarefas no navegador.
+- Para mexer nas janelas: a extensão [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
+  do GNOME e o teclado virtual (`scripts/instalar-teclado-virtual.sh`).
 
 ## Instalação
 
-```powershell
-git clone https://github.com/Pujol0100/voz-ao-claude.git
-cd voz-ao-claude
-powershell -ExecutionPolicy Bypass -File .\instalar.ps1
+```bash
+git clone https://github.com/Pujol0100/clarisse.git
+cd clarisse
+uv sync
+ollama pull gemma4:e4b-it-qat
+cp config/projetos.exemplo.json config/projetos.json
+cp config/aplicativos.exemplo.json config/aplicativos.json
+cp config/pastas.exemplo.json config/pastas.json
 ```
 
-O instalador detecta o Python, instala o `edge-tts`, copia os arquivos para `~/.claude/clarisse`, registra os três hooks (fazendo **backup** do seu `settings.json` e preservando hooks de terceiros), anexa o bloco de instruções ao `CLAUDE.md` e toca uma frase de teste.
+Edite os três arquivos em `config/` com os seus projetos, aplicativos e pastas.
+Eles nunca vão para o git.
 
-Depois, abra `/hooks` uma vez no Claude Code ou reinicie — hooks são lidos na abertura da sessão.
+Opcional: `config/bancos.json` (copie de `config/bancos.exemplo.json`) dá nome aos
+bancos que os seus projetos usam e marca os de produção. Ao rodar um projeto, a
+Clarisse fala o nome do banco e **recusa** os marcados como produção.
 
-## Comandos
+Opcional, uma vez só:
 
-| Comando | O que faz |
-|---|---|
-| `/clarisse` | Mostra o status |
-| `/clarisse ler` | Lê o próximo resumo da fila (mesmo efeito do `Ctrl+Alt+L`) |
-| `/clarisse o que esta rolando no <projeto>` | Lê a sessão daquele projeto e **fala** o que aconteceu |
-| `/clarisse quais projetos` | Lista os projetos com sessão gravada, do mais ativo para o menos |
-| `/clarisse pausar` | Congela a fala; de novo, retoma do mesmo ponto |
-| `/clarisse cancelar` | Corta a fala **na hora** |
-| `/clarisse atalhos off` | Encerra o escutador de atalhos |
-| `/clarisse atalhos on` | Sobe o escutador de atalhos |
-| `/clarisse repetir` | Repete a última fala |
-| `/clarisse repetir 2` | Repete a penúltima (guarda as 5 últimas) |
-| `/clarisse repetir devagar` | Repete mais lenta — para quando o número passou rápido |
-| `/clarisse historico` | Lista as 5 últimas falas em texto |
-| `/clarisse test` | Toca uma frase de teste |
-| `/clarisse voz <nome>` | Troca a voz |
-| `/clarisse rapida` / `lenta` | Ajusta a velocidade |
-| `/clarisse nao ligar sozinha` | Desativa o autostart |
-
-Frases naturais também funcionam: `/clarisse perdi`, `/clarisse não ouvi`, `/clarisse cala`.
-
-### Ela lê as suas sessões no seu lugar
-
-O resumo de fim de resposta só cobre o instante em que uma sessão termina. Ele não responde *"o que está rolando no omni-api agora"*, nem *"o que ele decidiu sobre a conciliação"*.
-
-O Claude Code grava a conversa de cada sessão em disco **enquanto ela acontece**. A Clarisse lê esses arquivos e conta o que houve — de qualquer projeto, a qualquer momento, sem depender daquela sessão ter terminado.
-
-```
-/clarisse o que esta rolando no omni-api
+```bash
+scripts/instalar-no-menu.sh    # põe a Clarisse no menu de aplicativos
+scripts/instalar-atalho.sh     # Ctrl+Alt+C liga e desliga o microfone, com qualquer janela na frente
+scripts/instalar-teclado-virtual.sh   # ydotool e wl-clipboard, para colar texto e apertar atalhos (pede senha)
 ```
 
-> *"No omni-api: os vinte e sete testes passaram, mas a conversão de data continua sem cobertura. Ficou pendente decidir se o desconto entra antes ou depois do imposto."*
+O teclado virtual precisa de permissão no `/dev/uinput`. O script dá essa permissão
+só a quem está usando a máquina, sem pôr o usuário no grupo `input`, que também
+lê tudo o que é digitado no teclado de verdade.
 
-Nome parcial serve: `o que esta rolando no concil` acha `conciliacao-bancaria`. Nome ambíguo faz ela **perguntar** em vez de escolher — `omni` casa com mais de um projeto, e adivinhar ali seria relatar o projeto errado. Nome exato ganha sozinho: pedir `omni-api` não devolve `omni-api-legado` junto.
+O texto entra **colado**, não digitado letra por letra: o `ydotool` digita como
+teclado americano e, no ABNT2, perderia os acentos e trocaria símbolos. Por isso
+o texto colado fica na área de transferência depois.
 
-Ela lê **as suas sessões**, não a memória dela. Isso vale para todos os projetos ao mesmo tempo, que é o ponto quando há dez terminais abertos e ninguém consegue acompanhar todos.
+## Uso
 
-**Privacidade — leia antes de usar com dado de cliente.** Transcrição de sessão contém tudo que passou pelo terminal. Um filtro mecânico barra formatos evidentes de segredo — chave, token, senha, cabeçalho de autorização — antes de qualquer texto virar áudio. Esse filtro pega **formato, não sentido**: nome de cliente dito em texto corrido passa. A segunda defesa é a instrução dada ao Claude que compõe o resumo, e instrução não é garantia.
-
-A verificação do projeto agora são **dois** comandos, porque a Leitora é Python e o resto é PowerShell:
-
-```powershell
-Invoke-Pester -Path .\tests
-python -m pytest
+```bash
+scripts/ligar.sh
 ```
 
-## Vozes disponíveis
+Ela confere o ambiente, liga o Ollama se precisar e abre a página. Na primeira vez,
+clique em qualquer lugar da página e autorize o microfone.
 
-| Voz | Perfil |
-|---|---|
-| `pt-BR-ThalitaMultilingualNeural` | Feminina, multilíngue, mais neutra — **padrão** |
-| `pt-BR-FranciscaNeural` | Feminina, brasileira, mais calorosa |
-| `pt-BR-AntonioNeural` | Masculina, brasileira |
+- **Falar:** botão Falar, barra de espaço com a página em foco, ou `Ctrl+Alt+C` de
+  qualquer lugar. Aperta, fala, aperta de novo.
+- **Escrever:** o campo de texto faz o mesmo que a voz.
+- **Desligar:** `Ctrl+C` na janela do terminal, ou `scripts/desligar.sh`.
 
-Lista completa: `python -m edge_tts --list-voices`
+Ajustes (modelo, voz, velocidade, cidade para a previsão do tempo, teto de gasto do
+Claude) ficam em `.env`; veja `.env.example`.
 
-## Privacidade — leia antes de usar
+### Calendário do Linux
 
-> A síntese neural **envia o texto do resumo para servidores da Microsoft** (é o mesmo motor de leitura em voz alta do Edge). O áudio não é gerado localmente.
+O calendário do GNOME é uma cópia da agenda do Outlook, e sozinho ele quase não
+atualiza (em 29/09/2026 ficou duas horas parado). Enquanto está ligada, a
+Clarisse pede ao Linux que busque as mudanças a cada 5 minutos
+(`CLARISSE_AGENDA_INTERVALO_MINUTOS`) e logo depois de criar um compromisso.
 
-Isso importa se você usa o Claude Code com dados corporativos ou de clientes. Duas mitigações:
+## Testes
 
-1. O bloco em `docs/INSTRUCOES-CLAUDE.md` já instrui o Claude a **não** colocar credencial, dado pessoal de terceiros, nome de cliente ou valor exato de contrato no resumo falado.
-2. Para uso 100% offline, troque o motor pela síntese nativa do Windows (`System.Speech`, voz *Microsoft Maria*). É gratuita e não sai da máquina — mas soa bem mais robótica. A troca fica isolada na função `Invoke-Fala`.
-
-Nada é enviado enquanto a Clarisse estiver pausada.
-
-## Configuração
-
-`~/.claude/clarisse/config.json`:
-
-```json
-{
-  "enabled": true,
-  "autoStart": true,
-  "voice": "pt-BR-ThalitaMultilingualNeural",
-  "rate": "+12%",
-  "volume": "+0%",
-  "maxChars": 1800,
-  "python": "",
-  "atalhos": {
-    "ativo": true,
-    "ler": "Ctrl+Alt+L",
-    "pausar": "Ctrl+Alt+P",
-    "cancelar": "Ctrl+Alt+X"
-  }
-}
+```bash
+uv run pytest
 ```
 
-`python` vazio faz o script detectar o interpretador sozinho. `maxChars` corta falas longas demais — 1800 dá cerca de um minuto e meio de áudio.
+## Privacidade
 
-As combinações aceitam `Ctrl`, `Alt`, `Shift` e `Win` mais uma tecla (`L`, `F9`, `Up`, `Space`...). Depois de trocar, rode `/clarisse atalhos off` e `/clarisse atalhos on`. Se outro programa já usar a combinação, o Windows recusa e o motivo aparece em `clarisse.log`.
+- O modelo, a transcrição e a auditoria ficam na máquina.
+- **O texto da resposta vai para a Microsoft** para virar voz (edge-tts).
+- O que é delegado ao Claude vai para a Anthropic.
+- A previsão do tempo consulta o Open-Meteo (gratuito para uso pessoal, sem conta).
+- Logs, áudio, auditoria e o registro da conversa (`dados/conversa.jsonl`) ficam em
+  `dados/`, fora do git.
 
-`atalhos.ativo` em `false` impede o escutador de subir junto com a sessão.
+Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
 
-## Trocar o nome dela
+## Ainda não faz
 
-"Clarisse" é só um nome. Renomeie `comandos/clarisse.md` para o nome que quiser (`/jarvis`, `/sofia`) e ajuste os textos — o motor não depende disso.
-
-## Desinstalar
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\instalar.ps1 -Desinstalar
-```
-
-Remove os hooks, o comando e o bloco do `CLAUDE.md`. A pasta `~/.claude/clarisse` é mantida (contém seu config e histórico) para você apagar quando quiser.
-
-## Problemas comuns
-
-| Sintoma | Causa provável |
-|---|---|
-| Não fala nada depois de instalar | Hooks ainda não carregados — abra `/hooks` ou reinicie |
-| Fala o teste mas não o resumo | O bloco de instruções não está no `CLAUDE.md`; rode o instalador sem `-SemInstrucoes` |
-| Silêncio total e nenhum erro | Veja `~/.claude/clarisse/clarisse.log` |
-| `Python nao encontrado` | Preencha o caminho no campo `python` do `config.json` |
-| Fala cortada no meio | Alguém apertou `Ctrl+Alt+X` ou rodou `/clarisse pausar` — use `/clarisse continuar` |
-| Bipa mas o atalho não faz nada | O escutador caiu ou outro programa tomou a tecla. Veja `/clarisse status` e `clarisse.log`; use `/clarisse ler` enquanto isso |
-| Leu o resumo de outro terminal | É a fila fazendo o trabalho dela: ela entrega o mais recente de qualquer sessão, dizendo de qual projeto veio. Aperte de novo para ouvir o próximo |
-| Resumo veio sem dizer o projeto | O Claude escreveu no `fala.txt` antigo em vez da caixa do projeto. Funciona, mas sem identificar a origem — reinstale para atualizar o bloco no `CLAUDE.md` |
-| Atalho continua ativo com o Claude fechado | É o esperado. `/clarisse atalhos off` encerra o processo residente |
-| Bipe não sai | Alguns notebooks silenciam o canal de sistema. Ponha `atalhos.ativo` em `false` e volte ao modo automático, ou confira o mixer do Windows |
+- Acordar com a palavra "Clarisse" (em agosto nenhum motor gratuito acertou isso em
+  português; fica para uma medição nova).
+- Escolher o contato no WhatsApp: ela cola o texto na conversa que estiver aberta
+  (não existe API oficial para conta pessoal).
+- Clicar com o mouse em outros programas: ela traz janelas, cola texto e aperta
+  atalhos, mas não clica.
+- Voz 100% offline.
 
 ## Licença
 

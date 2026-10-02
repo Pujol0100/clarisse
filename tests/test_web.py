@@ -1,0 +1,537 @@
+import asyncio
+import json
+from contextlib import ExitStack
+
+import pytest
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
+from clarisse.agente import Resposta
+from clarisse.auditoria import Auditoria
+from clarisse.eventos import Eventos
+from clarisse.web import criar_app, criar_avisador
+
+CHAVE = "chave-de-teste-" + "x" * 30
+ORIGEM = "http://127.0.0.1:8765"
+
+
+class AgenteFalso:
+    def __init__(self):
+        self.falas = []
+        self.proxima = Resposta("Abri o projeto.")
+
+    async def responder(self, fala):
+        self.falas.append(fala)
+        return self.proxima
+
+
+class TranscritorFalso:
+    def __init__(self):
+        self.audios = []
+
+    async def transcrever(self, audio):
+        self.audios.append(audio)
+        return "abre o omni api"
+
+
+class LocutorFalso:
+    def __init__(self, pasta, falhar=False):
+        self.pasta = pasta
+        self.falhar = falhar
+        self.textos = []
+
+    async def sintetizar(self, texto):
+        if self.falhar:
+            raise OSError("sem internet")
+        self.textos.append(texto)
+        self.pasta.mkdir(parents=True, exist_ok=True)
+        destino = self.pasta / ("a" * 32 + ".mp3")
+        destino.write_bytes(b"ID3")
+        return destino
+
+
+@pytest.fixture
+def pasta_web(tmp_path):
+    pasta = tmp_path / "web"
+    pasta.mkdir()
+    (pasta / "index.html").write_text("<!doctype html><title>Clarisse</title>", encoding="utf-8")
+    (pasta / "app.js").write_text("console.log(1)", encoding="utf-8")
+    return pasta
+
+
+@pytest.fixture
+def partes(tmp_path, pasta_web):
+    agente, transcritor, locutor, eventos = AgenteFalso(), TranscritorFalso(), LocutorFalso(tmp_path / "audio"), Eventos()
+    app = criar_app(
+        agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"),
+    )
+    return app, agente, transcritor, locutor, eventos
+
+
+@pytest.fixture
+def cliente(partes):
+    with TestClient(partes[0], base_url=ORIGEM) as c:
+        yield c
+
+
+@pytest.fixture
+def logado(cliente):
+    cliente.get("/")
+    return cliente
+
+
+def test_pagina_inicial_entrega_a_chave_em_cookie_protegido(cliente):
+    resposta = cliente.get("/")
+
+    assert resposta.status_code == 200
+    cookie = resposta.headers["set-cookie"]
+    assert f"clarisse_chave={CHAVE}" in cookie
+    assert "HttpOnly" in cookie
+    assert "SameSite=strict" in cookie or "SameSite=Strict" in cookie
+
+
+def test_host_estranho_e_recusado(partes):
+    cliente = TestClient(partes[0], base_url="http://clarisse.evil.com:8765")
+
+    assert cliente.get("/").status_code == 400
+
+
+def test_api_sem_chave_e_recusada(cliente):
+    assert cliente.post("/api/mensagem", json={"texto": "oi"}).status_code == 401
+
+
+def test_api_com_chave_errada_e_recusada(cliente):
+    resposta = cliente.post("/api/mensagem", json={"texto": "oi"}, headers={"X-Clarisse-Chave": "errada"})
+
+    assert resposta.status_code == 401
+
+
+def test_origem_de_outro_site_e_recusada_mesmo_com_chave(logado):
+    resposta = logado.post("/api/mensagem", json={"texto": "oi"}, headers={"Origin": "https://evil.com"})
+
+    assert resposta.status_code == 403
+
+
+def test_mensagem_passa_pelo_agente_e_volta_com_audio(logado, partes):
+    _, agente, _, locutor, _ = partes
+
+    resposta = logado.post("/api/mensagem", json={"texto": "abre o omni"}, headers={"Origin": ORIGEM})
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert agente.falas == ["abre o omni"]
+    assert corpo["texto"] == "Abri o projeto."
+    assert corpo["audio"] == "/audio/" + "a" * 32 + ".mp3"
+    assert locutor.textos == ["Abri o projeto."]
+
+
+def test_chave_pelo_cabecalho_serve_para_o_atalho(cliente, partes):
+    resposta = cliente.post("/api/escutar", headers={"X-Clarisse-Chave": CHAVE})
+
+    assert resposta.status_code == 200
+
+
+def test_mensagem_longa_demais_e_recusada(logado):
+    assert logado.post("/api/mensagem", json={"texto": "a" * 2001}).status_code == 422
+
+
+def test_falha_da_voz_nao_perde_o_texto(tmp_path, pasta_web):
+    app = criar_app(
+        agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(),
+        locutor=LocutorFalso(tmp_path / "audio", falhar=True),
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"),
+    )
+    cliente = TestClient(app, base_url=ORIGEM)
+    cliente.get("/")
+
+    corpo = cliente.post("/api/mensagem", json={"texto": "oi"}).json()
+
+    assert corpo["texto"] == "Abri o projeto."
+    assert corpo["audio"] is None
+
+
+def test_voz_transcreve_e_responde(logado, partes):
+    _, agente, transcritor, _, _ = partes
+
+    corpo = logado.post("/api/voz", content=b"webm", headers={"Content-Type": "audio/webm"}).json()
+
+    assert transcritor.audios == [b"webm"]
+    assert agente.falas == ["abre o omni api"]
+    assert corpo["transcricao"] == "abre o omni api"
+
+
+def test_audio_grande_demais_e_recusado(logado, partes):
+    _, _, transcritor, _, _ = partes
+
+    resposta = logado.post("/api/voz", content=b"0" * (10 * 1024 * 1024 + 1), headers={"Content-Type": "audio/webm"})
+
+    assert resposta.status_code == 413
+    assert transcritor.audios == []
+
+
+def test_audio_que_nao_e_audio_e_recusado(logado):
+    resposta = logado.post("/api/voz", content=b"x", headers={"Content-Type": "application/json"})
+
+    assert resposta.status_code == 415
+
+
+def test_fala_vazia_nao_chama_o_agente(logado, partes):
+    _, agente, transcritor, _, _ = partes
+    transcritor.transcrever = _devolve_vazio
+
+    corpo = logado.post("/api/voz", content=b"x", headers={"Content-Type": "audio/webm"}).json()
+
+    assert agente.falas == []
+    assert corpo["transcricao"] == ""
+
+
+async def _devolve_vazio(audio):
+    return ""
+
+
+def test_audio_so_serve_nome_gerado_pelo_sistema(logado, tmp_path, partes):
+    logado.post("/api/mensagem", json={"texto": "oi"})
+
+    assert logado.get("/audio/" + "a" * 32 + ".mp3").status_code == 200
+    assert logado.get("/audio/..%2F..%2Fetc%2Fpasswd").status_code == 404
+    assert logado.get("/audio/nao-existe.mp3").status_code == 404
+
+
+def test_parar_publica_evento_de_parar(logado, partes):
+    _, agente, _, locutor, eventos = partes
+    agente.proxima = Resposta("Parei.", parar=True)
+    fila = eventos.assinar()
+
+    corpo = logado.post("/api/mensagem", json={"texto": "para"}).json()
+
+    tipos = []
+    while not fila.empty():
+        tipos.append(fila.get_nowait()["tipo"])
+    assert "parar" in tipos
+    assert corpo["audio"] is None
+    assert locutor.textos == []
+
+
+def test_documentacao_automatica_desligada(logado):
+    assert logado.get("/docs").status_code == 404
+    assert logado.get("/openapi.json").status_code == 404
+
+
+def test_cabecalhos_de_seguranca(cliente):
+    cabecalhos = cliente.get("/").headers
+
+    assert "default-src 'self'" in cabecalhos["content-security-policy"]
+    assert "unsafe-inline" not in cabecalhos["content-security-policy"]
+    assert "frame-ancestors 'none'" in cabecalhos["content-security-policy"]
+    assert cabecalhos["x-content-type-options"] == "nosniff"
+    assert cabecalhos["x-frame-options"] == "DENY"
+    assert cabecalhos["referrer-policy"] == "no-referrer"
+    assert "microphone=(self)" in cabecalhos["permissions-policy"]
+
+
+def _cabecalhos_ws(origem=ORIGEM, chave=CHAVE):
+    """O cliente de teste manda Host "testserver" e nenhum cookie no WebSocket; o navegador manda os dois."""
+    cabecalhos = {"Host": "127.0.0.1:8765", "Origin": origem}
+    if chave:
+        cabecalhos["Cookie"] = f"clarisse_chave={chave}"
+    return cabecalhos
+
+
+def _recusa_do_websocket(cliente, cabecalhos) -> int:
+    with pytest.raises(WebSocketDisconnect) as recusa:
+        with cliente.websocket_connect("/ws", headers=cabecalhos) as ws:
+            ws.receive_json()
+    return recusa.value.code
+
+
+def test_websocket_sem_chave_e_recusado(cliente):
+    assert _recusa_do_websocket(cliente, _cabecalhos_ws(chave=None)) == 1008
+
+
+def test_websocket_com_chave_errada_e_recusado(cliente):
+    assert _recusa_do_websocket(cliente, _cabecalhos_ws(chave="errada")) == 1008
+
+
+def test_websocket_de_outra_origem_e_recusado(cliente):
+    assert _recusa_do_websocket(cliente, _cabecalhos_ws(origem="https://evil.com")) == 1008
+
+
+def test_websocket_de_host_estranho_e_recusado(cliente):
+    assert _recusa_do_websocket(cliente, {**_cabecalhos_ws(), "Host": "evil.com:8765"}) == 1008
+
+
+def test_websocket_recebe_o_estado_atual_e_os_eventos(logado):
+    with logado.websocket_connect("/ws", headers=_cabecalhos_ws()) as ws:
+        primeiro = ws.receive_json()
+        voz = ws.receive_json()
+        logado.post("/api/escutar")
+        evento = ws.receive_json()
+
+    assert primeiro == {"tipo": "estado", "estado": "idle"}
+    assert voz == {"tipo": "voz", "sua": True}
+    assert evento["tipo"] == "escutar"
+
+
+def _conectar(pilha, cliente):
+    ws = pilha.enter_context(cliente.websocket_connect("/ws", headers=_cabecalhos_ws()))
+    assert ws.receive_json()["tipo"] == "estado"
+    return ws
+
+
+def test_com_duas_paginas_abertas_so_a_primeira_fala(logado):
+    with ExitStack() as pilha:
+        primeira = _conectar(pilha, logado)
+        segunda = _conectar(pilha, logado)
+
+        assert primeira.receive_json() == {"tipo": "voz", "sua": True}
+        assert segunda.receive_json() == {"tipo": "voz", "sua": False}
+
+
+def test_pagina_que_pede_a_voz_passa_a_falar_e_a_outra_se_cala(logado):
+    with ExitStack() as pilha:
+        primeira = _conectar(pilha, logado)
+        segunda = _conectar(pilha, logado)
+        primeira.receive_json()
+        segunda.receive_json()
+
+        segunda.send_text("voz")
+
+        assert segunda.receive_json() == {"tipo": "voz", "sua": True}
+        assert primeira.receive_json() == {"tipo": "voz", "sua": False}
+
+
+def test_quando_a_pagina_que_fala_fecha_a_outra_assume_a_voz(logado):
+    with ExitStack() as da_segunda:
+        with ExitStack() as da_primeira:
+            primeira = _conectar(da_primeira, logado)
+            segunda = _conectar(da_segunda, logado)
+            primeira.receive_json()
+            segunda.receive_json()
+
+        assert segunda.receive_json() == {"tipo": "voz", "sua": True}
+
+
+def test_fim_da_fala_volta_ao_estado_parado(logado, partes):
+    _, _, _, _, eventos = partes
+    logado.post("/api/mensagem", json={"texto": "oi"})
+    assert eventos.estado_atual.value == "speaking"
+
+    logado.post("/api/fim-da-fala")
+
+    assert eventos.estado_atual.value == "idle"
+
+
+async def test_avisador_publica_o_aviso_e_fala_com_o_titulo(tmp_path):
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("omni-api", "O build passou.")
+
+    publicados = []
+    while not fila.empty():
+        publicados.append(fila.get_nowait())
+    assert {"tipo": "aviso", "titulo": "omni-api", "texto": "O build passou."}.items() <= publicados[0].items()
+    assert locutor.textos == ["Do omni-api: O build passou."]
+    assert any(e["tipo"] == "falar" for e in publicados)
+
+
+def test_audio_gerado_exige_a_chave(logado, partes):
+    logado.post("/api/mensagem", json={"texto": "oi"})
+    anonimo = TestClient(partes[0], base_url=ORIGEM)
+
+    assert anonimo.get("/audio/" + "a" * 32 + ".mp3").status_code == 401
+
+
+def test_audio_em_pedacos_sem_tamanho_declarado_tambem_e_limitado(logado, partes):
+    _, _, transcritor, _, _ = partes
+
+    def pedacos():
+        for _ in range(11):
+            yield b"0" * (1024 * 1024)
+
+    resposta = logado.post("/api/voz", content=pedacos(), headers={"Content-Type": "audio/webm"})
+
+    assert resposta.status_code == 413
+    assert transcritor.audios == []
+
+
+def test_origem_nula_e_recusada(logado):
+    resposta = logado.post("/api/mensagem", json={"texto": "oi"}, headers={"Origin": "null"})
+
+    assert resposta.status_code == 403
+
+
+def test_cada_troca_fica_registrada_na_conversa_local(logado, partes, tmp_path):
+    _, agente, _, _, _ = partes
+    agente.proxima = Resposta("Vou criar na sua agenda: teste, 15h. Confirma?", aguardando_confirmacao=True)
+
+    logado.post("/api/mensagem", json={"texto": "cria uma tarefa às 15h"})
+
+    [linha] = (tmp_path / "conversa.jsonl").read_text(encoding="utf-8").splitlines()
+    registro = json.loads(linha)
+    assert registro["fala"] == "cria uma tarefa às 15h"
+    assert registro["resposta"] == "Vou criar na sua agenda: teste, 15h. Confirma?"
+    assert registro["aguardando_confirmacao"] is True
+
+
+def test_tarefas_de_fundo_rodam_enquanto_o_servidor_esta_ligado(tmp_path, pasta_web):
+    situacao = []
+
+    async def tarefa():
+        situacao.append("iniciou")
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            situacao.append("encerrou")
+            raise
+
+    app = criar_app(
+        agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(), locutor=LocutorFalso(tmp_path / "a"),
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "a",
+        conversa=Auditoria(tmp_path / "c.jsonl"), tarefas_de_fundo=[tarefa],
+    )
+    with TestClient(app, base_url=ORIGEM) as cliente:
+        cliente.get("/health")
+        assert situacao == ["iniciou"]
+
+    assert situacao == ["iniciou", "encerrou"]
+
+
+def _eventos_publicados(fila):
+    publicados = []
+    while not fila.empty():
+        publicados.append(fila.get_nowait())
+    return publicados
+
+
+def test_fala_leva_a_figura_da_resposta_para_a_tela(logado, partes):
+    _, agente, _, _, eventos = partes
+    agente.proxima = Resposta("Amanhã chove em Campinas.", figura="chuva")
+    fila = eventos.assinar()
+
+    corpo = logado.post("/api/mensagem", json={"texto": "vai chover amanhã?"}).json()
+
+    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert falar["figura"] == "chuva"
+    assert corpo["figura"] == "chuva"
+
+
+async def test_aviso_do_claude_aparece_como_balao_de_mensagem(tmp_path):
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("omni-api", "O build passou.")
+
+    [falar] = [e for e in _eventos_publicados(fila) if e["tipo"] == "falar"]
+    assert falar["figura"] == "mensagem"
+
+
+class ExternasFalsas:
+    def __init__(self):
+        self.pedidos = []
+
+    def esquemas(self):
+        return [{"nome": "hora_e_data", "descricao": "Informa a hora.", "parametros": {"type": "object", "properties": {}}}]
+
+    async def executar(self, nome, argumentos):
+        self.pedidos.append((nome, argumentos))
+        return "São 10h."
+
+
+@pytest.fixture
+def com_externas(tmp_path, pasta_web):
+    externas = ExternasFalsas()
+    app = criar_app(
+        agente=AgenteFalso(), eventos=Eventos(), transcritor=TranscritorFalso(), locutor=LocutorFalso(tmp_path / "audio"),
+        chave=CHAVE, porta=8765, pasta_web=pasta_web, pasta_audio=tmp_path / "audio",
+        conversa=Auditoria(tmp_path / "conversa.jsonl"), externas=externas,
+    )
+    with TestClient(app, base_url=ORIGEM) as c:
+        yield c, externas
+
+
+def test_servidor_mcp_lista_as_ferramentas_com_a_chave(com_externas):
+    cliente, _ = com_externas
+
+    resposta = cliente.get("/api/ferramentas", headers={"X-Clarisse-Chave": CHAVE})
+
+    assert resposta.status_code == 200
+    assert resposta.json()["ferramentas"][0]["nome"] == "hora_e_data"
+
+
+def test_servidor_mcp_executa_pela_clarisse(com_externas):
+    cliente, externas = com_externas
+
+    resposta = cliente.post("/api/ferramenta", json={"nome": "hora_e_data", "argumentos": {}}, headers={"X-Clarisse-Chave": CHAVE})
+
+    assert resposta.json() == {"resultado": "São 10h."}
+    assert externas.pedidos == [("hora_e_data", {})]
+
+
+@pytest.mark.parametrize("rota,metodo", [("/api/ferramentas", "get"), ("/api/ferramenta", "post")])
+def test_rotas_do_servidor_mcp_exigem_a_chave(com_externas, rota, metodo):
+    cliente, externas = com_externas
+
+    resposta = getattr(cliente, metodo)(rota, **({"json": {"nome": "hora_e_data", "argumentos": {}}} if metodo == "post" else {}))
+
+    assert resposta.status_code in (401, 403)
+    assert externas.pedidos == []
+
+
+def test_campo_a_mais_no_pedido_e_recusado(com_externas):
+    cliente, externas = com_externas
+
+    resposta = cliente.post(
+        "/api/ferramenta", json={"nome": "hora_e_data", "argumentos": {}, "confirmado": True},
+        headers={"X-Clarisse-Chave": CHAVE},
+    )
+
+    assert resposta.status_code == 422
+    assert externas.pedidos == []
+
+
+async def test_pergunta_do_claude_aparece_com_os_botoes_e_e_falada_uma_vez(tmp_path):
+    from clarisse.web import criar_anunciador
+
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_anunciador(eventos, locutor)("O Claude quer: Vou colar oi. Confirma?")
+
+    publicados = [fila.get_nowait() for _ in range(fila.qsize())]
+    assert {"tipo": "resposta", "texto": "O Claude quer: Vou colar oi. Confirma?", "aguardando_confirmacao": True}.items() <= publicados[0].items()
+    assert " ".join(locutor.textos) == "O Claude quer: Vou colar oi. Confirma?"
+
+
+def test_fala_sai_em_partes_com_legenda_e_a_resposta_espera_a_fala(logado, partes):
+    _, agente, _, locutor, eventos = partes
+    agente.proxima = Resposta("Em Campinas faz 27 graus. Hoje chove à tarde. Amanhã abre sol.")
+    fila = eventos.assinar()
+
+    logado.post("/api/mensagem", json={"texto": "e o tempo?"})
+
+    publicados = _eventos_publicados(fila)
+    [resposta] = [e for e in publicados if e["tipo"] == "resposta"]
+    falas = [e for e in publicados if e["tipo"] == "falar"]
+    assert [f["legenda"] for f in falas] == ["Em Campinas faz 27 graus.", "Hoje chove à tarde. Amanhã abre sol."]
+    assert [(f["parte"], f["total"]) for f in falas] == [(0, 2), (1, 2)]
+    assert {f["fala"] for f in falas} == {resposta["fala"]}
+    assert locutor.textos == ["Em Campinas faz 27 graus.", "Hoje chove à tarde. Amanhã abre sol."]
+
+
+async def test_aviso_e_pergunta_do_claude_tambem_esperam_a_fala(tmp_path):
+    from clarisse.web import criar_anunciador
+
+    eventos, locutor = Eventos(), LocutorFalso(tmp_path / "audio")
+    fila = eventos.assinar()
+
+    await criar_avisador(eventos, locutor)("Claude", "Terminei.")
+    await criar_anunciador(eventos, locutor)("O Claude quer: fechar. Confirma?")
+
+    publicados = _eventos_publicados(fila)
+    for tipo in ("aviso", "resposta"):
+        [texto] = [e for e in publicados if e["tipo"] == tipo]
+        assert texto["fala"] in {e["fala"] for e in publicados if e["tipo"] == "falar"}
