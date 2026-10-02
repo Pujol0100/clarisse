@@ -1,10 +1,71 @@
-"""Voz para texto (faster-whisper, local) e texto para voz (edge-tts, serviço da Microsoft)."""
+"""Voz para texto (faster-whisper) e texto para voz (Kokoro), as duas na máquina: nada do que a
+Clarisse ouve ou fala sai do notebook."""
 import asyncio
+import ctypes.util
 import io
 import re
+import threading
 import uuid
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+
+import numpy as np
+import soundfile
+
+Gerador = Callable[[str, Path], Awaitable[None]]
+_TAXA_DO_KOKORO = 24000
+_PARTE_DA_RECEITA = re.compile(r"^([a-z]{2}_[a-z]+)\*(\d+(?:\.\d+)?)$")
+
+
+def receita_da_voz(receita: str) -> list[tuple[str, float]]:
+    """'pf_dora*0.8+af_bella*0.2' (Dora com 20% de Bella, escolhida em 02/10/2026) vira [(voz, peso)]."""
+    partes = []
+    for parte in receita.replace(" ", "").split("+"):
+        achado = _PARTE_DA_RECEITA.match(parte)
+        if not achado:
+            raise ValueError(f"receita de voz inválida: {receita!r} (exemplo: pf_dora*0.8+af_bella*0.2)")
+        partes.append((achado.group(1), float(achado.group(2))))
+    return partes
+
+
+def carregar_kokoro():
+    import misaki.espeak  # noqa: F401  aponta para o espeak embutido no espeakng-loader
+
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+    # O espeak embutido no espeakng-loader 0.2.x procura os dados num caminho da máquina onde foi
+    # compilado e ignora o caminho que recebe (02/10/2026). O do sistema funciona: apt install espeak-ng.
+    biblioteca = ctypes.util.find_library("espeak-ng")
+    if biblioteca is None:
+        raise RuntimeError("falta o espeak-ng do sistema: sudo apt install espeak-ng")
+    EspeakWrapper.set_library(biblioteca)
+    EspeakWrapper.set_data_path(None)
+
+    from kokoro import KPipeline
+
+    return KPipeline(lang_code="p", repo_id="hexgrad/Kokoro-82M")
+
+
+def gerar_local(receita: str, velocidade: float, carregar: Callable[[], object] = carregar_kokoro) -> Gerador:
+    """Voz do Kokoro, no processador. O modelo carrega no primeiro uso; a receita é conferida já."""
+    partes = receita_da_voz(receita)
+    estado: dict = {}
+    trava = threading.Lock()
+
+    def sintetizar(texto: str, destino: Path) -> None:
+        with trava:
+            if "pipeline" not in estado:
+                pipeline = carregar()
+                estado["pipeline"] = pipeline
+                estado["voz"] = sum(peso * pipeline.load_voice(nome) for nome, peso in partes)
+            pedacos = [np.asarray(audio) for _, _, audio in estado["pipeline"](texto, voice=estado["voz"], speed=velocidade)]
+        audio = np.concatenate(pedacos) if pedacos else np.zeros(_TAXA_DO_KOKORO // 10, dtype="float32")
+        soundfile.write(destino, audio, _TAXA_DO_KOKORO, format="MP3")
+
+    async def gerar(texto: str, destino: Path) -> None:
+        await asyncio.to_thread(sintetizar, texto, destino)
+
+    return gerar
 
 _LINK_MARKDOWN = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 _URL = re.compile(r"https?://\S+")
@@ -105,24 +166,10 @@ def carregar_whisper(modelo: str, dispositivo: str):
 
 
 class Locutor:
-    def __init__(
-        self,
-        pasta: Path,
-        gerar: Callable[[str, Path], Awaitable[None]] | None = None,
-        voz: str = "pt-BR-ThalitaMultilingualNeural",
-        velocidade: str = "+10%",
-        guardar: int = 20,
-    ):
+    def __init__(self, pasta: Path, gerar: Gerador, guardar: int = 20):
         self._pasta = pasta
-        self._gerar = gerar or self._edge_tts
-        self._voz = voz
-        self._velocidade = velocidade
+        self._gerar = gerar
         self._guardar = guardar
-
-    async def _edge_tts(self, texto: str, destino: Path) -> None:
-        import edge_tts
-
-        await edge_tts.Communicate(texto, self._voz, rate=self._velocidade).save(str(destino))
 
     async def sintetizar(self, texto: str) -> Path:
         self._pasta.mkdir(parents=True, exist_ok=True)

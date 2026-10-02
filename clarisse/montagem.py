@@ -35,7 +35,7 @@ from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.microsoft import ContaMicrosoft
 from clarisse.redator import redigir_email
-from clarisse.voz import Locutor, Transcritor, carregar_whisper
+from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
 CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
@@ -160,7 +160,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     gravar_chave(CAMINHO_DA_CHAVE, chave)
 
     eventos = Eventos()
-    locutor = Locutor(ajustes.pasta_dados / "audio", voz=ajustes.voz, velocidade=ajustes.voz_velocidade)
+    locutor = Locutor(ajustes.pasta_dados / "audio", gerar=gerar_local(ajustes.voz, ajustes.voz_velocidade))
     delegacoes = Delegacoes(criar_avisador(eventos, locutor))
     http_externo = httpx.AsyncClient()
     executor = Executor()
@@ -172,6 +172,10 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         await manter_sites_atualizados(
             http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
         )
+
+    async def aquecer_a_voz():
+        # O modelo de voz leva alguns segundos para carregar: carrega ao ligar, não na primeira resposta.
+        await locutor.sintetizar("Pronta.")
 
     async def avisar_os_lembretes():
         await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
@@ -196,6 +200,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
+        tarefas_de_fundo=[aquecer_a_voz, manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )
