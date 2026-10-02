@@ -10,7 +10,6 @@ from clarisse.auditoria import Auditoria
 from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Eventos
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Registro, Risco
-from clarisse.figuras import CALENDARIO
 
 
 class ArgsTexto(Argumentos):
@@ -56,7 +55,7 @@ def agente(executadas, confirmacoes, eventos, tmp_path):
         return f"Colei {args.texto}."
 
     r = Registro()
-    r.registrar(Ferramenta("agenda", "lê a agenda", ArgsTexto, agenda, figura=CALENDARIO))
+    r.registrar(Ferramenta("agenda", "lê a agenda", ArgsTexto, agenda, grupo="agenda"))
     r.registrar(Ferramenta(
         "colar", "cola texto", ArgsTexto, colar,
         risco=Risco.CONFIRMAR, descrever=lambda a: f"Vou colar {a.texto}. Confirma?",
@@ -72,7 +71,7 @@ def agente(executadas, confirmacoes, eventos, tmp_path):
     )
 
 
-async def test_ferramenta_segura_roda_e_mostra_a_figura(agente, executadas, eventos):
+async def test_ferramenta_segura_roda_e_acende_o_grupo_dela(agente, executadas, eventos):
     fila = eventos.assinar()
 
     resultado = await agente.executar_externo("agenda", {"texto": "amanhã"})
@@ -80,7 +79,7 @@ async def test_ferramenta_segura_roda_e_mostra_a_figura(agente, executadas, even
     assert resultado == "Amanhã: reunião às 10h."
     assert executadas == [("agenda", "amanhã")]
     publicados = [fila.get_nowait() for _ in range(fila.qsize())]
-    assert {"tipo": "figura", "figura": CALENDARIO} in [{k: e[k] for k in ("tipo", "figura")} for e in publicados if e["tipo"] == "figura"]
+    assert [e["grupo"] for e in publicados if e["tipo"] == "ferramenta"] == ["agenda", "agenda"]
 
 
 async def test_ferramenta_arriscada_pergunta_pela_voz_e_roda_com_sim(agente, executadas, anuncios):

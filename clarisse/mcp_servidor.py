@@ -1,8 +1,8 @@
 """Servidor MCP da Clarisse: dá ao Claude as ferramentas dela, sem executar nada aqui.
 
 Cada chamada é repassada à Clarisse que está ligada (rotas /api/ferramentas e /api/ferramenta,
-com a chave da sessão). Lá valem a mesma avaliação, a confirmação pela voz, a auditoria e as
-figuras dos drones. Rode com: python -m clarisse.mcp_servidor
+com a chave da sessão). Lá valem a mesma avaliação, a confirmação pela voz, a auditoria e os
+cartões da tela. Rode com: python -m clarisse.mcp_servidor
 """
 import asyncio
 import os

@@ -22,8 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v7
-      - run: uv export --format requirements-txt --no-hashes --no-dev --frozen > requisitos.txt
-      - run: uvx pip-audit -r requisitos.txt
+      # As versões já vêm travadas pelo uv.lock: o pip-audit só consulta, sem refazer a resolução (o PyTorch
+      # de CPU não está no PyPI). O "+cpu" sai para o PyTorch também ser consultado: é o mesmo código.
+      - run: uv export --format requirements-txt --no-hashes --no-dev --frozen | sed 's/+cpu//' > requisitos.txt
+      - run: uvx pip-audit -r requisitos.txt --disable-pip --no-deps
 
   segredos:
     runs-on: ubuntu-24.04

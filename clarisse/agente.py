@@ -10,7 +10,7 @@ from datetime import datetime
 from clarisse.auditoria import Auditoria
 from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Estado, Eventos
-from clarisse.figuras import Retorno
+from clarisse.cartoes import Retorno, cartao_de_texto
 from clarisse.ferramentas.registro import Registro
 from clarisse.ferramentas.sistema import data_por_extenso
 from clarisse.llm import ErroDoModelo
@@ -38,20 +38,43 @@ _CUTUCADA = {
 }
 
 
-def prompt_do_sistema(projetos: list[str], agora: datetime, cidade: str | None = None, sistemas: list[str] | None = None) -> str:
-    texto = f"""Você é a Clarisse, assistente de voz que roda no computador do usuário.
-Hoje é {data_por_extenso(agora)}.
-Responda sempre em português do Brasil, em no máximo duas frases curtas, porque a resposta será falada.
-Quando o pedido exigir uma ação ou uma informação do mundo real, chame a ferramenta adequada. Nunca invente o resultado de uma ferramenta e nunca diga que fez algo sem ter chamado a ferramenta.
-Para conversa, contas simples ou conhecimento geral, responda direto, sem ferramenta.
-Tarefas complexas de programação, análise, leitura de sites ou agenda vão para o Claude.
-Perguntas sobre uma empresa, uma pessoa, preços, cotações, resultados ou fatos de hoje vão para pedir_ao_claude, que pesquisa na internet. Nunca responda que não tem a informação sem antes pedir ao Claude.
-Qualquer pergunta sobre a agenda, inclusive se um compromisso que você acabou de criar está lá, chama consultar_agenda. Nunca confirme o que está na agenda de memória.
-Quando o usuário mencionar o Claude, chame pedir_ao_claude (ou abrir_claude_na_tela, se ele quiser ver o Claude trabalhando) na mesma hora. Nunca responda que vai pedir ao Claude sem chamar a ferramenta.
-Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usuário disse. O sistema confirma sozinho as ações arriscadas.
-Pedidos curtos como "aperta enter", "desfaz", "salva", "volta pro terminal" ou "abre o vs code" já estão completos: chame a ferramenta na hora e deixe vazios os campos que o usuário não disse. Nunca responda com uma pergunta quando existe uma ferramenta para o pedido.
-Se nenhuma ferramenta faz exatamente o que o usuário pediu, diga que não consegue fazer isso e o que consegue fazer no lugar. Nunca faça outra coisa parecida dizendo que fez o pedido.
-Projetos cadastrados: {", ".join(projetos) or "nenhum"}. A transcrição de voz pode errar o nome; escolha o projeto cadastrado mais parecido."""
+def prompt_do_sistema(
+    projetos: list[str], agora: datetime, cidade: str | None = None, sistemas: list[str] | None = None,
+    ferramentas: set[str] | frozenset[str] = frozenset(),
+) -> str:
+    """As regras que falam de uma ferramenta só entram quando ela existe: sem o Claude, o modelo
+    não é mandado a pesquisar com ele, e sim a dizer que não sabe."""
+    com_claude = "pedir_ao_claude" in ferramentas
+    linhas = [
+        "Você é a Clarisse, assistente de voz que roda no computador do usuário.",
+        f"Hoje é {data_por_extenso(agora)}.",
+        "Responda sempre em português do Brasil, em no máximo duas frases curtas, porque a resposta será falada.",
+        "Quando o pedido exigir uma ação ou uma informação do mundo real, chame a ferramenta adequada. Nunca invente o resultado de uma ferramenta e nunca diga que fez algo sem ter chamado a ferramenta.",
+        "Para conversa, contas simples ou conhecimento geral, responda direto, sem ferramenta.",
+    ]
+    if com_claude:
+        linhas += [
+            "Tarefas complexas de programação, análise, leitura de sites ou agenda vão para o Claude.",
+            "Perguntas sobre uma empresa, uma pessoa, preços, cotações, resultados ou fatos de hoje vão para pedir_ao_claude, que pesquisa na internet. Nunca responda que não tem a informação sem antes pedir ao Claude.",
+        ]
+    else:
+        linhas.append(
+            "Você não tem acesso à internet para pesquisar. Para fatos do mundo que nenhuma ferramenta traz (empresas, pessoas, "
+            "preços, cotações, resultados, acontecimentos), diga em uma frase que não sabe; nunca invente."
+        )
+    if "consultar_agenda" in ferramentas:
+        linhas.append("Qualquer pergunta sobre a agenda, inclusive se um compromisso que você acabou de criar está lá, chama consultar_agenda. Nunca confirme o que está na agenda de memória.")
+    if com_claude:
+        linhas.append("Quando o usuário mencionar o Claude, chame pedir_ao_claude (ou abrir_claude_na_tela, se ele quiser ver o Claude trabalhando) na mesma hora. Nunca responda que vai pedir ao Claude sem chamar a ferramenta.")
+    elif {"abrir_claude_na_tela", "ler_resposta_do_claude"} <= set(ferramentas):
+        linhas.append("Para ver o Claude trabalhando num projeto, chame abrir_claude_na_tela; para ouvir o que o Claude respondeu, chame ler_resposta_do_claude.")
+    linhas += [
+        "Não peça confirmação nem detalhes: chame a ferramenta direto com o que o usuário disse. O sistema confirma sozinho as ações arriscadas.",
+        'Pedidos curtos como "aperta enter", "desfaz", "salva", "volta pro terminal" ou "abre o vs code" já estão completos: chame a ferramenta na hora e deixe vazios os campos que o usuário não disse. Nunca responda com uma pergunta quando existe uma ferramenta para o pedido.',
+        "Se nenhuma ferramenta faz exatamente o que o usuário pediu, diga que não consegue fazer isso e o que consegue fazer no lugar. Nunca faça outra coisa parecida dizendo que fez o pedido.",
+        f"Projetos cadastrados: {', '.join(projetos) or 'nenhum'}. A transcrição de voz pode errar o nome; escolha o projeto cadastrado mais parecido.",
+    ]
+    texto = "\n".join(linhas)
     if sistemas:
         texto += f"\nSistemas da empresa na internet: {', '.join(sistemas)}. 'Abre o X' sem falar em VS Code chama abrir."
     if cidade:
@@ -64,7 +87,7 @@ class Resposta:
     texto: str
     parar: bool = False
     aguardando_confirmacao: bool = False
-    figura: str | None = None
+    cartao: dict | None = None
 
 
 class Agente:
@@ -96,14 +119,19 @@ class Agente:
         self._conversas: list[list[dict]] = []
         self._pendente: tuple[Decisao, list[dict], int] | None = None
         self._trava = asyncio.Lock()
-        self._figura: str | None = None
+        # Da conversa em andamento: o cartão que a ferramenta montou e o grupo da última ferramenta.
+        self._cartao: dict | None = None
+        self._grupo: str | None = None
         self._na_integra: str | None = None
+        self._depois: tuple[str, dict] | None = None
 
     async def responder(self, fala: str) -> Resposta:
         async with self._trava:
             fala = fala.strip()
-            self._figura = None
+            self._cartao = None
+            self._grupo = None
             self._na_integra = None
+            self._depois = None
             if pede_para_parar(fala):
                 self._pendente = None
                 if self._confirmacoes:
@@ -119,12 +147,16 @@ class Agente:
                 if confirma(fala):
                     self._conversas.pop()
                     mensagens.append(await self._executar(decisao))
+                    if self._na_integra is not None:
+                        return self._concluir(mensagens, inicio, self._na_integra)
                     return await self._laco(mensagens, inicio)
                 if nega(fala):
                     return self._concluir([{"role": "user", "content": fala}], 0, "Tudo bem, cancelei.")
 
             mensagens = [
-                {"role": "system", "content": prompt_do_sistema(self._projetos, self._agora(), self._cidade, self._sistemas())},
+                {"role": "system", "content": prompt_do_sistema(
+                    self._projetos, self._agora(), self._cidade, self._sistemas(), set(self._registro.nomes()),
+                )},
                 *self._historico(),
                 {"role": "user", "content": fala},
             ]
@@ -162,6 +194,11 @@ class Agente:
                     return self._concluir([*mensagens[inicio:], espera], 0, frase, aguardando=True)
                 else:
                     mensagens.append(await self._executar(decisao))
+                    seguinte = avaliar(self._registro, *self._depois) if self._depois else None
+                    if seguinte and seguinte.acao != "recusar":
+                        self._pendente = (seguinte, mensagens, inicio)
+                        pergunta = self._na_integra or mensagens[-1]["content"]
+                        return self._concluir(mensagens, inicio, pergunta, aguardando=True)
                     if self._na_integra is not None:
                         return self._concluir(mensagens, inicio, self._na_integra)
         return self._concluir(mensagens, inicio, "Não consegui concluir esse pedido. Tente dizer de outro jeito.")
@@ -198,33 +235,31 @@ class Agente:
             frase = decisao.ferramenta.frase_de_confirmacao(decisao.args)
             if not (self._confirmacoes and await self._confirmacoes.pedir(f"O Claude quer: {frase}")):
                 return "O usuário não confirmou; não fiz isso."
-        mensagem, figura = await self._rodar(decisao)
-        if figura:
-            await self._eventos.publicar({"tipo": "figura", "figura": figura})
+        mensagem, _ = await self._rodar(decisao)
         await self._eventos.estado(Estado.PARADA)
         return mensagem["content"]
 
     async def _executar(self, decisao: Decisao) -> dict:
-        mensagem, figura = await self._rodar(decisao)
-        self._figura = figura or self._figura
+        mensagem, cartao = await self._rodar(decisao)
+        self._cartao = cartao or self._cartao
+        self._grupo = decisao.ferramenta.grupo
         return mensagem
 
-    async def _rodar(self, decisao: Decisao) -> tuple[dict, str | None]:
-        nome = decisao.ferramenta.nome
-        figura = None
+    async def _rodar(self, decisao: Decisao) -> tuple[dict, dict | None]:
+        nome, grupo = decisao.ferramenta.nome, decisao.ferramenta.grupo
+        cartao = None
         await self._eventos.estado(Estado.EXECUTANDO)
-        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": "iniciada"})
+        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "grupo": grupo, "situacao": "iniciada"})
         inicio = time.monotonic()
         try:
             resultado = await asyncio.wait_for(decisao.ferramenta.executar(decisao.args), self._timeout)
             situacao = "concluida"
             if isinstance(resultado, Retorno):
-                figura = resultado.figura or decisao.ferramenta.figura
+                cartao = resultado.cartao
                 if resultado.na_integra:
                     self._na_integra = resultado.texto
+                self._depois = resultado.confirmar_depois
                 resultado = resultado.texto
-            else:
-                figura = decisao.ferramenta.figura
         except Exception as erro:
             log.exception("ferramenta %s falhou", nome)
             resultado = f"Erro ao executar {nome}: {erro}"
@@ -236,8 +271,8 @@ class Agente:
             situacao="ok" if situacao == "concluida" else "erro",
             duracao_ms=round((time.monotonic() - inicio) * 1000),
         )
-        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "situacao": situacao})
-        return _mensagem_de_ferramenta(nome, resultado), figura
+        await self._eventos.publicar({"tipo": "ferramenta", "ferramenta": nome, "grupo": grupo, "situacao": situacao})
+        return _mensagem_de_ferramenta(nome, resultado), cartao
 
     def _historico(self) -> list[dict]:
         return [mensagem for conversa in self._conversas for mensagem in conversa]
@@ -245,7 +280,8 @@ class Agente:
     def _concluir(self, mensagens: list[dict], inicio: int, texto: str, aguardando: bool = False) -> Resposta:
         conversa = [_encurtar(m) for m in mensagens[inicio:]] + [{"role": "assistant", "content": texto}]
         self._conversas = [*self._conversas, conversa][-_CONVERSAS_LEMBRADAS:]
-        return Resposta(texto, aguardando_confirmacao=aguardando, figura=self._figura)
+        cartao = self._cartao or (cartao_de_texto(self._grupo, texto) if self._grupo else None)
+        return Resposta(texto, aguardando_confirmacao=aguardando, cartao=cartao)
 
 
 def _encurtar(mensagem: dict) -> dict:

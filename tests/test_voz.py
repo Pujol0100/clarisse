@@ -1,8 +1,12 @@
+import asyncio
 from dataclasses import dataclass
 
 import pytest
 
-from clarisse.voz import Locutor, Transcritor, texto_para_fala
+import numpy as np
+import soundfile
+
+from clarisse.voz import Locutor, Transcritor, enderecos_falados, gerar_local, texto_para_fala
 
 
 @dataclass
@@ -130,3 +134,78 @@ def test_trechos_ja_saem_limpos_para_a_fala():
 
     assert dividir_em_trechos("Rode:\n\n```bash\nls\n```\n\nPronto.") == ["Rode: Trecho de código.", "Pronto."]
     assert dividir_em_trechos("   ") == []
+
+
+@pytest.mark.parametrize("falado,escrito", [
+    ("manda para fulano arroba smartcompass ponto com ponto br", "manda para fulano@smartcompass.com.br"),
+    ("Escreve para Vinicius ponto Pujol arroba Smartcompass ponto com ponto br.", "Escreve para vinicius.pujol@smartcompass.com.br."),
+    ("o e-mail é ana underline souza arroba gmail ponto com", "o e-mail é ana_souza@gmail.com"),
+    ("suporte traço ti arroba empresa ponto com", "suporte-ti@empresa.com"),
+    ("do meu ponto de vista está ok", "do meu ponto de vista está ok"),
+    ("o símbolo arroba fica no meio", "o símbolo arroba fica no meio"),
+    ("já veio certo: ana@x.com", "já veio certo: ana@x.com"),
+])
+def test_endereco_de_email_falado_vira_escrito(falado, escrito):
+    assert enderecos_falados(falado) == escrito
+
+
+class WhisperDoEmail(WhisperFalso):
+    def transcribe(self, audio, **opcoes):
+        return iter([Segmento(" Escreve para ana arroba x ponto com")]), None
+
+
+async def test_transcricao_ja_sai_com_o_endereco_escrito():
+    transcritor = Transcritor(carregar=WhisperDoEmail, dicas=[])
+
+    assert await transcritor.transcrever(b"audio") == "Escreve para ana@x.com"
+
+
+class PipelineFalso:
+    """Imita o KPipeline do Kokoro: vozes carregáveis e áudio em pedaços de 24 kHz."""
+
+    def __init__(self):
+        self.chamadas = []
+        self.threads = []
+        self.vozes = {"pf_dora": np.full(4, 1.0, dtype="float32"), "af_bella": np.full(4, 3.0, dtype="float32")}
+
+    def load_voice(self, nome):
+        return self.vozes[nome]
+
+    def __call__(self, texto, voice, speed):
+        import threading
+
+        self.chamadas.append((texto, voice, speed))
+        self.threads.append(threading.get_ident())
+        for _ in range(2):
+            yield None, None, np.zeros(2400, dtype="float32")
+
+
+async def test_voz_local_mistura_as_vozes_da_receita_e_grava_mp3(tmp_path):
+    cargas, pipeline = [], PipelineFalso()
+    gerar = gerar_local("pf_dora*0.8+af_bella*0.2", 1.08, carregar=lambda: cargas.append(1) or pipeline)
+
+    await gerar("Oi", tmp_path / "a.mp3")
+    await gerar("Tchau", tmp_path / "b.mp3")
+
+    texto, voz, velocidade = pipeline.chamadas[0]
+    assert texto == "Oi" and velocidade == 1.08
+    assert list(voz) == pytest.approx([1.4] * 4)
+    info = soundfile.info(tmp_path / "a.mp3")
+    assert info.format == "MP3" and info.samplerate == 24000 and info.duration == pytest.approx(0.2, abs=0.06)
+    assert cargas == [1]
+
+
+@pytest.mark.parametrize("receita", ["pf_dora", "pf_dora*abc", "pf_dora*0.8+", "Dora*1"])
+def test_receita_de_voz_escrita_errado_e_recusada_ao_ligar(receita):
+    with pytest.raises(ValueError):
+        gerar_local(receita, 1.0, carregar=PipelineFalso)
+
+
+async def test_toda_fala_e_gerada_na_mesma_thread(tmp_path):
+    # O PyTorch cria um grupo de trabalhadores por thread: uma thread nova a cada frase lotava o processador.
+    pipeline = PipelineFalso()
+    gerar = gerar_local("pf_dora*1", 1.0, carregar=lambda: pipeline)
+
+    await asyncio.gather(*(gerar(f"frase {i}", tmp_path / f"{i}.mp3") for i in range(6)))
+
+    assert len(set(pipeline.threads)) == 1

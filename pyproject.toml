@@ -6,14 +6,18 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "edge-tts>=7.2.8",
     "fastapi>=0.141.1",
     "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
+    "kokoro>=0.9.4",
     "mcp>=1.20",
     "psutil>=7.2.2",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2",
+    "soundfile>=0.13",
+    "torch>=2.6",
+    # Sem este piso o resolvedor cai num transformers de 2021 que precisa compilar Rust.
+    "transformers>=4.40",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -32,3 +36,12 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv]
 package = false
+
+# A voz roda no processador: o PyTorch só de CPU baixa ~200 MB em vez de ~2 GB.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

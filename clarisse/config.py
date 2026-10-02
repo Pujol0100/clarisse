@@ -17,12 +17,18 @@ class Ajustes(BaseSettings):
     modelo: str = "gemma4:e4b-it-qat"
     whisper_modelo: str = "small"
     whisper_dispositivo: str = "cpu"
-    voz: str = "pt-BR-ThalitaMultilingualNeural"
-    voz_velocidade: str = "+10%"
+    # Voz do Kokoro, na máquina: Dora com 20% de Bella (escolhida em 02/10/2026).
+    voz: str = "pf_dora*0.8+af_bella*0.2"
+    voz_velocidade: float = 1.08
+    # Desligado em 01/10/2026: a Clarisse responde só com o modelo local. Abrir o Claude e ler o que ele
+    # respondeu continuam (não mandam nada ao Claude).
+    usar_claude: bool = False
     claude_modelo: str = "sonnet"
     claude_timeout: int = 600
     claude_teto_usd: float = 1.0
     cidade: str | None = None
+    # Cofre do Obsidian para buscar e ler notas; sem ele, as ferramentas de notas não existem.
+    cofre_de_notas: Path | None = None
     agenda_intervalo_minutos: float = 5
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")

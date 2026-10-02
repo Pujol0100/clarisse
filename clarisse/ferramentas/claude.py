@@ -10,7 +10,6 @@ from typing import Annotated
 from pydantic import Field, create_model
 
 from clarisse.config import Cadastros, normalizar
-from clarisse.figuras import CALENDARIO, CODIGO, MENSAGEM
 from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.sistema import data_por_extenso
@@ -18,7 +17,6 @@ from clarisse.ferramentas.sistema import data_por_extenso
 log = logging.getLogger(__name__)
 
 FERRAMENTAS_DE_LEITURA = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
-_LER_AGENDA = "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
 _CRIAR_EVENTO = "mcp__claude_ai_Microsoft_365__outlook_create_event"
 _BUSCAR_PESSOAS = "mcp__claude_ai_Microsoft_365__search_people"
 _PARA_VOZ = (
@@ -161,9 +159,6 @@ def ferramentas_do_claude(
         projeto=campo_projeto(cadastros, "Projeto, se o pedido for sobre um", obrigatorio=False),
     )
 
-    class ArgsAgenda(Argumentos):
-        periodo: str = Field("hoje", max_length=100, description="Período, como o usuário falou")
-
     class ArgsCompromisso(Argumentos):
         titulo: str = Field(max_length=200, description="Título do compromisso")
         quando: str = Field(max_length=100, description="Data e hora como o usuário falou")
@@ -196,13 +191,6 @@ def ferramentas_do_claude(
         pedido = f"{args.pedido}\n\n{_PESQUISE}"
         delegacoes.iniciar(titulo, rodar_claude(executor, pedido, pasta, FERRAMENTAS_DE_LEITURA, modelo, timeout, teto_usd))
         return "Pedi ao Claude. Aviso quando ele terminar."
-
-    async def consultar_agenda(args: ArgsAgenda) -> str:
-        pedido = (
-            f"Hoje é {data_por_extenso(agora())}. Liste meus compromissos de {args.periodo} "
-            "com horário e título, usando a busca de calendário."
-        )
-        return await rodar_claude(executor, pedido, _pasta_neutra(), [_LER_AGENDA], modelo, _TIMEOUT_DA_AGENDA, teto_usd)
 
     async def criar_compromisso(args: ArgsCompromisso) -> str:
         pedido = (
@@ -293,19 +281,18 @@ def ferramentas_do_claude(
             "abrir_claude_na_tela",
             "Abre o VS Code no projeto e inicia uma conversa NOVA do Claude Code, visível, já com o pedido do usuário. "
             "Use quando o usuário quer ver o Claude trabalhando numa conversa nova.",
-            ArgsNaTela, abrir_claude_na_tela, figura=CODIGO,
+            ArgsNaTela, abrir_claude_na_tela, grupo="claude",
         ),
         Ferramenta(
             "pedir_ao_claude",
             "Envia um pedido a uma conversa NOVA do Claude, em segundo plano; o resultado é falado quando fica pronto. "
             "Use para perguntas difíceis, programação, análise, leitura de sites e para pesquisar na internet: "
             "empresas, pessoas, cotações, resultados de jogos e fatos de hoje.",
-            ArgsPedido, pedir_ao_claude, figura=CODIGO,
+            ArgsPedido, pedir_ao_claude, grupo="claude",
         ),
-        Ferramenta("consultar_agenda", "Lê os compromissos da agenda.", ArgsAgenda, consultar_agenda, figura=CALENDARIO),
         Ferramenta(
             "criar_compromisso", "Cria um compromisso ou lembrete na agenda.", ArgsCompromisso, criar_compromisso,
-            risco=Risco.CONFIRMAR, descrever=confirmar_compromisso, figura=CALENDARIO,
+            risco=Risco.CONFIRMAR, descrever=confirmar_compromisso, grupo="agenda",
         ),
         Ferramenta(
             "mandar_para_conversa_do_claude",
@@ -314,18 +301,18 @@ def ferramentas_do_claude(
             "na aba, janela ou conversa do Claude que já está aberta, por exemplo 'vai no VS Code na aba da Clarisse e "
             "digita obrigado'. Não abre nada novo.",
             ArgsMensagem, mandar_para_conversa_do_claude,
-            risco=Risco.CONFIRMAR, descrever=confirmar_mensagem, figura=MENSAGEM,
+            risco=Risco.CONFIRMAR, descrever=confirmar_mensagem, grupo="claude",
         ),
         *([Ferramenta(
             "fazer_no_navegador",
             "Usa o navegador para uma tarefa num site ou sistema web: abrir, ler, conferir um dashboard ou uma página. "
             "O resultado é falado quando fica pronto.",
-            ArgsNavegador, fazer_no_navegador, risco=Risco.CONFIRMAR, descrever=confirmar_navegador, figura=CODIGO,
+            ArgsNavegador, fazer_no_navegador, risco=Risco.CONFIRMAR, descrever=confirmar_navegador, grupo="navegador",
         )] if mcp_navegador else []),
         *([Ferramenta(
             "fazer_em_etapas",
             "Para pedidos com várias etapas no computador ('abre o projeto e depois o arquivo', 'abre o site e confere "
             "tal coisa'). O Claude faz em sequência com as ferramentas da Clarisse e o resultado é falado no fim.",
-            ArgsEtapas, fazer_em_etapas, figura=CODIGO,
+            ArgsEtapas, fazer_em_etapas, grupo="claude",
         )] if mcp_clarisse else []),
     ]

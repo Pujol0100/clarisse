@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clarisse — protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0A0A; --surface: #141416; --surface-2: #1C1C20; --line: #2A2A30;
+    --text: #FFFFFF; --muted: #A3A3AA; --gold: #C9A84C; --gold-text: #E5C875;
+    --sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden;
+    background-image:
+      radial-gradient(ellipse at 50% 42%, rgba(201,168,76,0.07), transparent 55%),
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    background-position: center, center, center;
+  }
+  body::after { /* vinheta */
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.75) 100%);
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+
+  /* ---------- topo ---------- */
+  .topo { position: fixed; top: 24px; left: 0; right: 0; text-align: center; z-index: 3; }
+  .marca { font-family: var(--mono); letter-spacing: 0.6em; font-size: 13px; color: var(--muted); padding-left: 0.6em; }
+  .estado {
+    margin-top: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.35em;
+    color: var(--gold-text); text-transform: uppercase; min-height: 16px; padding-left: 0.35em;
+  }
+  .hora { position: fixed; top: 24px; right: 28px; font-family: var(--mono); font-size: 13px; color: var(--muted); z-index: 3; font-variant-numeric: tabular-nums; }
+  .canto { position: fixed; top: 24px; left: 28px; font-family: var(--mono); font-size: 11px; color: var(--muted); z-index: 3; letter-spacing: 0.12em; line-height: 1.7; }
+  .canto b { color: var(--gold-text); font-weight: 500; }
+
+  /* o que a pessoa disse */
+  .voce {
+    position: fixed; left: 50%; transform: translateX(-50%); top: 74px; z-index: 3;
+    font-size: 17px; color: var(--muted); opacity: 0; transition: opacity .4s; white-space: nowrap;
+  }
+  .voce.visivel { opacity: 1; }
+  .voce::before { content: "VOCÊ  "; font-family: var(--mono); font-size: 11px; letter-spacing: .2em; color: var(--gold); }
+
+  /* ---------- cartão principal ---------- */
+  .palco-cartao { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 4; }
+  .cartao {
+    position: relative; width: min(440px, 86vw); padding: 18px 20px 20px;
+    background: rgba(20,20,22,0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line); border-radius: 6px;
+    opacity: 0; transform: translateY(24px) scale(.9); transition: opacity .45s ease, transform .55s cubic-bezier(.2,.9,.25,1.15);
+  }
+  .cartao.entrou { opacity: 1; transform: none; }
+  .cartao.saindo { opacity: 0; transform: translateY(38vh) scale(.35); transition: opacity .6s ease, transform .7s cubic-bezier(.5,0,.75,0); }
+  .cartao::before { /* traço dourado no topo */
+    content: ""; position: absolute; left: 20px; right: 20px; top: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  /* cantoneiras de HUD */
+  .cartao i { position: absolute; width: 10px; height: 10px; border-color: var(--gold); border-style: solid; opacity: .8; }
+  .cartao i:nth-of-type(1) { top: -5px; left: -5px; border-width: 1px 0 0 1px; }
+  .cartao i:nth-of-type(2) { top: -5px; right: -5px; border-width: 1px 1px 0 0; }
+  .cartao i:nth-of-type(3) { bottom: -5px; left: -5px; border-width: 0 0 1px 1px; }
+  .cartao i:nth-of-type(4) { bottom: -5px; right: -5px; border-width: 0 1px 1px 0; }
+  .cartao-titulo { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold-text); display: flex; justify-content: space-between; }
+  .cartao-titulo span:last-child { color: var(--muted); }
+  .clima { display: flex; align-items: baseline; gap: 14px; margin: 10px 0 14px; }
+  .clima-temp { font-family: var(--mono); font-size: 52px; font-weight: 500; line-height: 1; }
+  .clima-cond { font-size: 18px; color: var(--muted); }
+  .dias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dia { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .dia-nome { font-size: 13px; color: var(--muted); }
+  .dia-num { font-family: var(--mono); font-size: 15px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .dia-chuva { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .lista { list-style: none; margin: 12px 0 0; padding: 0; }
+  .lista li { display: flex; gap: 14px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 17px; line-height: 1.35; }
+  .lista li:first-child { border-top: 0; }
+  .lista .marca-item { font-family: var(--mono); font-size: 14px; color: var(--gold-text); min-width: 46px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- legenda da fala ---------- */
+  .legenda {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 150px; z-index: 5;
+    width: min(760px, 90vw); text-align: center; font-size: 24px; line-height: 1.4;
+    text-shadow: 0 0 18px #000, 0 0 4px #000; opacity: 0; transition: opacity .3s;
+  }
+  .legenda.visivel { opacity: 1; }
+
+  /* ---------- fileira de cartões ---------- */
+  .fileira {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 3;
+    display: flex; gap: 10px; max-width: 94vw;
+  }
+  .mini {
+    width: 168px; padding: 10px 12px; background: rgba(20,20,22,0.85); border: 1px solid var(--line); border-radius: 6px;
+    animation: chegar .6s cubic-bezier(.2,.9,.25,1.1);
+  }
+  .mini-titulo { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--gold-text); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-texto { font-size: 14px; margin-top: 4px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @keyframes chegar { from { opacity: 0; transform: translateY(30px) scale(.8); } }
+
+  /* microfone */
+  .mic {
+    position: fixed; right: 28px; bottom: 28px; z-index: 3; display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase;
+  }
+  .mic-ponto { width: 10px; height: 10px; border-radius: 50%; background: var(--line); border: 1px solid var(--muted); }
+  body[data-estado="listening"] .mic-ponto { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 12px var(--gold); }
+  body[data-estado="listening"] .mic { color: var(--gold-text); }
+
+  /* ---------- notícia escolhida: o cartão vira bloco de leitura ---------- */
+  .cartao { pointer-events: auto; }
+  .lista li.clicavel { cursor: pointer; border-radius: 4px; transition: background .2s; }
+  .lista li.clicavel:hover { background: rgba(201,168,76,0.08); }
+  .lista li.escolhida { background: rgba(201,168,76,0.14); }
+  .cartao.leitura {
+    width: min(720px, calc(92vw - var(--chat)));
+    transition: width .5s ease, opacity .45s ease, transform .55s cubic-bezier(.2,.9,.25,1.15);
+  }
+  .leitura-corpo { max-height: 34vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .leitura-foto {
+    height: 170px; margin: 14px 0 16px; border-radius: 4px; border: 1px solid var(--line);
+    background: linear-gradient(135deg, #1C1C20, #2A2A30 60%, rgba(201,168,76,0.25));
+    display: grid; place-items: center; color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: .2em;
+  }
+  .leitura-titulo { margin: 0 0 8px; font-size: 26px; line-height: 1.25; font-weight: 700; }
+  .leitura-sub { margin: 0 0 16px; font-size: 17px; color: var(--muted); }
+  .leitura-corpo p {
+    margin: 0 0 14px; font-size: 19px; line-height: 1.6; color: rgba(255,255,255,0.45);
+    border-left: 2px solid transparent; padding-left: 12px; transition: color .3s, border-color .3s;
+  }
+  .leitura-corpo p.lendo { color: var(--text); border-left-color: var(--gold); }
+  .leitura-corpo p.lido { color: rgba(255,255,255,0.7); }
+
+  /* ---------- escrita opcional: o chat abre à direita e a Clarisse vai para a esquerda ---------- */
+  body { --chat: 0px; }
+  body.com-chat { --chat: min(400px, 40vw); }
+  .topo, .palco-cartao { right: var(--chat); transition: right .45s ease; }
+  .voce, .legenda, .fileira { left: calc((100vw - var(--chat)) / 2); transition: left .45s ease, opacity .3s; }
+  .hora { right: calc(28px + var(--chat)); transition: right .45s ease; }
+  .mic { right: calc(28px + var(--chat)); transition: right .45s ease; }
+  .legenda { width: min(760px, calc(90vw - var(--chat))); }
+
+  .botao-escrever {
+    position: fixed; left: 28px; bottom: 24px; z-index: 6;
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+    background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; cursor: pointer;
+  }
+  .botao-escrever:hover, .botao-escrever:focus-visible { color: var(--gold-text); border-color: var(--gold); outline: none; }
+  body.com-chat .botao-escrever { color: var(--gold-text); border-color: var(--gold); }
+
+  .chat {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 40vw); z-index: 7;
+    display: flex; flex-direction: column;
+    background: rgba(20,20,22,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid var(--line);
+    transform: translateX(100%); transition: transform .45s ease; visibility: hidden;
+  }
+  body.com-chat .chat { transform: none; visibility: visible; }
+  .chat-topo { display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
+  .chat-topo span { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; color: var(--gold-text); }
+  .chat-fechar { background: none; border: 0; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .chat-fechar:hover { color: var(--text); }
+  .chat-falas { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-falas p { margin: 0; padding: 10px 12px; border-radius: 6px; font-size: 16px; line-height: 1.4; max-width: 88%; }
+  .fala-voce { align-self: flex-end; background: var(--surface-2); border: 1px solid var(--line); }
+  .fala-clarisse { align-self: flex-start; border: 1px solid rgba(201,168,76,0.35); }
+  .chat-form { padding: 14px 20px 20px; border-top: 1px solid var(--line); }
+  .chat-form input {
+    width: 100%; padding: 12px 14px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 16px;
+  }
+  .chat-form input:focus { outline: none; border-color: var(--gold); }
+  .chat-dica { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body data-estado="idle">
+  <canvas id="nucleo" aria-hidden="true"></canvas>
+
+  <header class="topo">
+    <div class="marca">CLARISSE</div>
+    <div class="estado" id="estado" role="status" aria-live="polite"></div>
+  </header>
+  <div class="canto">LOCAL · GEMMA<br><b>●</b> PRONTA</div>
+  <div class="hora" id="hora"></div>
+  <div class="voce" id="voce"></div>
+
+  <div class="palco-cartao" id="palco-cartao"></div>
+  <p class="legenda" id="legenda" aria-live="polite"></p>
+  <div class="fileira" id="fileira"></div>
+  <div class="mic"><span class="mic-ponto"></span><span id="mic-texto">Diga “Clarisse”</span></div>
+
+  <button type="button" class="botao-escrever" id="escrever" aria-expanded="false" aria-controls="chat">✎ Escrever</button>
+
+  <aside class="chat" id="chat" aria-label="Escrever para a Clarisse">
+    <div class="chat-topo">
+      <span>CONVERSA</span>
+      <button type="button" class="chat-fechar" id="fechar-chat" aria-label="Fechar a escrita">×</button>
+    </div>
+    <section class="chat-falas" id="falas" role="log" aria-live="polite"></section>
+    <form class="chat-form" id="formulario" autocomplete="off">
+      <label for="texto" style="position:absolute;left:-9999px">Escrever para a Clarisse</label>
+      <input id="texto" maxlength="2000" placeholder="Escreva e aperte Enter">
+      <p class="chat-dica">A voz continua ligada. Feche aqui para voltar só à voz.</p>
+    </form>
+  </aside>
+
+<script>
+"use strict";
+
+/* Protótipo de 01/10/2026: anel com globo, filamentos e constelação de ferramentas; cartões que
+   saem do anel e descem para a fileira. Dados fictícios, roteiro simulado em ciclo. */
+
+/* =========================== núcleo (canvas) =========================== */
+
+const tela = document.getElementById("nucleo");
+const c = tela.getContext("2d");
+let L, A, DPR, CX, CY, R;
+
+const FERRAMENTAS = [
+  { nome: "Clima", ang: -38 }, { nome: "Agenda", ang: -8 }, { nome: "Notícias", ang: 22 }, { nome: "Navegador", ang: 50 },
+  { nome: "Claude", ang: 218 }, { nome: "Código", ang: 188 }, { nome: "Janelas", ang: 158 }, { nome: "Arquivos", ang: 130 },
+].map((f) => ({ ...f, brilho: 0, ativo: false }));
+
+let chatAtual = 0;  // largura do chat aberto, animada
+
+function medir() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  L = innerWidth; A = innerHeight;
+  tela.width = L * DPR; tela.height = A * DPR;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  posicionar();
+}
+
+function posicionar() {
+  const livre = L - chatAtual;
+  CX = livre / 2; CY = A * 0.46;
+  R = Math.min(livre * 0.5, A * 0.9) * 0.27;
+  for (const f of FERRAMENTAS) {
+    const a = (f.ang * Math.PI) / 180;
+    f.x = CX + Math.cos(a) * R * 2.35;
+    f.y = CY + Math.sin(a) * R * 1.35;
+  }
+}
+addEventListener("resize", medir);
+medir();
+
+const DOURADO = [201, 168, 76], OURO_CLARO = [229, 200, 117];
+const rgba = ([r, g, b], a) => `rgba(${r},${g},${b},${a})`;
+
+let estado = "idle";
+let nivel = 0;          // voz/microfone, 0..1
+let agitacao = 0.05;    // deformação dos filamentos (suavizada)
+let giro = 0;
+
+const ALVOS = {
+  idle:      { agit: 0.05, giro: 0.12, brilho: 0.55 },
+  listening: { agit: 0.08, giro: 0.20, brilho: 0.85 },
+  thinking:  { agit: 0.035, giro: 0.9, brilho: 0.75 },
+  executing: { agit: 0.04, giro: 1.2, brilho: 0.8 },
+  speaking:  { agit: 0.07, giro: 0.25, brilho: 1.0 },
+};
+let brilho = 0.55;
+
+const FILAMENTOS = Array.from({ length: 9 }, (_, i) => ({
+  f1: 2 + (i % 3), f2: 4 + ((i * 2) % 5), f3: 7 + (i % 2),
+  p1: Math.random() * 6.28, p2: Math.random() * 6.28, p3: Math.random() * 6.28,
+  v1: 0.3 + Math.random() * 0.5, v2: -0.2 - Math.random() * 0.6, v3: 0.5 + Math.random() * 0.4,
+  escala: 0.92 + i * 0.022,
+}));
+
+function filamentos(t) {
+  c.globalCompositeOperation = "lighter";
+  const amp = agitacao + nivel * 0.12;
+  for (const [i, f] of FILAMENTOS.entries()) {
+    c.beginPath();
+    for (let k = 0; k <= 200; k++) {
+      const th = (k / 200) * Math.PI * 2;
+      const d = Math.sin(f.f1 * th + t * f.v1 + f.p1) * 0.55
+              + Math.sin(f.f2 * th + t * f.v2 + f.p2) * 0.3
+              + Math.sin(f.f3 * th + t * f.v3 + f.p3) * 0.15 * (0.4 + nivel);
+      const r = R * f.escala * (1 + amp * d);
+      const x = CX + Math.cos(th + giro * 0.15) * r, y = CY + Math.sin(th + giro * 0.15) * r;
+      k ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    const a = (0.16 + 0.1 * (i % 3)) * brilho;
+    c.strokeStyle = rgba(i % 4 === 0 ? [255, 255, 255] : DOURADO, a);
+    c.lineWidth = 1.1;
+    c.shadowColor = rgba(DOURADO, 0.9);
+    c.shadowBlur = 10;
+    c.stroke();
+  }
+  c.shadowBlur = 0;
+  c.globalCompositeOperation = "source-over";
+}
+
+/* globo de arame girando dentro do anel */
+function globo(t) {
+  const rg = R * 0.58, inclina = -0.2;
+  const ci = Math.cos(inclina), si = Math.sin(inclina);
+  const proj = (x, y, z) => { const y2 = y * ci - z * si, z2 = y * si + z * ci; return [CX + x * rg, CY + y2 * rg, z2]; };
+  c.lineWidth = 0.8;
+  const desenha = (pts) => {
+    for (let k = 1; k < pts.length; k++) {
+      const [x0, y0, z0] = pts[k - 1], [x1, y1, z1] = pts[k];
+      const z = (z0 + z1) / 2;
+      c.strokeStyle = rgba(OURO_CLARO, (z > 0 ? 0.32 : 0.07) * brilho);
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    }
+  };
+  for (let m = 0; m < 12; m++) { // meridianos
+    const lam = (m / 12) * Math.PI + giro * 0.4;
+    const pts = [];
+    for (let k = 0; k <= 40; k++) {
+      const phi = -Math.PI / 2 + (k / 40) * Math.PI;
+      pts.push(proj(Math.cos(phi) * Math.sin(lam), Math.sin(phi), Math.cos(phi) * Math.cos(lam)));
+    }
+    desenha(pts);
+  }
+  for (let p = 1; p < 8; p++) { // paralelos
+    const phi = -Math.PI / 2 + (p / 8) * Math.PI;
+    const pts = [];
+    for (let k = 0; k <= 60; k++) {
+      const lam = (k / 60) * Math.PI * 2;
+      pts.push(proj(Math.cos(phi) * Math.sin(lam), Math.sin(phi), Math.cos(phi) * Math.cos(lam)));
+    }
+    desenha(pts);
+  }
+}
+
+/* anel dourado + escala de HUD */
+function anel(t) {
+  const g = c.createRadialGradient(CX, CY, R * 0.2, CX, CY, R * 0.75);
+  g.addColorStop(0, rgba(DOURADO, 0.10 * brilho));
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = g; c.beginPath(); c.arc(CX, CY, R * 0.75, 0, Math.PI * 2); c.fill();
+
+  c.shadowColor = rgba(OURO_CLARO, 1); c.shadowBlur = 22 + nivel * 30;
+  c.strokeStyle = rgba(OURO_CLARO, 0.9 * brilho); c.lineWidth = 2.6 + nivel * 2;
+  c.beginPath(); c.arc(CX, CY, R * 0.66, 0, Math.PI * 2); c.stroke();
+  c.shadowBlur = 0;
+
+  // marcas de régua girando
+  c.strokeStyle = rgba(DOURADO, 0.45 * brilho); c.lineWidth = 1;
+  for (let k = 0; k < 120; k++) {
+    const a = (k / 120) * Math.PI * 2 - giro * 0.6;
+    const longo = k % 10 === 0;
+    const r0 = R * 0.72, r1 = R * (longo ? 0.77 : 0.745);
+    c.beginPath(); c.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0); c.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1); c.stroke();
+  }
+  // arcos tracejados em sentidos opostos
+  c.setLineDash([R * 0.18, R * 0.08]);
+  c.strokeStyle = rgba(DOURADO, 0.3 * brilho);
+  c.beginPath(); c.arc(CX, CY, R * 1.24, giro * 0.8, giro * 0.8 + Math.PI * 1.3); c.stroke();
+  c.beginPath(); c.arc(CX, CY, R * 1.32, -giro * 0.5, -giro * 0.5 + Math.PI * 0.8); c.stroke();
+  c.setLineDash([]);
+}
+
+/* constelação de ferramentas */
+function constelacao(t, dt) {
+  c.font = "500 12px 'IBM Plex Mono', monospace";
+  c.textBaseline = "middle";
+  for (const f of FERRAMENTAS) {
+    f.brilho += ((f.ativo ? 1 : 0) - f.brilho) * Math.min(1, dt * 5);
+    const dx = f.x - CX, dy = f.y - CY, dist = Math.hypot(dx, dy);
+    const bx = CX + (dx / dist) * R * 1.05, by = CY + (dy / dist) * R * 1.05;
+    const mx = (f.x + bx) / 2 + dy * 0.12, my = (f.y + by) / 2 - dx * 0.12;
+
+    c.strokeStyle = rgba(DOURADO, 0.14 + f.brilho * 0.6);
+    c.lineWidth = 1 + f.brilho;
+    c.beginPath(); c.moveTo(f.x, f.y); c.quadraticCurveTo(mx, my, bx, by); c.stroke();
+
+    if (f.brilho > 0.05) { // pulsos de luz viajando até o núcleo
+      for (let p = 0; p < 3; p++) {
+        const u = ((t * 0.9 + p / 3) % 1);
+        const x = (1 - u) ** 2 * f.x + 2 * (1 - u) * u * mx + u * u * bx;
+        const y = (1 - u) ** 2 * f.y + 2 * (1 - u) * u * my + u * u * by;
+        c.fillStyle = rgba(OURO_CLARO, f.brilho);
+        c.shadowColor = rgba(OURO_CLARO, 1); c.shadowBlur = 12;
+        c.beginPath(); c.arc(x, y, 2.4, 0, Math.PI * 2); c.fill();
+        c.shadowBlur = 0;
+      }
+    }
+    // nó
+    c.fillStyle = "#0A0A0A";
+    c.strokeStyle = rgba(f.brilho > 0.1 ? OURO_CLARO : DOURADO, 0.5 + f.brilho * 0.5);
+    c.lineWidth = 1.2;
+    c.shadowColor = rgba(OURO_CLARO, f.brilho); c.shadowBlur = 18 * f.brilho;
+    c.beginPath(); c.arc(f.x, f.y, 6 + f.brilho * 2, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.shadowBlur = 0;
+    c.fillStyle = rgba(OURO_CLARO, 0.35 + f.brilho * 0.65);
+    c.beginPath(); c.arc(f.x, f.y, 2.2, 0, Math.PI * 2); c.fill();
+
+    const esquerda = f.x < CX;
+    c.textAlign = esquerda ? "right" : "left";
+    c.fillStyle = f.brilho > 0.1 ? rgba([255, 255, 255], 0.6 + f.brilho * 0.4) : "rgba(163,163,170,0.8)";
+    c.fillText(f.nome.toUpperCase(), f.x + (esquerda ? -16 : 16), f.y);
+  }
+}
+
+/* poeira de partículas orbitando */
+const POEIRA = Array.from({ length: 140 }, () => ({ a: Math.random() * 6.28, r: 0.8 + Math.random() * 0.9, v: 0.02 + Math.random() * 0.08, s: Math.random() * 1.3 + 0.3 }));
+function poeira() {
+  for (const p of POEIRA) {
+    const a = p.a + giro * p.v * 3;
+    c.fillStyle = rgba(DOURADO, 0.25 * brilho);
+    c.fillRect(CX + Math.cos(a) * R * p.r * 1.25, CY + Math.sin(a) * R * p.r * 0.95, p.s, p.s);
+  }
+}
+
+let antes = performance.now();
+function quadro(agora) {
+  const dt = Math.min(0.05, (agora - antes) / 1000); antes = agora;
+  const t = agora / 1000;
+  const alvo = ALVOS[estado];
+  agitacao += (alvo.agit - agitacao) * dt * 3;
+  brilho += (alvo.brilho - brilho) * dt * 3;
+  giro += alvo.giro * dt;
+  nivel = simularNivel(t);
+  const chatAlvo = document.body.classList.contains("com-chat") ? Math.min(400, L * 0.4) : 0;
+  if (Math.abs(chatAlvo - chatAtual) > 0.5) {
+    chatAtual += (chatAlvo - chatAtual) * Math.min(1, dt * 7);
+    posicionar();
+  }
+
+  c.clearRect(0, 0, L, A);
+  poeira();
+  constelacao(t, dt);
+  globo(t);
+  anel(t);
+  filamentos(t);
+  requestAnimationFrame(quadro);
+}
+requestAnimationFrame(quadro);
+
+/* =========================== interface =========================== */
+
+const $ = (id) => document.getElementById(id);
+const NOMES = { idle: "", listening: "Ouvindo", thinking: "Pensando", executing: "Consultando", speaking: "Falando" };
+
+function mudarEstado(e) {
+  estado = e;
+  document.body.dataset.estado = e;
+  $("estado").textContent = NOMES[e];
+  $("mic-texto").textContent = e === "listening" ? "Ouvindo" : "Diga “Clarisse”";
+}
+
+function simularNivel(t) {
+  if (estado === "speaking") return 0.35 + 0.35 * Math.abs(Math.sin(t * 7.3)) * (0.6 + 0.4 * Math.sin(t * 2.1));
+  if (estado === "listening") return 0.15 + 0.25 * Math.abs(Math.sin(t * 5.1));
+  return 0;
+}
+
+function relogio() {
+  $("hora").textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+setInterval(relogio, 1000); relogio();
+
+function el(tag, classe, texto) { const e = document.createElement(tag); if (classe) e.className = classe; if (texto != null) e.textContent = texto; return e; }
+
+function montarCartao(dado) {
+  const cartao = el("article", "cartao");
+  for (let i = 0; i < 4; i++) cartao.append(el("i"));
+  const titulo = el("div", "cartao-titulo");
+  titulo.append(el("span", null, dado.titulo), el("span", null, dado.canto || ""));
+  cartao.append(titulo);
+  if (dado.tipo === "clima") {
+    const linha = el("div", "clima");
+    linha.append(el("span", "clima-temp", dado.temp), el("span", "clima-cond", dado.cond));
+    const dias = el("div", "dias");
+    for (const [nome, min, max, chuva] of dado.dias) {
+      const d = el("div", "dia");
+      d.append(el("div", "dia-nome", nome), el("div", "dia-num", `${min} · ${max}`), el("div", "dia-chuva", `chuva ${chuva}`));
+      dias.append(d);
+    }
+    cartao.append(linha, dias);
+  } else {
+    const ul = el("ul", "lista");
+    dado.itens.forEach(([marca, texto], indice) => {
+      const li = el("li", dado.clicavel ? "clicavel" : null);
+      li.dataset.indice = indice;
+      li.append(el("span", "marca-item", marca), el("span", null, texto));
+      ul.append(li);
+    });
+    cartao.append(ul);
+  }
+  return cartao;
+}
+
+function guardarNaFileira(dado) {
+  const mini = el("div", "mini");
+  mini.append(el("div", "mini-titulo", dado.titulo), el("div", "mini-texto", dado.resumo));
+  $("fileira").append(mini);
+  const minis = $("fileira").children;
+  while (minis.length > 6) minis[0].remove();
+}
+
+/* =========================== roteiro simulado =========================== */
+
+const ROTEIRO = [
+  {
+    voce: "Clarisse, como está o tempo hoje?", ferramenta: "Clima",
+    legenda: "Em Campinas faz 26 graus agora, com sol entre nuvens. A máxima de hoje é 29.",
+    cartao: { tipo: "clima", titulo: "Clima", canto: "Campinas", temp: "26°", cond: "Sol entre nuvens", resumo: "26° · sol entre nuvens",
+      dias: [["Hoje", "18°", "29°", "10%"], ["Amanhã", "17°", "27°", "40%"], ["Sábado", "16°", "24°", "70%"]] },
+  },
+  {
+    voce: "O que eu tenho na agenda hoje?", ferramenta: "Agenda",
+    legenda: "Você tem três compromissos hoje. O próximo é às duas da tarde.",
+    cartao: { tipo: "lista", titulo: "Agenda", canto: "hoje", resumo: "3 compromissos",
+      itens: [["09:30", "Daily do time de produto"], ["14:00", "Revisão do layout novo"], ["16:30", "Conversa com o financeiro"]] },
+  },
+  {
+    voce: "Quais as notícias de tecnologia?", ferramenta: "Notícias",
+    legenda: "Separei três manchetes de tecnologia. Quer que eu leia alguma? É só dizer o número.",
+    cartao: { tipo: "lista", titulo: "Notícias", canto: "tecnologia", resumo: "3 manchetes", clicavel: true,
+      itens: [["01", "Manchete fictícia sobre chips de IA"], ["02", "Manchete fictícia sobre redes 6G"], ["03", "Manchete fictícia sobre carros elétricos"]] },
+    leitura: { fala: "Lê a segunda", indice: 1 },
+  },
+  {
+    voce: "Pede para o Claude revisar a PR de ontem", ferramenta: "Claude",
+    legenda: "Pedi ao Claude. Ele vai revisar e eu aviso quando terminar.",
+    cartao: { tipo: "lista", titulo: "Claude", canto: "em andamento", resumo: "revisando a PR",
+      itens: [["→", "Revisar a PR de ontem"], ["◷", "Aviso quando terminar"]] },
+  },
+];
+
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Matérias fictícias: na Clarisse de verdade o texto vem do próprio feed do g1. */
+const MATERIAS = [
+  { titulo: "Manchete fictícia sobre chips de IA", subtitulo: "Texto de exemplo para o protótipo.", fonte: "g1 · tecnologia",
+    paragrafos: ["Primeiro parágrafo de exemplo, lido em voz alta pela Clarisse.", "Segundo parágrafo de exemplo.", "Terceiro parágrafo de exemplo."] },
+  { titulo: "Manchete fictícia sobre redes 6G", subtitulo: "Testes da nova geração de redes móveis começam em laboratório.", fonte: "g1 · tecnologia",
+    paragrafos: [
+      "Este é um texto de exemplo. Na Clarisse de verdade, aqui entra a matéria inteira que já vem no feed do g1, sem abrir o site.",
+      "Enquanto ela lê, o parágrafo da vez fica aceso e o bloco rola sozinho, para você acompanhar com os olhos se quiser.",
+      "Os parágrafos já lidos ficam em cinza claro. Dizer “para” interrompe a leitura a qualquer momento.",
+      "No fim da matéria, o bloco volta a ser um cartão e desce para a fileira, como os outros.",
+    ] },
+  { titulo: "Manchete fictícia sobre carros elétricos", subtitulo: "Texto de exemplo para o protótipo.", fonte: "g1 · tecnologia",
+    paragrafos: ["Primeiro parágrafo de exemplo.", "Segundo parágrafo de exemplo."] },
+];
+
+/* Espera a pessoa escolher clicando numa manchete; sem clique, segue a escolha falada do roteiro. */
+function esperarEscolha(cartao, ms) {
+  return new Promise((resolver) => {
+    const tempo = setTimeout(() => { cartao.removeEventListener("click", clique); resolver(null); }, ms);
+    function clique(e) {
+      const li = e.target.closest("li[data-indice]");
+      if (!li) return;
+      clearTimeout(tempo);
+      cartao.removeEventListener("click", clique);
+      resolver(Number(li.dataset.indice));
+    }
+    cartao.addEventListener("click", clique);
+  });
+}
+
+function abrirLeitura(cartao, m) {
+  cartao.classList.add("leitura");
+  cartao.querySelector(".lista").remove();
+  cartao.querySelector(".cartao-titulo span:last-child").textContent = m.fonte;
+  const corpo = el("div", "leitura-corpo");
+  m.paragrafos.forEach((t) => corpo.append(el("p", null, t)));
+  cartao.append(el("div", "leitura-foto", "FOTO DA MATÉRIA"), el("h2", "leitura-titulo", m.titulo), el("p", "leitura-sub", m.subtitulo), corpo);
+  return [...corpo.children];
+}
+
+async function lerNoticia(cartao, passo) {
+  const clicada = await esperarEscolha(cartao, 3500);
+  const indice = clicada ?? passo.leitura.indice;
+  const fala = clicada == null ? passo.leitura.fala : `(clicou na notícia ${indice + 1})`;
+  $("legenda").classList.remove("visivel");
+  if (clicada == null) {
+    mudarEstado("listening");
+    await espera(1500);
+  }
+  $("voce").textContent = fala;
+  $("voce").classList.add("visivel");
+  adicionarFala("voce", fala);
+  cartao.querySelector(`li[data-indice="${indice}"]`).classList.add("escolhida");
+  mudarEstado("thinking");
+  await espera(800);
+
+  const materia = MATERIAS[indice];
+  const paragrafos = abrirLeitura(cartao, materia);
+  mudarEstado("speaking");
+  adicionarFala("clarisse", `Lendo: ${materia.titulo}`);
+  for (const p of paragrafos) {
+    p.classList.add("lendo");
+    p.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    await espera(Math.max(2600, p.textContent.split(" ").length * 230));
+    p.classList.replace("lendo", "lido");
+  }
+}
+
+/* ---------- escrita opcional ---------- */
+
+const fila = [];  // pedidos escritos passam na frente do roteiro
+
+function abrirChat(aberto) {
+  document.body.classList.toggle("com-chat", aberto);
+  $("escrever").setAttribute("aria-expanded", String(aberto));
+  if (aberto) setTimeout(() => $("texto").focus(), 300);
+}
+
+function adicionarFala(quem, texto) {
+  const p = el("p", `fala-${quem}`, texto);
+  $("falas").append(p);
+  $("falas").scrollTop = $("falas").scrollHeight;
+}
+
+$("escrever").addEventListener("click", () => abrirChat(!document.body.classList.contains("com-chat")));
+$("fechar-chat").addEventListener("click", () => abrirChat(false));
+$("formulario").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const texto = $("texto").value.trim();
+  if (!texto) return;
+  $("texto").value = "";
+  fila.push({
+    voce: texto, ferramenta: "Claude", escrito: true,
+    legenda: "No protótipo eu só repito: aqui entraria a resposta de verdade.",
+    cartao: { tipo: "lista", titulo: "Resposta", canto: "escrita", resumo: texto, itens: [["›", texto]] },
+  });
+});
+
+async function cena(passo) {
+  if (!passo.escrito) {
+    mudarEstado("listening");
+    $("voce").classList.remove("visivel");
+    await espera(1800);
+  }
+  adicionarFala("voce", passo.voce);
+  $("voce").textContent = passo.voce;
+  $("voce").classList.add("visivel");
+  mudarEstado("thinking");
+  await espera(1100);
+  const f = FERRAMENTAS.find((x) => x.nome === passo.ferramenta);
+  f.ativo = true;
+  mudarEstado("executing");
+  await espera(1400);
+  f.ativo = false;
+
+  const cartao = montarCartao(passo.cartao);
+  $("palco-cartao").append(cartao);
+  requestAnimationFrame(() => requestAnimationFrame(() => cartao.classList.add("entrou")));
+  mudarEstado("speaking");
+  adicionarFala("clarisse", passo.legenda);
+  $("legenda").textContent = passo.legenda;
+  $("legenda").classList.add("visivel");
+  await espera(4800);
+  if (passo.leitura) await lerNoticia(cartao, passo);
+
+  $("legenda").classList.remove("visivel");
+  cartao.classList.add("saindo");
+  await espera(650);
+  cartao.remove();
+  guardarNaFileira(passo.cartao);
+  mudarEstado("idle");
+  $("voce").classList.remove("visivel");
+  await espera(1800);
+}
+
+(async () => {
+  await espera(1500);
+  // ?cena=3 começa direto pelas notícias
+  for (let i = (Number(new URLSearchParams(location.search).get("cena")) || 1) - 1; ; ) {
+    if (fila.length) { await cena(fila.shift()); continue; }
+    await cena(ROTEIRO[i]);
+    i = (i + 1) % ROTEIRO.length;
+  }
+})();
+</script>
+</body>
+</html>

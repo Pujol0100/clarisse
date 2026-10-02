@@ -11,7 +11,6 @@ import psutil
 from pydantic import Field
 
 from clarisse.config import Cadastros, normalizar
-from clarisse.figuras import RELOGIO
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.aplicacoes import achar_projetos
 from clarisse.sites import Site, achar_sites
@@ -215,7 +214,7 @@ def ferramentas_do_sistema(
         return f"Volume em {args.nivel} por cento."
 
     return [
-        Ferramenta("hora_e_data", "Informa a hora e a data atuais.", Argumentos, hora_e_data, figura=RELOGIO),
+        Ferramenta("hora_e_data", "Informa a hora e a data atuais.", Argumentos, hora_e_data),
         Ferramenta("abrir_aplicativo", "Abre um aplicativo instalado.", ArgsNome, abrir_aplicativo),
         Ferramenta(
             "fechar_aplicativo", "Fecha um aplicativo aberto.", ArgsNome, fechar_aplicativo,
@@ -229,6 +228,6 @@ def ferramentas_do_sistema(
             "onde está, no programa padrão.",
             ArgsArquivo, abrir_arquivo,
         ),
-        Ferramenta("abrir_site", "Abre um site no navegador.", ArgsSite, abrir_site),
+        Ferramenta("abrir_site", "Abre um site no navegador.", ArgsSite, abrir_site, grupo="navegador"),
         Ferramenta("ajustar_volume", "Ajusta o volume do sistema.", ArgsVolume, ajustar_volume),
     ]

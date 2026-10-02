@@ -19,7 +19,6 @@ from starlette.websockets import WebSocketClose
 
 from clarisse.auditoria import Auditoria
 from clarisse.eventos import Estado, Eventos
-from clarisse.figuras import MENSAGEM
 from clarisse.voz import dividir_em_trechos
 
 log = logging.getLogger(__name__)
@@ -34,7 +33,8 @@ def _cabecalhos_de_seguranca(porta: int) -> dict[str, str]:
     conexoes = f"'self' ws://127.0.0.1:{porta} ws://localhost:{porta}"
     return {
         "Content-Security-Policy": (
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            # Fotos das notícias vêm do servidor de imagens da Globo; nada mais de fora.
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://*.glbimg.com; "
             f"media-src 'self' blob:; connect-src {conexoes}; frame-ancestors 'none'; "
             "base-uri 'none'; form-action 'self'; object-src 'none'"
         ),
@@ -107,13 +107,24 @@ def _nova_fala() -> str:
     return uuid.uuid4().hex
 
 
-async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = None, fala: str | None = None) -> str | None:
+def _trechos(texto: str, cartao: dict | None = None) -> list[tuple[str, int | None]]:
+    """Trechos da fala e o parágrafo de onde cada um saiu. Na leitura de uma matéria, o título vai
+    primeiro e cada parágrafo se divide sozinho, para a tela acender o parágrafo da vez."""
+    if not (cartao and cartao.get("tipo") == "leitura"):
+        return [(trecho, None) for trecho in dividir_em_trechos(texto)]
+    titulo = cartao["titulo"] if cartao["titulo"].endswith((".", "!", "?")) else f"{cartao['titulo']}."
+    return [(trecho, None) for trecho in dividir_em_trechos(titulo)] + [
+        (trecho, i) for i, paragrafo in enumerate(cartao["paragrafos"]) for trecho in dividir_em_trechos(paragrafo)
+    ]
+
+
+async def _falar(eventos: Eventos, locutor, texto: str, fala: str | None = None, cartao: dict | None = None) -> str | None:
     """Fala em trechos: o primeiro sai assim que fica pronto e os outros são gerados enquanto ele toca.
     Cada trecho leva a legenda; o texto na tela espera a fala `fala` começar."""
     fala = fala or _nova_fala()
-    trechos = dividir_em_trechos(texto)
+    trechos = _trechos(texto, cartao)
     primeiro = None
-    for parte, trecho in enumerate(trechos):
+    for parte, (trecho, paragrafo) in enumerate(trechos):
         try:
             caminho = await locutor.sintetizar(trecho)
         except Exception:
@@ -126,7 +137,7 @@ async def _falar(eventos: Eventos, locutor, texto: str, figura: str | None = Non
             await eventos.estado(Estado.FALANDO)
         await eventos.publicar({
             "tipo": "falar", "fala": fala, "parte": parte, "total": len(trechos),
-            "audio": url, "legenda": trecho, "figura": figura,
+            "audio": url, "legenda": trecho, "paragrafo": paragrafo,
         })
         primeiro = primeiro or url
     return primeiro
@@ -137,16 +148,18 @@ def criar_anunciador(eventos: Eventos, locutor) -> Callable[[str], Awaitable[Non
     async def anunciar(frase: str) -> None:
         fala = _nova_fala()
         await eventos.publicar({"tipo": "resposta", "fala": fala, "texto": frase, "aguardando_confirmacao": True})
-        await _falar(eventos, locutor, frase, figura=MENSAGEM, fala=fala)
+        await _falar(eventos, locutor, frase, fala=fala)
 
     return anunciar
 
 
 def criar_avisador(eventos: Eventos, locutor) -> Callable[[str, str], Awaitable[None]]:
-    async def avisar(titulo: str, texto: str) -> None:
+    async def avisar(titulo: str, texto: str, falar: str | None = None) -> None:
         fala = _nova_fala()
-        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto})
-        await _falar(eventos, locutor, f"Do {titulo}: {texto}", figura=MENSAGEM, fala=fala)
+        cartao = {"tipo": "texto", "titulo": titulo, "texto": texto}
+        falado = falar or f"Do {titulo}: {texto}"
+        await eventos.publicar({"tipo": "aviso", "fala": fala, "titulo": titulo, "texto": texto, "cartao": cartao, "falado": falado})
+        await _falar(eventos, locutor, falado, fala=fala)
 
     return avisar
 
@@ -183,15 +196,15 @@ def criar_app(
         fala = _nova_fala()
         await eventos.publicar({
             "tipo": "resposta", "fala": fala, "texto": resposta.texto,
-            "aguardando_confirmacao": resposta.aguardando_confirmacao,
+            "aguardando_confirmacao": resposta.aguardando_confirmacao, "cartao": resposta.cartao,
         })
-        audio = await _falar(eventos, locutor, resposta.texto, figura=resposta.figura, fala=fala)
+        audio = await _falar(eventos, locutor, resposta.texto, fala=fala, cartao=resposta.cartao)
         return {
             "texto": resposta.texto,
             "audio": audio,
             "aguardando_confirmacao": resposta.aguardando_confirmacao,
             "parar": False,
-            "figura": resposta.figura,
+            "cartao": resposta.cartao,
         }
 
     @app.get("/", response_class=HTMLResponse)

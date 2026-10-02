@@ -133,22 +133,7 @@ async def test_claude_que_estoura_o_tempo_vira_aviso(montar, delegacoes, executo
     assert "demorou" in texto.lower()
 
 
-async def test_consultar_agenda_usa_so_a_leitura_do_calendario_e_a_data_de_hoje(montar, executor):
-    f = montar()["consultar_agenda"]
-    executor.respostas.append(_json_do_claude("Às 10h, reunião de time."))
-
-    resposta = await f.executar(f.argumentos(periodo="hoje"))
-
-    argumentos, _ = executor.executados[0]
-    assert resposta == "Às 10h, reunião de time."
-    assert _valor_da_opcao(argumentos, "--allowedTools") == "mcp__claude_ai_Microsoft_365__outlook_calendar_search"
-    assert _valor_da_opcao(argumentos, "--tools") == "ToolSearch"
-    assert "28 de setembro de 2026" in argumentos[2]
-
-
-
 @pytest.mark.parametrize("ferramenta,args", [
-    ("consultar_agenda", {"periodo": "amanhã"}),
     ("criar_compromisso", {"titulo": "Reunião", "quando": "amanhã às 10h"}),
 ])
 async def test_agenda_espera_os_conectores_antes_de_o_claude_comecar(montar, executor, ferramenta, args):

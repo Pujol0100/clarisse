@@ -9,7 +9,7 @@ config/*.json
 !config/*.exemplo.json
 
 # Estado local da Clarisse: áudio, auditoria, logs
-dados/
+/dados/
 
 # Ambiente e caches Python
 .venv/

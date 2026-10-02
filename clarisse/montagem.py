@@ -16,17 +16,26 @@ from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
 from clarisse.ferramentas.aplicacoes import carregar_bancos, esperar_site, ferramentas_de_aplicacoes
 from clarisse.ferramentas.claude import Delegacoes, ferramentas_do_claude
+from clarisse.cartoes import UltimaEscolha
+from clarisse.ferramentas.dokploy import ferramentas_do_dokploy
+from clarisse.ferramentas.escolhas import ferramentas_de_escolha
+from clarisse.ferramentas.github import ferramentas_do_github
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.leitura import ferramentas_de_leitura
+from clarisse.ferramentas.lembretes import Lembretes, ferramentas_de_lembretes, manter_lembretes
 from clarisse.ferramentas.noticias import ferramentas_de_noticias
+from clarisse.ferramentas.notas import ferramentas_de_notas
+from clarisse.ferramentas.outlook import ferramentas_do_outlook
 from clarisse.ferramentas.processos import Executor
 from clarisse.ferramentas.projetos import ferramentas_de_projetos
 from clarisse.ferramentas.registro import Registro
-from clarisse.sites import carregar_sites, manter_sites_atualizados
+from clarisse.sites import carregar_sites, manter_sites_atualizados, servidores_do_dokploy
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
-from clarisse.voz import Locutor, Transcritor, carregar_whisper
+from clarisse.microsoft import ContaMicrosoft
+from clarisse.redator import redigir_email
+from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
 CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
@@ -72,6 +81,20 @@ def _config_da_clarisse(porta: int) -> Path:
     return caminho
 
 
+# Ferramentas que mandam o pedido ao Claude. Sem `usar_claude`, ficam de fora; abrir o Claude na tela
+# e ler a resposta dele ficam, porque não mandam nada.
+DELEGAM_AO_CLAUDE = {
+    "pedir_ao_claude", "fazer_em_etapas", "fazer_no_navegador",
+    "mandar_para_conversa_do_claude", "criar_compromisso",
+}
+
+
+def _paineis_do_dokploy() -> list[tuple[str, str]]:
+    """Os mesmos painéis e chaves de leitura que o Claude Code usa, lidos a cada pergunta."""
+    configuracao = Path.home() / ".claude.json"
+    return servidores_do_dokploy(configuracao) if configuracao.is_file() else []
+
+
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
     apos_mudar_agenda=None,
@@ -83,12 +106,20 @@ def montar_registro(
         return carregar_sites(ajustes.pasta_config)
 
     raizes = sorted({pasta.parent for pasta in cadastros.projetos.values()})
+    escolhas = UltimaEscolha()
+    redator = ClienteOllama(httpx.AsyncClient(base_url=ajustes.ollama_url), ajustes.modelo)
+
+    async def redigir(sobre: str, para: str, assinatura: str | None) -> tuple[str, str]:
+        return await redigir_email(redator, sobre, para, assinatura)
+
+    async def abrir_no_navegador(endereco: str) -> None:
+        await executor.iniciar(["xdg-open", endereco])
 
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
         *ferramentas_de_janelas(cadastros, executor),
-        *ferramentas_de_leitura(executor),
+        *ferramentas_de_leitura(executor, cadastros=cadastros),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
             raizes=raizes,
@@ -107,11 +138,20 @@ def montar_registro(
             mcp_navegador=_config_do_navegador(),
             mcp_clarisse=_config_da_clarisse(ajustes.porta),
         ),
-        *ferramentas_de_noticias(http),
+        *ferramentas_de_noticias(http, abrir=abrir_no_navegador, escolhas=escolhas),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
+        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas, redigir=redigir),
+        *ferramentas_do_github(executor, cadastros),
+        *ferramentas_do_dokploy(http, _paineis_do_dokploy),
+        *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),
+        *ferramentas_de_escolha(escolhas),
     ]
+    cofre = ajustes.cofre_de_notas.expanduser() if ajustes.cofre_de_notas else None
+    if cofre and cofre.is_dir():
+        ferramentas += ferramentas_de_notas(cofre, escolhas=escolhas)
     for ferramenta in ferramentas:
-        registro.registrar(ferramenta)
+        if ajustes.usar_claude or ferramenta.nome not in DELEGAM_AO_CLAUDE:
+            registro.registrar(ferramenta)
     return registro
 
 
@@ -120,7 +160,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     gravar_chave(CAMINHO_DA_CHAVE, chave)
 
     eventos = Eventos()
-    locutor = Locutor(ajustes.pasta_dados / "audio", voz=ajustes.voz, velocidade=ajustes.voz_velocidade)
+    locutor = Locutor(ajustes.pasta_dados / "audio", gerar=gerar_local(ajustes.voz, ajustes.voz_velocidade))
     delegacoes = Delegacoes(criar_avisador(eventos, locutor))
     http_externo = httpx.AsyncClient()
     executor = Executor()
@@ -132,6 +172,13 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         await manter_sites_atualizados(
             http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
         )
+
+    async def aquecer_a_voz():
+        # O modelo de voz leva alguns segundos para carregar: carrega ao ligar, não na primeira resposta.
+        await locutor.sintetizar("Pronta.")
+
+    async def avisar_os_lembretes():
+        await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
 
     async def manter_agenda_do_linux():
         await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
@@ -153,6 +200,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[manter_agenda_do_linux, manter_sites_da_empresa],
+        tarefas_de_fundo=[aquecer_a_voz, manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )
