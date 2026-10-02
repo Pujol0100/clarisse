@@ -35,7 +35,7 @@ from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.microsoft import ContaMicrosoft
 from clarisse.redator import redigir_email
-from clarisse.voz import Gerador, Locutor, Transcritor, carregar_whisper, com_reserva, gerar_azure, gerar_edge
+from clarisse.voz import Locutor, Transcritor, carregar_whisper
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
 CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
@@ -155,20 +155,12 @@ def montar_registro(
     return registro
 
 
-def montar_voz(ajustes: Ajustes, http: httpx.AsyncClient) -> Gerador:
-    reserva = gerar_edge(ajustes.voz, ajustes.voz_velocidade)
-    if not ajustes.azure_chave:
-        return reserva
-    azure = gerar_azure(http, ajustes.azure_chave, ajustes.azure_regiao, ajustes.voz_azure, ajustes.voz_velocidade)
-    return com_reserva(azure, reserva)
-
-
 def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     chave = secrets.token_urlsafe(32)
     gravar_chave(CAMINHO_DA_CHAVE, chave)
 
     eventos = Eventos()
-    locutor = Locutor(ajustes.pasta_dados / "audio", gerar=montar_voz(ajustes, httpx.AsyncClient()))
+    locutor = Locutor(ajustes.pasta_dados / "audio", voz=ajustes.voz, velocidade=ajustes.voz_velocidade)
     delegacoes = Delegacoes(criar_avisador(eventos, locutor))
     http_externo = httpx.AsyncClient()
     executor = Executor()

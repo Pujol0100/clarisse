@@ -19,10 +19,6 @@ class Ajustes(BaseSettings):
     whisper_dispositivo: str = "cpu"
     voz: str = "pt-BR-ThalitaMultilingualNeural"
     voz_velocidade: str = "+10%"
-    # Com a chave do serviço de voz do Azure, a Clarisse fala com voz_azure; a voz acima vira a reserva.
-    azure_chave: str | None = None
-    azure_regiao: str = "brazilsouth"
-    voz_azure: str = "pt-BR-BrendaNeural"
     # Desligado em 01/10/2026: a Clarisse responde só com o modelo local. Abrir o Claude e ler o que ele
     # respondeu continuam (não mandam nada ao Claude).
     usar_claude: bool = False

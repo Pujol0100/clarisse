@@ -91,20 +91,3 @@ def test_notas_do_obsidian_so_entram_com_o_cofre_configurado(cadastros, executor
     )
 
     assert set(com.nomes()) - set(sem.nomes()) == {"buscar_nas_notas", "ler_nota"}
-
-
-async def test_com_a_chave_do_azure_a_voz_e_a_brenda_e_sem_ela_nada_vai_ao_azure(tmp_path):
-    pedidos = []
-
-    def responder(pedido):
-        pedidos.append(pedido)
-        return httpx.Response(200, content=b"mp3")
-
-    http = httpx.AsyncClient(transport=httpx.MockTransport(responder))
-    com_chave = Ajustes(_env_file=None, pasta_dados=tmp_path, azure_chave="k", azure_regiao="brazilsouth")
-
-    await montagem.montar_voz(com_chave, http)("oi", tmp_path / "a.mp3")
-
-    assert pedidos[0].url.host == "brazilsouth.tts.speech.microsoft.com"
-    assert "pt-BR-BrendaNeural" in pedidos[0].read().decode()
-    assert Ajustes(_env_file=None).azure_chave is None

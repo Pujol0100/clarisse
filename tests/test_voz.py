@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-import httpx
-
-from clarisse.voz import Locutor, Transcritor, com_reserva, enderecos_falados, gerar_azure, texto_para_fala
+from clarisse.voz import Locutor, Transcritor, enderecos_falados, texto_para_fala
 
 
 @dataclass
@@ -156,51 +154,3 @@ async def test_transcricao_ja_sai_com_o_endereco_escrito():
     transcritor = Transcritor(carregar=WhisperDoEmail, dicas=[])
 
     assert await transcritor.transcrever(b"audio") == "Escreve para ana@x.com"
-
-
-async def test_voz_do_azure_pede_o_audio_com_a_voz_escolhida_e_grava(tmp_path):
-    pedidos = []
-
-    def responder(pedido):
-        pedidos.append(pedido)
-        return httpx.Response(200, content=b"ID3-mp3")
-
-    gerar = gerar_azure(httpx.AsyncClient(transport=httpx.MockTransport(responder)), "chave-secreta", "brazilsouth",
-                        "pt-BR-BrendaNeural", "+10%")
-    destino = tmp_path / "fala.mp3"
-
-    await gerar("Preço < R$ 5 & frete", destino)
-
-    [pedido] = pedidos
-    assert str(pedido.url) == "https://brazilsouth.tts.speech.microsoft.com/cognitiveservices/v1"
-    assert pedido.headers["Ocp-Apim-Subscription-Key"] == "chave-secreta"
-    assert pedido.headers["X-Microsoft-OutputFormat"] == "audio-24khz-48kbitrate-mono-mp3"
-    ssml = pedido.read().decode()
-    assert "<voice name='pt-BR-BrendaNeural'>" in ssml and "<prosody rate='+10%'>" in ssml
-    assert "Preço &lt; R$ 5 &amp; frete" in ssml
-    assert destino.read_bytes() == b"ID3-mp3"
-
-
-async def test_voz_do_azure_que_falha_levanta_erro(tmp_path):
-    gerar = gerar_azure(httpx.AsyncClient(transport=httpx.MockTransport(lambda p: httpx.Response(429))), "k", "brazilsouth",
-                        "pt-BR-BrendaNeural", "+0%")
-
-    with pytest.raises(httpx.HTTPStatusError):
-        await gerar("oi", tmp_path / "x.mp3")
-
-
-async def test_se_a_voz_principal_falha_fala_com_a_reserva(tmp_path):
-    usadas = []
-
-    async def principal(texto, destino):
-        usadas.append("principal")
-        raise httpx.ConnectError("sem rede")
-
-    async def reserva(texto, destino):
-        usadas.append("reserva")
-        destino.write_bytes(b"mp3")
-
-    destino = tmp_path / "fala.mp3"
-    await com_reserva(principal, reserva)("oi", destino)
-
-    assert usadas == ["principal", "reserva"] and destino.read_bytes() == b"mp3"
