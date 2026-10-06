@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import psutil
 from pydantic import Field
 
+from clarisse.area_de_trabalho import definir_volume as volume_do_windows
 from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.aplicacoes import achar_projetos
@@ -19,9 +20,12 @@ _DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta
 _MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
           "agosto", "setembro", "outubro", "novembro", "dezembro"]
 _ESQUEMAS_PERIGOSOS = ("javascript:", "data:", "file:", "vbscript:", "mailto:")
-_PASTAS_PULADAS = {"node_modules", "__pycache__", "venv", "site-packages", "dist", "build", "graphify-out"}
+_PASTAS_PULADAS = {"node_modules", "__pycache__", "venv", "site-packages", "dist", "build", "graphify-out", "AppData"}
 # Abrir estes pode executar um programa em vez de mostrar o arquivo.
-_EXTENSOES_QUE_EXECUTAM = {".sh", ".bash", ".desktop", ".appimage", ".run", ".bin", ".exe", ".jar", ".deb", ".rpm"}
+_EXTENSOES_QUE_EXECUTAM = {
+    ".exe", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh",
+    ".msi", ".msp", ".lnk", ".scr", ".pif", ".reg", ".cpl", ".hta", ".jar", ".appref-ms",
+}
 # Tipo falado vira filtro de extensão: nenhum arquivo tem "planilha" no nome.
 _TIPOS = {
     "planilha": {".xlsx", ".xls", ".xlsm", ".csv", ".ods"},
@@ -105,7 +109,7 @@ def _procurar_arquivos(nome: str) -> list[Path]:
 
 
 def _executa_programa(caminho: Path) -> bool:
-    return caminho.suffix.lower() in _EXTENSOES_QUE_EXECUTAM or os.access(caminho, os.X_OK)
+    return caminho.suffix.lower() in _EXTENSOES_QUE_EXECUTAM
 
 
 class ArgsSite(Argumentos):
@@ -123,6 +127,7 @@ def ferramentas_do_sistema(
     processos: Callable[[], list[str]] = _nomes_dos_processos,
     sites: Callable[[], list[Site]] = list,
     raizes: list[Path] = (),
+    definir_volume: Callable[[int], None] = volume_do_windows,
 ) -> list[Ferramenta]:
     cadastrados = ", ".join(cadastros.aplicativos) or "nenhum"
 
@@ -134,7 +139,7 @@ def ferramentas_do_sistema(
         if chave is None:
             # O modelo às vezes chama esta ferramenta para sistema da empresa ou projeto.
             if len(achados := achar_sites(args.nome, sites())) == 1:
-                await executor.iniciar(["xdg-open", achados[0].endereco])
+                await executor.abrir(achados[0].endereco)
                 return f"Abri o {achados[0].nome} no navegador."
             if projetos := achar_projetos(args.nome, list(raizes)):
                 return f"O {projetos[0].name} é um projeto desta máquina. Quer que eu rode ele local ou abra no VS Code?"
@@ -146,9 +151,7 @@ def ferramentas_do_sistema(
         chave = cadastros.achar_aplicativo(args.nome)
         if chave is None:
             return f"Não conheço o aplicativo {args.nome}. Os cadastrados são: {cadastrados}."
-        # O Linux guarda só 15 caracteres do nome do processo, e o pkill -x compara com eles.
-        resultado = await executor.executar(["pkill", "-x", cadastros.aplicativos[chave].processo[:15]])
-        if resultado.codigo == 1:
+        if await executor.encerrar(cadastros.aplicativos[chave].processo) == 0:
             return f"O {chave} não estava aberto."
         return f"Fechei o {chave}."
 
@@ -157,8 +160,8 @@ def ferramentas_do_sistema(
         return f"Vou fechar o {chave}, e o que não estiver salvo nele se perde. Confirma?"
 
     async def listar_programas_abertos(args: Argumentos) -> str:
-        rodando = set(processos())
-        abertos = [k for k, app in cadastros.aplicativos.items() if app.processo in rodando]
+        rodando = {nome.lower() for nome in processos()}
+        abertos = [k for k, app in cadastros.aplicativos.items() if app.processo.lower() in rodando]
         if not abertos:
             return "Nenhum dos aplicativos cadastrados está aberto."
         return "Abertos agora: " + ", ".join(abertos) + "."
@@ -173,7 +176,7 @@ def ferramentas_do_sistema(
                 return "Não abro pastas fora da sua pasta pessoal."
             if not destino.is_dir():
                 return f"Não achei a pasta {args.pasta}."
-        await executor.iniciar(["xdg-open", str(destino)])
+        await executor.abrir(str(destino))
         return f"Abri a pasta {destino.name}."
 
     async def abrir_arquivo(args: ArgsArquivo) -> str:
@@ -193,24 +196,22 @@ def ferramentas_do_sistema(
                 f"Achei {len(abriveis)} arquivos com esse nome. Os mais recentes: {recentes}. "
                 "Diga um pedaço a mais do nome."
             )
-        await executor.iniciar(["xdg-open", str(abriveis[0])])
+        await executor.abrir(str(abriveis[0]))
         return f"Abri {abriveis[0].name}."
 
     async def abrir_site(args: ArgsSite) -> str:
         # Nome sem ponto que é sistema da empresa: "sc360" viraria sc360.com, site de outra empresa.
         if "." not in args.endereco and len(achados := achar_sites(args.endereco, sites())) == 1:
-            await executor.iniciar(["xdg-open", achados[0].endereco])
+            await executor.abrir(achados[0].endereco)
             return f"Abri o {achados[0].nome}."
         url = normalizar_site(args.endereco)
         if url is None:
             return f"Não abro esse endereço: {args.endereco}. Só sites http ou https."
-        await executor.iniciar(["xdg-open", url])
+        await executor.abrir(url)
         return f"Abri {url}."
 
     async def ajustar_volume(args: ArgsVolume) -> str:
-        resultado = await executor.executar(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{args.nivel / 100:.2f}"])
-        if resultado.codigo != 0:
-            return f"Não consegui ajustar o volume: {resultado.erro.strip()}"
+        definir_volume(args.nivel)
         return f"Volume em {args.nivel} por cento."
 
     return [
