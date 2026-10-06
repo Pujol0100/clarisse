@@ -13,6 +13,7 @@ from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.sistema import data_por_extenso
+from clarisse.terminal import em_aspas, terminal
 
 log = logging.getLogger(__name__)
 
@@ -177,7 +178,7 @@ def ferramentas_do_claude(
             return projeto_desconhecido(cadastros, args.projeto)
         pasta = str(cadastros.projetos[chave])
         await executor.iniciar(["code", pasta])
-        await executor.iniciar(["ptyxis", "--new-window", "-d", pasta, "--", "claude", args.pedido])
+        await executor.iniciar(terminal(Path(pasta), f"claude {em_aspas(args.pedido)}"))
         return f"Abri o VS Code e o Claude no projeto {chave}, já com o seu pedido."
 
     async def pedir_ao_claude(args) -> str:

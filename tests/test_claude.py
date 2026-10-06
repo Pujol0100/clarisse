@@ -1,3 +1,4 @@
+import base64
 import json
 from datetime import datetime
 
@@ -53,12 +54,13 @@ async def test_abrir_na_tela_abre_vscode_e_terminal_com_o_pedido(montar, cadastr
     f = montar()["abrir_claude_na_tela"]
     pasta = str(cadastros.projetos["omni-api"])
 
-    await f.executar(f.argumentos(projeto="omni-api", pedido="corrige o teste; rm -rf ~"))
+    await f.executar(f.argumentos(projeto="omni-api", pedido="corrige o teste d'ela; del /q *"))
 
-    assert executor.iniciados == [
-        (["code", pasta], None),
-        (["ptyxis", "--new-window", "-d", pasta, "--", "claude", "corrige o teste; rm -rf ~"], None),
-    ]
+    (vscode, _), (terminal, _) = executor.iniciados
+    assert vscode == ["code", pasta]
+    assert terminal[:5] == ["wt.exe", "-w", "new", "-d", pasta]
+    comando = base64.b64decode(terminal[-1]).decode("utf-16-le")
+    assert comando == "claude 'corrige o teste d''ela; del /q *'"
 
 
 async def test_pedir_ao_claude_responde_na_hora_e_avisa_quando_termina(montar, delegacoes, cadastros, executor, avisos):
