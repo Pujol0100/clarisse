@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
-ESPERADOS = {"ligar.ps1", "desligar.ps1", "instalar-no-menu.ps1"}
+ESPERADOS = {"ligar.ps1", "desligar.ps1", "instalar-no-menu.ps1", "entrar-microsoft.ps1"}
 
 
 def _erros_de_sintaxe(script: Path) -> list[str]:
