@@ -54,7 +54,7 @@ class Parte:
 def _script_de_dev(pasta: Path) -> tuple[str, str] | None:
     """Nome e conteúdo do script de desenvolvimento do package.json da pasta."""
     try:
-        scripts = json.loads((pasta / "package.json").read_text()).get("scripts", {})
+        scripts = json.loads((pasta / "package.json").read_text(encoding="utf-8")).get("scripts", {})
     except (OSError, json.JSONDecodeError):
         return None
     return next(((nome, scripts[nome]) for nome in _SCRIPTS_DE_DEV if nome in scripts), None)
@@ -116,7 +116,7 @@ async def esperar_site(endereco: str, cliente: httpx.AsyncClient, limite: float 
 def carregar_bancos(caminho: Path) -> dict[str, Banco]:
     if not caminho.is_file():
         return {}
-    return {endereco: Banco(**dados) for endereco, dados in json.loads(caminho.read_text()).items()}
+    return {endereco: Banco(**dados) for endereco, dados in json.loads(caminho.read_text(encoding="utf-8")).items()}
 
 
 class ArgsRodar(Argumentos):

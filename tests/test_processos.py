@@ -59,7 +59,7 @@ async def test_estourar_o_tempo_encerra_tambem_os_filhos(executor, tmp_path):
 
     resultado = await executor.executar([sys.executable, "-c", codigo], timeout=3)
 
-    neto = int(arquivo_do_neto.read_text())
+    neto = int(arquivo_do_neto.read_text(encoding="utf-8"))
     assert resultado.estourou_tempo
     assert not psutil.pid_exists(neto) or psutil.Process(neto).status() == psutil.STATUS_ZOMBIE
 

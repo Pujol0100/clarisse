@@ -15,9 +15,9 @@ BANCOS = {
 
 def _pacote(pasta, scripts, instalado=True, trava=True):
     pasta.mkdir(parents=True, exist_ok=True)
-    (pasta / "package.json").write_text(json.dumps({"scripts": scripts}))
+    (pasta / "package.json").write_text(json.dumps({"scripts": scripts}), encoding="utf-8")
     if trava:
-        (pasta / "package-lock.json").write_text("{}")
+        (pasta / "package-lock.json").write_text("{}", encoding="utf-8")
     if instalado:
         (pasta / "node_modules").mkdir(exist_ok=True)
 
@@ -33,8 +33,7 @@ def _smart_anchor(raiz, banco="10.0.0.5:65432"):
         # Variáveis de scripts de sincronização: apontam para produção, mas o servidor de dev não as usa.
         'SYNC_URL_ORIGEM="postgresql://postgres:outra@10.0.0.5:45432/postgres"\n'
         "PD_DB_HOST=10.0.0.5\n"
-        "PD_DB_PORT=45432\n"
-    )
+        "PD_DB_PORT=45432\n", encoding="utf-8")
     return projeto
 
 
@@ -249,7 +248,7 @@ async def test_esperar_site_desiste_no_limite():
 
 def test_banco_no_estilo_db_host_e_db_port(montar, tmp_path):
     _pacote(tmp_path / "omni-app", {"dev": "vite"})
-    (tmp_path / "omni-app" / ".env").write_text("DB_HOST=10.0.0.5\nDB_PORT=65432\nDB_PASSWORD=segredo\n")
+    (tmp_path / "omni-app" / ".env").write_text("DB_HOST=10.0.0.5\nDB_PORT=65432\nDB_PASSWORD=segredo\n", encoding="utf-8")
     f = montar()
 
     frase = f.frase_de_confirmacao(f.argumentos(projeto="omni-app"))
@@ -260,7 +259,7 @@ def test_banco_no_estilo_db_host_e_db_port(montar, tmp_path):
 
 def test_banco_local_da_maquina_e_dito_como_local(montar, tmp_path):
     _pacote(tmp_path / "sc360", {"dev": "next dev"})
-    (tmp_path / "sc360" / ".env").write_text('DATABASE_URL="postgresql://u:p@localhost:5440/sc360"\n')
+    (tmp_path / "sc360" / ".env").write_text('DATABASE_URL="postgresql://u:p@localhost:5440/sc360"\n', encoding="utf-8")
     f = montar()
 
     frase = f.frase_de_confirmacao(f.argumentos(projeto="sc360"))

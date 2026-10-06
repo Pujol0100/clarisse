@@ -25,7 +25,7 @@ CONVERSA = [
 
 def _gravar(caminho, linhas, idade=0):
     caminho.parent.mkdir(parents=True, exist_ok=True)
-    caminho.write_text("\n".join(json.dumps(l, ensure_ascii=False) for l in linhas) + "\n")
+    caminho.write_text("\n".join(json.dumps(l, ensure_ascii=False) for l in linhas) + "\n", encoding="utf-8")
     os.utime(caminho, (1_800_000_000 - idade, 1_800_000_000 - idade))
 
 

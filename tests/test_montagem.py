@@ -69,7 +69,7 @@ def test_claude_das_tarefas_roda_numa_pasta_local_do_usuario():
 def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
     monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
 
-    config = json.loads(montagem._config_do_navegador().read_text())
+    config = json.loads(montagem._config_do_navegador().read_text(encoding="utf-8"))
 
     pacote = config["mcpServers"]["playwright"]["args"][-1]
     assert re.fullmatch(r"@playwright/mcp@\d+\.\d+\.\d+", pacote)
@@ -80,7 +80,7 @@ def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path
 
     monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
 
-    servidor = json.loads(montagem._config_da_clarisse(porta=8765).read_text())["mcpServers"]["clarisse"]
+    servidor = json.loads(montagem._config_da_clarisse(porta=8765).read_text(encoding="utf-8"))["mcpServers"]["clarisse"]
 
     assert servidor["command"] == sys.executable
     assert servidor["args"] == ["-m", "clarisse.mcp_servidor"]

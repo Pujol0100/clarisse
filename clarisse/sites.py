@@ -36,12 +36,12 @@ def _sem_barra(endereco: str) -> str:
 def carregar_sites(pasta_config: Path) -> list[Site]:
     manuais = []
     if (pasta_config / "sites.json").is_file():
-        for nome, dados in json.loads((pasta_config / "sites.json").read_text()).items():
+        for nome, dados in json.loads((pasta_config / "sites.json").read_text(encoding="utf-8")).items():
             manuais.append(Site(nome, dados["endereco"], dados.get("apelidos", [])))
     conhecidos = {_sem_barra(s.endereco) for s in manuais}
     automaticos = []
     if (pasta_config / "sites-dokploy.json").is_file():
-        for por_painel in json.loads((pasta_config / "sites-dokploy.json").read_text()).values():
+        for por_painel in json.loads((pasta_config / "sites-dokploy.json").read_text(encoding="utf-8")).values():
             for nome, endereco in por_painel.items():
                 if _sem_barra(endereco) not in conhecidos:
                     conhecidos.add(_sem_barra(endereco))
@@ -56,7 +56,7 @@ def achar_sites(nome: str, sites: list[Site]) -> list[Site]:
 
 
 def servidores_do_dokploy(configuracao_do_claude: Path) -> list[tuple[str, str]]:
-    servidores = json.loads(configuracao_do_claude.read_text()).get("mcpServers", {})
+    servidores = json.loads(configuracao_do_claude.read_text(encoding="utf-8")).get("mcpServers", {})
     pares = []
     for nome, servidor in servidores.items():
         env = servidor.get("env", {})
@@ -89,14 +89,14 @@ async def _telas_do_painel(http, url: str, chave: str) -> dict[str, str]:
 
 
 async def atualizar_sites_do_dokploy(http, servidores: list[tuple[str, str]], destino: Path) -> None:
-    anterior = json.loads(destino.read_text()) if destino.is_file() else {}
+    anterior = json.loads(destino.read_text(encoding="utf-8")) if destino.is_file() else {}
     novo = dict(anterior)
     for url, chave in servidores:
         try:
             novo[url] = await _telas_do_painel(http, url, chave)
         except (httpx.HTTPError, KeyError, ValueError) as erro:
             log.warning("não consegui ler os sites do Dokploy em %s: %r", url, erro)
-    destino.write_text(json.dumps(novo, ensure_ascii=False, indent=1))
+    destino.write_text(json.dumps(novo, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 async def manter_sites_atualizados(http, configuracao_do_claude: Path, destino: Path, intervalo: float = 86400) -> None:

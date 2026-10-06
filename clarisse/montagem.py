@@ -59,7 +59,7 @@ def _config_do_navegador() -> Path:
     """O Claude das tarefas no navegador só enxerga este servidor: o Playwright, com janela visível para login."""
     PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
-    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}))
+    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}), encoding="utf-8")
     return caminho
 
 
@@ -72,7 +72,7 @@ def _config_da_clarisse(porta: int) -> Path:
         "args": ["-m", "clarisse.mcp_servidor"],
         "env": {"PYTHONPATH": str(RAIZ), "CLARISSE_PORTA": str(porta)},
     }
-    caminho.write_text(json.dumps({"mcpServers": {"clarisse": servidor}}))
+    caminho.write_text(json.dumps({"mcpServers": {"clarisse": servidor}}), encoding="utf-8")
     return caminho
 
 

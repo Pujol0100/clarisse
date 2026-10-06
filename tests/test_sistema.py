@@ -137,7 +137,7 @@ async def test_falha_do_programa_vira_mensagem(ferramentas, executor):
 def _arquivo(pasta, nome, idade=0):
     caminho = pasta / nome
     caminho.parent.mkdir(parents=True, exist_ok=True)
-    caminho.write_text("x")
+    caminho.write_text("x", encoding="utf-8")
     antigo = 1_700_000_000 - idade
     os.utime(caminho, (antigo, antigo))
     return caminho
