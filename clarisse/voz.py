@@ -1,7 +1,6 @@
 """Voz para texto (faster-whisper) e texto para voz (Kokoro), as duas na máquina: nada do que a
 Clarisse ouve ou fala sai do notebook."""
 import asyncio
-import ctypes.util
 import io
 import re
 import uuid
@@ -32,17 +31,6 @@ def receita_da_voz(receita: str) -> list[tuple[str, float]]:
 
 def carregar_kokoro():
     import misaki.espeak  # noqa: F401  aponta para o espeak embutido no espeakng-loader
-
-    from phonemizer.backend.espeak.wrapper import EspeakWrapper
-
-    # O espeak embutido no espeakng-loader 0.2.x procura os dados num caminho da máquina onde foi
-    # compilado e ignora o caminho que recebe (02/10/2026). O do sistema funciona: apt install espeak-ng.
-    biblioteca = ctypes.util.find_library("espeak-ng")
-    if biblioteca is None:
-        raise RuntimeError("falta o espeak-ng do sistema: sudo apt install espeak-ng")
-    EspeakWrapper.set_library(biblioteca)
-    EspeakWrapper.set_data_path(None)
-
     import torch
     from kokoro import KPipeline
 
