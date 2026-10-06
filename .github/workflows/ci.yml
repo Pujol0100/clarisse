@@ -9,8 +9,9 @@ permissions:
   contents: read
 
 jobs:
+  # A Clarisse roda só no Windows (desde 05/10/2026); os outros jobs não dependem do sistema.
   testes:
-    runs-on: ubuntu-24.04
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
