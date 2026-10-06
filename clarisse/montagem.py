@@ -1,16 +1,15 @@
 """Junta as peças da Clarisse a partir dos ajustes e cadastros."""
 import json
-import os
 import secrets
 import sys
 from pathlib import Path
 
 import httpx
 
-from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, manter_agendas_atualizadas
 from clarisse.agente import Agente
+from clarisse.area_de_trabalho import AreaDeTrabalho
 from clarisse.auditoria import Auditoria
-from clarisse.config import Ajustes, Cadastros
+from clarisse.config import CAMINHO_DA_CHAVE, PASTA_LOCAL, Ajustes, Cadastros
 from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
@@ -33,19 +32,19 @@ from clarisse.sites import carregar_sites, manter_sites_atualizados, servidores_
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
-from clarisse.microsoft import ContaMicrosoft
+from clarisse.microsoft import ContaMicrosoft, LoginMicrosoft
 from clarisse.redator import redigir_email
+from clarisse.tecla import escutar_pela_tecla
 from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
-CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
 RAIZ = Path(__file__).resolve().parent.parent
 # Ferramentas que chamariam outro Claude: o Claude das etapas não pode pedi-las.
 FORA_DO_CLAUDE = {"pedir_ao_claude", "fazer_em_etapas"}
 CONFIRMAR_PARA_O_CLAUDE = {"apertar_atalho"}
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 # Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
-PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
+PASTA_NEUTRA_DO_CLAUDE = PASTA_LOCAL / "claude"
 # Palavras que a transcrição erra sem dica: "git" virou "G de" na medição de 29/09/2026.
 VOCABULARIO_FALADO = ["Clarisse", "Claude", "git", "git status", "git pull", "VS Code"]
 # Versão fixa: com @latest o npx baixaria código novo sem revisão a cada tarefa.
@@ -53,18 +52,15 @@ PLAYWRIGHT_MCP = "@playwright/mcp@0.0.83"
 
 
 def gravar_chave(caminho: Path, chave: str) -> None:
-    caminho.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    caminho.unlink(missing_ok=True)
-    descritor = os.open(caminho, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descritor, "w") as arquivo:
-        arquivo.write(chave)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_text(chave, encoding="utf-8")
 
 
 def _config_do_navegador() -> Path:
     """O Claude das tarefas no navegador só enxerga este servidor: o Playwright, com janela visível para login."""
     PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
-    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}))
+    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "cmd", "args": ["/c", "npx", "-y", PLAYWRIGHT_MCP]}}}), encoding="utf-8")
     return caminho
 
 
@@ -77,7 +73,7 @@ def _config_da_clarisse(porta: int) -> Path:
         "args": ["-m", "clarisse.mcp_servidor"],
         "env": {"PYTHONPATH": str(RAIZ), "CLARISSE_PORTA": str(porta)},
     }
-    caminho.write_text(json.dumps({"mcpServers": {"clarisse": servidor}}))
+    caminho.write_text(json.dumps({"mcpServers": {"clarisse": servidor}}), encoding="utf-8")
     return caminho
 
 
@@ -97,7 +93,6 @@ def _paineis_do_dokploy() -> list[tuple[str, str]]:
 
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
-    apos_mudar_agenda=None,
 ) -> Registro:
     registro = Registro()
     http_local = httpx.AsyncClient()
@@ -113,12 +108,12 @@ def montar_registro(
         return await redigir_email(redator, sobre, para, assinatura)
 
     async def abrir_no_navegador(endereco: str) -> None:
-        await executor.iniciar(["xdg-open", endereco])
+        await executor.abrir(endereco)
 
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
-        *ferramentas_de_janelas(cadastros, executor),
+        *ferramentas_de_janelas(cadastros, AreaDeTrabalho()),
         *ferramentas_de_leitura(executor, cadastros=cadastros),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
@@ -134,13 +129,12 @@ def montar_registro(
             modelo=ajustes.claude_modelo,
             timeout=ajustes.claude_timeout,
             teto_usd=ajustes.claude_teto_usd,
-            apos_mudar_agenda=apos_mudar_agenda,
             mcp_navegador=_config_do_navegador(),
             mcp_clarisse=_config_da_clarisse(ajustes.porta),
         ),
         *ferramentas_de_noticias(http, abrir=abrir_no_navegador, escolhas=escolhas),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
-        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas, redigir=redigir),
+        *ferramentas_do_outlook(ContaMicrosoft(LoginMicrosoft().token, http), escolhas=escolhas, redigir=redigir),
         *ferramentas_do_github(executor, cadastros),
         *ferramentas_do_dokploy(http, _paineis_do_dokploy),
         *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),
@@ -165,9 +159,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     http_externo = httpx.AsyncClient()
     executor = Executor()
 
-    async def atualizar_agenda_do_linux():
-        await atualizar_agendas(executor, agendas_do_microsoft365())
-
     async def manter_sites_da_empresa():
         await manter_sites_atualizados(
             http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
@@ -177,13 +168,13 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         # O modelo de voz leva alguns segundos para carregar: carrega ao ligar, não na primeira resposta.
         await locutor.sintetizar("Pronta.")
 
+    async def falar_pela_tecla():
+        await escutar_pela_tecla(eventos.publicar)
+
     async def avisar_os_lembretes():
         await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
 
-    async def manter_agenda_do_linux():
-        await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
-
-    registro = montar_registro(ajustes, cadastros, executor, http_externo, delegacoes, apos_mudar_agenda=atualizar_agenda_do_linux)
+    registro = montar_registro(ajustes, cadastros, executor, http_externo, delegacoes)
     modelo = ClienteOllama(httpx.AsyncClient(base_url=ajustes.ollama_url), ajustes.modelo)
     agente = Agente(
         modelo, registro, eventos, Auditoria(ajustes.pasta_dados / "auditoria.jsonl"),
@@ -200,6 +191,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[aquecer_a_voz, manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
+        tarefas_de_fundo=[aquecer_a_voz, falar_pela_tecla, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )

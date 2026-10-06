@@ -1,12 +1,12 @@
 import json
+import os
 import re
-import stat
 from pathlib import Path
 
 import httpx
 
 from clarisse import montagem
-from clarisse.config import Ajustes
+from clarisse.config import CAMINHO_DA_CHAVE, Ajustes
 from clarisse.ferramentas.claude import Delegacoes
 from clarisse.montagem import gravar_chave, montar_registro
 
@@ -49,23 +49,35 @@ def test_sem_o_claude_fica_so_o_que_roda_aqui_e_continua_abrindo_e_lendo_o_claud
     assert set(registro.nomes()) == LOCAIS
 
 
-def test_chave_gravada_so_para_o_dono(tmp_path):
-    caminho = tmp_path / "config" / "clarisse" / "chave"
+def test_chave_nova_substitui_a_antiga(tmp_path):
+    caminho = tmp_path / "Clarisse" / "chave"
 
     gravar_chave(caminho, "segredo-da-sessao")
     gravar_chave(caminho, "outra-sessao")
 
-    assert caminho.read_text() == "outra-sessao"
-    assert stat.S_IMODE(caminho.stat().st_mode) == 0o600
+    assert caminho.read_text(encoding="utf-8") == "outra-sessao"
+
+
+def test_chave_fica_na_pasta_do_usuario_no_appdata():
+    assert CAMINHO_DA_CHAVE.is_relative_to(Path(os.environ["APPDATA"]))
 
 
 def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
     monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
 
-    config = json.loads(montagem._config_do_navegador().read_text())
+    config = json.loads(montagem._config_do_navegador().read_text(encoding="utf-8"))
 
     pacote = config["mcpServers"]["playwright"]["args"][-1]
     assert re.fullmatch(r"@playwright/mcp@\d+\.\d+\.\d+", pacote)
+
+
+def test_playwright_do_navegador_abre_o_npx_pelo_cmd(tmp_path, monkeypatch):
+    monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
+
+    servidor = json.loads(montagem._config_do_navegador().read_text(encoding="utf-8"))["mcpServers"]["playwright"]
+
+    assert servidor["command"] == "cmd"
+    assert servidor["args"][:3] == ["/c", "npx", "-y"]
 
 
 def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path, monkeypatch):
@@ -73,7 +85,7 @@ def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path
 
     monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
 
-    servidor = json.loads(montagem._config_da_clarisse(porta=8765).read_text())["mcpServers"]["clarisse"]
+    servidor = json.loads(montagem._config_da_clarisse(porta=8765).read_text(encoding="utf-8"))["mcpServers"]["clarisse"]
 
     assert servidor["command"] == sys.executable
     assert servidor["args"] == ["-m", "clarisse.mcp_servidor"]

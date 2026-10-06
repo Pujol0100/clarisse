@@ -59,25 +59,42 @@ class ArgsLeitura(Argumentos):
     )
 
 
-def _mexeu_no_projeto(conversa: Path, marcas: tuple[str, ...]) -> bool:
+def _textos(valor) -> list[str]:
+    if isinstance(valor, str):
+        return [valor]
+    if isinstance(valor, dict):
+        valor = list(valor.values())
+    if isinstance(valor, list):
+        return [texto for item in valor for texto in _textos(item)]
+    return []
+
+
+def _mexeu_no_projeto(conversa: Path, caminho: Path) -> bool:
     """Conta só a pasta onde o Claude estava e o que as ferramentas dele usaram; citar o caminho num
     texto ou receber o caminho num resultado não faz da conversa uma conversa do projeto."""
+    nome = caminho.name.lower()
+    # No Windows o mesmo caminho chega com \ ou /, e com o drive em maiúscula ou minúscula.
+    marcas = (str(caminho).lower().rstrip("\\") + "\\", f"\\worktrees\\{nome}\\")
+
+    def dentro(texto: str) -> bool:
+        normal = texto.replace("/", "\\").lower()
+        return any(m in normal for m in marcas)
+
     texto = conversa.read_text(encoding="utf-8", errors="ignore")
     for bruta in texto.splitlines():
-        if not any(m in bruta for m in marcas):
+        if nome not in bruta.lower():
             continue
         try:
             linha = json.loads(bruta)
         except json.JSONDecodeError:
             continue
-        if any(m in f"{linha.get('cwd') or ''}/" for m in marcas):
+        if dentro(f"{linha.get('cwd') or ''}\\"):
             return True
         if linha.get("type") != "assistant":
             continue
         for item in (linha.get("message") or {}).get("content") or []:
             if isinstance(item, dict) and item.get("type") == "tool_use":
-                entrada = json.dumps(item.get("input"), ensure_ascii=False)
-                if any(m in entrada for m in marcas):
+                if any(dentro(texto) for texto in _textos(item.get("input"))):
                     return True
     return False
 
@@ -99,13 +116,12 @@ def ferramentas_de_leitura(
             return projeto_desconhecido(cadastros, nome)
         caminho = cadastros.projetos[chave]
         propria = pasta_das_conversas / _pasta_do_projeto(str(caminho))
-        marcas = (f"{caminho}/", f"/worktrees/{caminho.name}/")
         recentes = sorted(
             pasta_das_conversas.glob("*/*.jsonl") if pasta_das_conversas.is_dir() else [],
             key=lambda c: c.stat().st_mtime, reverse=True,
         )[:_CONVERSAS_OLHADAS]
         for conversa in recentes:
-            if conversa.parent == propria or _mexeu_no_projeto(conversa, marcas):
+            if conversa.parent == propria or _mexeu_no_projeto(conversa, caminho):
                 return conversa
         return f"Não achei conversa do Claude no projeto {chave}."
 

@@ -1,3 +1,4 @@
+import base64
 import json
 
 import pytest
@@ -15,9 +16,9 @@ BANCOS = {
 
 def _pacote(pasta, scripts, instalado=True, trava=True):
     pasta.mkdir(parents=True, exist_ok=True)
-    (pasta / "package.json").write_text(json.dumps({"scripts": scripts}))
+    (pasta / "package.json").write_text(json.dumps({"scripts": scripts}), encoding="utf-8")
     if trava:
-        (pasta / "package-lock.json").write_text("{}")
+        (pasta / "package-lock.json").write_text("{}", encoding="utf-8")
     if instalado:
         (pasta / "node_modules").mkdir(exist_ok=True)
 
@@ -33,15 +34,19 @@ def _smart_anchor(raiz, banco="10.0.0.5:65432"):
         # Variáveis de scripts de sincronização: apontam para produção, mas o servidor de dev não as usa.
         'SYNC_URL_ORIGEM="postgresql://postgres:outra@10.0.0.5:45432/postgres"\n'
         "PD_DB_HOST=10.0.0.5\n"
-        "PD_DB_PORT=45432\n"
-    )
+        "PD_DB_PORT=45432\n", encoding="utf-8")
     return projeto
 
 
 def _comando(argumentos):
-    """O que roda dentro do terminal: ptyxis ... -- bash -c "<comando>"."""
-    assert argumentos[-3:-1] == ["bash", "-c"]
-    return argumentos[-1]
+    """O que roda dentro do terminal: wt.exe ... powershell.exe -NoExit -EncodedCommand <comando>."""
+    assert argumentos[-2] == "-EncodedCommand"
+    return base64.b64decode(argumentos[-1]).decode("utf-16-le")
+
+
+def _pasta(argumentos):
+    assert argumentos[:4] == ["wt.exe", "-w", "new", "-d"]
+    return argumentos[4]
 
 
 class Avisos:
@@ -147,11 +152,8 @@ async def test_abre_um_terminal_visivel_por_parte(montar, executor, tmp_path):
 
     await f.executar(f.argumentos(projeto="smart-anchor"))
 
-    assert [a[:4] for a, _ in executor.iniciados] == [
-        ["ptyxis", "--new-window", "-d", str(projeto / "backend")],
-        ["ptyxis", "--new-window", "-d", str(projeto / "frontend")],
-    ]
-    assert all(_comando(a).startswith("npm run dev;") for a, _ in executor.iniciados)
+    assert [_pasta(a) for a, _ in executor.iniciados] == [str(projeto / "backend"), str(projeto / "frontend")]
+    assert all(_comando(a) == "npm.cmd run dev" for a, _ in executor.iniciados)
 
 
 async def test_quando_o_site_responde_abre_o_navegador_e_avisa(montar, executor, delegacoes, avisos, tmp_path):
@@ -161,7 +163,7 @@ async def test_quando_o_site_responde_abre_o_navegador_e_avisa(montar, executor,
     await f.executar(f.argumentos(projeto="smart-anchor"))
     await delegacoes.aguardar()
 
-    assert (["xdg-open", "http://localhost:3100"], None) in executor.iniciados
+    assert executor.abertos == ["http://localhost:3100"]
     [(_, texto)] = avisos.recebidos
     assert "no ar" in texto
 
@@ -173,7 +175,7 @@ async def test_site_que_nao_responde_vira_aviso_sem_abrir_navegador(montar, exec
     await f.executar(f.argumentos(projeto="smart-anchor"))
     await delegacoes.aguardar()
 
-    assert not any(a[0] == "xdg-open" for a, _ in executor.iniciados)
+    assert executor.abertos == []
     [(_, texto)] = avisos.recebidos
     assert "terminal" in texto.lower()
 
@@ -190,7 +192,7 @@ async def test_endereco_do_site_vem_do_script(montar, executor, delegacoes, tmp_
     await f.executar(f.argumentos(projeto="painel"))
     await delegacoes.aguardar()
 
-    assert (["xdg-open", endereco], None) in executor.iniciados
+    assert executor.abertos == [endereco]
 
 
 async def test_projeto_sem_script_de_dev_nao_roda(montar, executor, tmp_path):
@@ -249,7 +251,7 @@ async def test_esperar_site_desiste_no_limite():
 
 def test_banco_no_estilo_db_host_e_db_port(montar, tmp_path):
     _pacote(tmp_path / "omni-app", {"dev": "vite"})
-    (tmp_path / "omni-app" / ".env").write_text("DB_HOST=10.0.0.5\nDB_PORT=65432\nDB_PASSWORD=segredo\n")
+    (tmp_path / "omni-app" / ".env").write_text("DB_HOST=10.0.0.5\nDB_PORT=65432\nDB_PASSWORD=segredo\n", encoding="utf-8")
     f = montar()
 
     frase = f.frase_de_confirmacao(f.argumentos(projeto="omni-app"))
@@ -260,7 +262,7 @@ def test_banco_no_estilo_db_host_e_db_port(montar, tmp_path):
 
 def test_banco_local_da_maquina_e_dito_como_local(montar, tmp_path):
     _pacote(tmp_path / "sc360", {"dev": "next dev"})
-    (tmp_path / "sc360" / ".env").write_text('DATABASE_URL="postgresql://u:p@localhost:5440/sc360"\n')
+    (tmp_path / "sc360" / ".env").write_text('DATABASE_URL="postgresql://u:p@localhost:5440/sc360"\n', encoding="utf-8")
     f = montar()
 
     frase = f.frase_de_confirmacao(f.argumentos(projeto="sc360"))
@@ -275,8 +277,8 @@ async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
     await f.executar(f.argumentos(projeto="omni api"))
 
     [(argumentos, _)] = executor.iniciados
-    assert argumentos[3] == str(tmp_path / "omni-api")
-    assert _comando(argumentos).startswith("npm run start:dev;")
+    assert _pasta(argumentos) == str(tmp_path / "omni-api")
+    assert _comando(argumentos) == "npm.cmd run start:dev"
 
 
 
@@ -295,8 +297,9 @@ async def test_sem_dependencias_instala_com_npm_ci_antes_de_rodar(montar, execut
     assert "instalar as dependências" in frase
     assert "minutos" in resposta
     backend, frontend = (a for a, _ in executor.iniciados[:2])
-    assert backend[3] == str(projeto / "backend") and _comando(backend).startswith("npm ci && npm run dev;")
-    assert frontend[3] == str(projeto / "frontend") and _comando(frontend).startswith("npm run dev;")
+    assert _pasta(backend) == str(projeto / "backend")
+    assert _comando(backend) == "npm.cmd ci; if ($LASTEXITCODE -eq 0) { npm.cmd run dev }"
+    assert _pasta(frontend) == str(projeto / "frontend") and _comando(frontend) == "npm.cmd run dev"
     assert esperas == [600]
 
 
@@ -306,7 +309,7 @@ async def test_sem_package_lock_instala_com_npm_install(montar, executor, tmp_pa
 
     await f.executar(f.argumentos(projeto="painel"))
 
-    assert _comando(executor.iniciados[0][0]).startswith("npm install && npm run dev;")
+    assert _comando(executor.iniciados[0][0]) == "npm.cmd install; if ($LASTEXITCODE -eq 0) { npm.cmd run dev }"
 
 
 async def test_com_dependencias_espera_o_site_so_dois_minutos(montar, delegacoes, esperas, tmp_path):
@@ -337,9 +340,7 @@ async def test_terminal_fica_aberto_mostrando_o_erro_quando_o_servidor_para(mont
 
     await f.executar(f.argumentos(projeto="painel"))
 
-    comando = _comando(executor.iniciados[0][0])
-    assert comando.startswith("npm run dev;")
-    assert comando.rstrip().endswith("read")
+    assert "-NoExit" in executor.iniciados[0][0]
 
 
 
@@ -358,7 +359,7 @@ async def test_abrir_sistema_da_internet_pelo_apelido(todas, executor):
 
     resposta = await f.executar(f.argumentos(nome="quadro"))
 
-    assert executor.iniciados == [(["xdg-open", "https://kanban.exemplo.com/"], None)]
+    assert executor.abertos == ["https://kanban.exemplo.com/"]
     assert "kanban" in resposta
 
 
@@ -380,7 +381,7 @@ async def test_escolhido_o_site_abre_o_site(todas, executor, tmp_path):
 
     await f.executar(f.argumentos(nome="omni", onde="site"))
 
-    assert executor.iniciados == [(["xdg-open", "https://omni.exemplo.com/"], None)]
+    assert executor.abertos == ["https://omni.exemplo.com/"]
 
 
 async def test_escolhido_o_local_roda_o_projeto_com_confirmacao(todas, executor, tmp_path):
@@ -391,7 +392,7 @@ async def test_escolhido_o_local_roda_o_projeto_com_confirmacao(todas, executor,
     assert f.risco_de(args) is Risco.CONFIRMAR
     assert "Vou rodar o omni" in f.frase_de_confirmacao(args)
     await f.executar(args)
-    assert executor.iniciados[0][0][:4] == ["ptyxis", "--new-window", "-d", str(tmp_path / "omni")]
+    assert _pasta(executor.iniciados[0][0]) == str(tmp_path / "omni")
 
 
 async def test_projeto_sem_site_roda_local_com_confirmacao(todas, executor, tmp_path):
@@ -401,7 +402,7 @@ async def test_projeto_sem_site_roda_local_com_confirmacao(todas, executor, tmp_
 
     assert f.risco_de(args) is Risco.CONFIRMAR
     await f.executar(args)
-    assert executor.iniciados[0][0][3] == str(projeto / "backend")
+    assert _pasta(executor.iniciados[0][0]) == str(projeto / "backend")
 
 
 async def test_varios_sites_com_o_nome_pergunta_qual(todas, executor):

@@ -13,6 +13,7 @@ from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.projetos import campo_projeto, projeto_desconhecido
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
 from clarisse.ferramentas.sistema import data_por_extenso
+from clarisse.terminal import em_aspas, terminal
 
 log = logging.getLogger(__name__)
 
@@ -142,7 +143,6 @@ def ferramentas_do_claude(
     timeout: float,
     teto_usd: float,
     agora: Callable[[], datetime] = datetime.now,
-    apos_mudar_agenda: Callable[[], Awaitable[None]] | None = None,
     mcp_navegador: Path | None = None,
     mcp_clarisse: Path | None = None,
 ) -> list[Ferramenta]:
@@ -177,7 +177,7 @@ def ferramentas_do_claude(
             return projeto_desconhecido(cadastros, args.projeto)
         pasta = str(cadastros.projetos[chave])
         await executor.iniciar(["code", pasta])
-        await executor.iniciar(["ptyxis", "--new-window", "-d", pasta, "--", "claude", args.pedido])
+        await executor.iniciar(terminal(Path(pasta), f"claude {em_aspas(args.pedido)}"))
         return f"Abri o VS Code e o Claude no projeto {chave}, já com o seu pedido."
 
     async def pedir_ao_claude(args) -> str:
@@ -207,8 +207,6 @@ def ferramentas_do_claude(
             )
             ferramentas.append(_BUSCAR_PESSOAS)
         resultado = await rodar_claude(executor, pedido, _pasta_neutra(), ferramentas, modelo, _TIMEOUT_DA_AGENDA, teto_usd)
-        if apos_mudar_agenda:
-            await apos_mudar_agenda()
         return resultado
 
     def confirmar_compromisso(args: ArgsCompromisso) -> str:

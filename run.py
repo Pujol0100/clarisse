@@ -1,5 +1,4 @@
 """Liga a Clarisse: confere o ambiente, liga o Ollama se preciso, sobe o servidor e abre a página."""
-import ctypes.util
 import os
 import shutil
 import subprocess
@@ -47,7 +46,7 @@ def garantir_ollama(ajustes: Ajustes) -> bool:
     registro.parent.mkdir(parents=True, exist_ok=True)
     subprocess.Popen(
         [str(binario), "serve"],
-        stdout=registro.open("a"), stderr=subprocess.STDOUT, start_new_session=True,
+        stdout=registro.open("a"), stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         env={**os.environ, "OLLAMA_HOST": ajustes.ollama_url.removeprefix("http://")},
     )
     for _ in range(40):
@@ -90,10 +89,6 @@ def main() -> None:
         ok("Claude Code encontrado")
     else:
         aviso("Comando claude não encontrado: as tarefas para o Claude vão falhar.")
-    if ctypes.util.find_library("espeak-ng"):
-        ok("Voz local (Kokoro) com o espeak-ng do sistema")
-    else:
-        aviso("Falta o espeak-ng: a voz não vai funcionar. Instale com: sudo apt install espeak-ng")
     if garantir_ollama(ajustes):
         garantir_modelo(ajustes)
 

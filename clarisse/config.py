@@ -1,5 +1,6 @@
 """Ajustes (variáveis CLARISSE_* e .env) e cadastros pessoais (config/*.json)."""
 import json
+import os
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -7,13 +8,17 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PASTA_DO_USUARIO = Path(os.environ["APPDATA"]) / "Clarisse"
+PASTA_LOCAL = Path(os.environ["LOCALAPPDATA"]) / "Clarisse"
+CAMINHO_DA_CHAVE = PASTA_DO_USUARIO / "chave"
+
 
 class Ajustes(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CLARISSE_", env_file=".env", extra="ignore")
 
     porta: int = 8765
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_bin: str = "~/.local/ollama/bin/ollama"
+    ollama_bin: str = "~/AppData/Local/Programs/Ollama/ollama.exe"
     modelo: str = "gemma4:e4b-it-qat"
     whisper_modelo: str = "small"
     whisper_dispositivo: str = "cpu"
@@ -29,7 +34,6 @@ class Ajustes(BaseSettings):
     cidade: str | None = None
     # Cofre do Obsidian para buscar e ler notas; sem ele, as ferramentas de notas não existem.
     cofre_de_notas: Path | None = None
-    agenda_intervalo_minutos: float = 5
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")
     abrir_navegador: bool = True

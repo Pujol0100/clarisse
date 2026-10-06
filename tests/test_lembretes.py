@@ -23,7 +23,7 @@ async def test_lembrar_daqui_a_minutos_guarda_no_arquivo(tmp_path):
     resposta = await _chamar(ferramentas, "lembrar", texto="ligar para o financeiro", em_minutos=20)
 
     assert resposta.texto == "Combinado: hoje às 14:35 eu lembro de ligar para o financeiro."
-    assert json.loads((tmp_path / "lembretes.json").read_text()) == [
+    assert json.loads((tmp_path / "lembretes.json").read_text(encoding="utf-8")) == [
         {"quando": "2026-10-01T14:35:00", "texto": "ligar para o financeiro"},
     ]
 

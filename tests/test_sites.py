@@ -7,7 +7,7 @@ from clarisse.sites import achar_sites, atualizar_sites_do_dokploy, carregar_sit
 
 
 def _gravar(caminho, dados):
-    caminho.write_text(json.dumps(dados, ensure_ascii=False))
+    caminho.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
 
 
 def test_apelidos_manuais_valem_e_o_dokploy_so_acrescenta_o_que_falta(tmp_path):
@@ -85,7 +85,7 @@ async def test_atualiza_com_as_telas_do_dokploy_sem_apis_nem_mcp(tmp_path):
 
     await atualizar_sites_do_dokploy(http, [("https://painel", "chave-a")], tmp_path / "sites-dokploy.json")
 
-    assert json.loads((tmp_path / "sites-dokploy.json").read_text()) == {
+    assert json.loads((tmp_path / "sites-dokploy.json").read_text(encoding="utf-8")) == {
         "https://painel": {"Kanban": "https://kanban.exemplo.com/"},
     }
     assert all(chave == "chave-a" for _, chave in chamadas)
@@ -100,7 +100,7 @@ async def test_painel_fora_do_ar_mantem_o_que_ele_tinha_e_os_outros_atualizam(tm
 
     await atualizar_sites_do_dokploy(_dokploy(DOMINIOS, []), [("https://quebrado", "x"), ("https://painel", "c")], destino)
 
-    assert json.loads(destino.read_text()) == {
+    assert json.loads(destino.read_text(encoding="utf-8")) == {
         "https://quebrado": {"Favo": "https://favo.exemplo.com/"},
         "https://painel": {"Kanban": "https://kanban.exemplo.com/"},
     }
@@ -115,7 +115,7 @@ async def test_enderecos_que_nao_sao_tela_ficam_de_fora(tmp_path, host):
 
     await atualizar_sites_do_dokploy(_dokploy(respostas, []), [("https://painel", "c")], tmp_path / "s.json")
 
-    assert json.loads((tmp_path / "s.json").read_text()) == {"https://painel": {}}
+    assert json.loads((tmp_path / "s.json").read_text(encoding="utf-8")) == {"https://painel": {}}
 
 
 async def test_palavra_que_so_contem_api_continua_sendo_tela(tmp_path):
@@ -126,4 +126,4 @@ async def test_palavra_que_so_contem_api_continua_sendo_tela(tmp_path):
 
     await atualizar_sites_do_dokploy(_dokploy(respostas, []), [("https://painel", "c")], tmp_path / "s.json")
 
-    assert json.loads((tmp_path / "s.json").read_text()) == {"https://painel": {"Mapa Capital": "https://capital.exemplo.com/"}}
+    assert json.loads((tmp_path / "s.json").read_text(encoding="utf-8")) == {"https://painel": {"Mapa Capital": "https://capital.exemplo.com/"}}

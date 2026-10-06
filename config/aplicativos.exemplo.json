@@ -1,8 +1,8 @@
 {
-  "vscode": {"abrir": ["code"], "processo": "code", "apelidos": ["vs code", "visual studio code", "visual code"]},
-  "chrome": {"abrir": ["google-chrome"], "processo": "chrome", "apelidos": ["google chrome", "navegador"]},
-  "firefox": {"abrir": ["firefox"], "processo": "firefox", "apelidos": []},
-  "terminal": {"abrir": ["ptyxis", "--new-window"], "processo": "ptyxis", "apelidos": ["console"]},
-  "arquivos": {"abrir": ["nautilus"], "processo": "nautilus", "apelidos": ["gerenciador de arquivos"]},
-  "calculadora": {"abrir": ["gnome-calculator"], "processo": "gnome-calculator", "apelidos": []}
+  "vscode": {"abrir": ["code"], "processo": "Code.exe", "apelidos": ["vs code", "visual studio code", "visual code"]},
+  "chrome": {"abrir": ["C:/Program Files/Google/Chrome/Application/chrome.exe"], "processo": "chrome.exe", "apelidos": ["google chrome", "navegador"]},
+  "edge": {"abrir": ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"], "processo": "msedge.exe", "apelidos": ["microsoft edge"]},
+  "terminal": {"abrir": ["wt.exe"], "processo": "WindowsTerminal.exe", "apelidos": ["windows terminal", "console", "powershell"]},
+  "bloco de notas": {"abrir": ["notepad.exe"], "processo": "Notepad.exe", "apelidos": ["notepad"]},
+  "calculadora": {"abrir": ["calc.exe"], "processo": "CalculatorApp.exe", "apelidos": []}
 }

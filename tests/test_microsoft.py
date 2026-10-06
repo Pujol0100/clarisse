@@ -1,86 +1,149 @@
-"""Leitura do Outlook pelo Microsoft Graph com o token da conta Microsoft do GNOME."""
+"""Leitura do Outlook pelo Microsoft Graph com o token do login MSAL."""
 import httpx
 import pytest
 
-from clarisse.ferramentas.processos import Resultado
-from clarisse.microsoft import ContaMicrosoft, SemContaMicrosoft
-
-CONTAS = (
-    "({objectpath '/org/gnome/OnlineAccounts/Manager': {'org.gnome.OnlineAccounts.Manager': {}}, "
-    "'/org/gnome/OnlineAccounts/Accounts/account_1_0': {'org.gnome.OnlineAccounts.Account': "
-    "{'ProviderType': <'google'>, 'Identity': <'x@gmail.com'>}}, "
-    "'/org/gnome/OnlineAccounts/Accounts/account_2_0': {'org.gnome.OnlineAccounts.Account': "
-    "{'ProviderType': <'ms_graph'>, 'Identity': <'x@empresa.com'>}}},)"
-)
+from clarisse.microsoft import ESCOPOS, ContaMicrosoft, LoginMicrosoft, SemContaMicrosoft
 
 
-def _conta(executor, responder):
-    return ContaMicrosoft(executor, httpx.AsyncClient(transport=httpx.MockTransport(responder)))
+class Tokens:
+    def __init__(self, *tokens):
+        self.tokens = list(tokens)
+        self.pedidos: list[bool] = []
+
+    async def __call__(self, forcar_novo: bool) -> str:
+        self.pedidos.append(forcar_novo)
+        if not self.tokens:
+            raise SemContaMicrosoft("Entre na conta Microsoft.")
+        return self.tokens.pop(0)
 
 
-async def test_pede_o_token_a_conta_microsoft_do_gnome_e_usa_no_graph(executor):
-    executor.respostas += [Resultado(0, CONTAS, ""), Resultado(0, "('token-1', 3599)", "")]
+def _conta(tokens, responder):
+    return ContaMicrosoft(tokens, httpx.AsyncClient(transport=httpx.MockTransport(responder)))
+
+
+async def test_usa_o_token_do_login_no_graph():
     pedidos = []
 
     def responder(pedido):
         pedidos.append(pedido)
         return httpx.Response(200, json={"value": []})
 
-    dados = await _conta(executor, responder).get("/me/calendarView", {"$top": "5"})
+    dados = await _conta(Tokens("token-1"), responder).get("/me/calendarView", {"$top": "5"})
 
     assert dados == {"value": []}
-    pedir_token = executor.executados[1][0]
-    assert "/org/gnome/OnlineAccounts/Accounts/account_2_0" in pedir_token
-    assert pedir_token[-1] == "org.gnome.OnlineAccounts.OAuth2Based.GetAccessToken"
     assert pedidos[0].headers["Authorization"] == "Bearer token-1"
     assert str(pedidos[0].url).startswith("https://graph.microsoft.com/v1.0/me/calendarView")
 
 
-async def test_guarda_o_token_entre_pedidos(executor):
-    executor.respostas += [Resultado(0, CONTAS, ""), Resultado(0, "('token-1', 3599)", "")]
-    conta = _conta(executor, lambda p: httpx.Response(200, json={}))
+async def test_guarda_o_token_entre_pedidos():
+    tokens = Tokens("token-1")
+    conta = _conta(tokens, lambda p: httpx.Response(200, json={}))
 
     await conta.get("/me", {})
     await conta.get("/me", {})
 
-    assert len(executor.executados) == 2
+    assert tokens.pedidos == [False]
 
 
-async def test_token_vencido_pede_outro_e_repete_uma_vez(executor):
-    executor.respostas += [
-        Resultado(0, CONTAS, ""), Resultado(0, "('velho', 3599)", ""), Resultado(0, "('novo', 3599)", ""),
-    ]
+async def test_token_vencido_pede_outro_a_forca_e_repete_uma_vez():
+    tokens = Tokens("velho", "novo")
     usados = []
 
     def responder(pedido):
         usados.append(pedido.headers["Authorization"])
         return httpx.Response(401 if len(usados) == 1 else 200, json={"ok": True})
 
-    dados = await _conta(executor, responder).get("/me", {})
+    dados = await _conta(tokens, responder).get("/me", {})
 
     assert dados == {"ok": True}
     assert usados == ["Bearer velho", "Bearer novo"]
+    assert tokens.pedidos == [False, True]
 
 
-async def test_sem_conta_microsoft_no_gnome_avisa(executor):
-    executor.respostas.append(Resultado(0, "({objectpath '/org/gnome/OnlineAccounts/Manager': {}},)", ""))
-
-    with pytest.raises(SemContaMicrosoft):
-        await _conta(executor, lambda p: httpx.Response(200)).get("/me", {})
-
-
-async def test_post_manda_o_corpo_com_o_token_e_aceita_resposta_vazia(executor):
-    executor.respostas += [Resultado(0, CONTAS, ""), Resultado(0, "('token-1', 3599)", "")]
+async def test_post_manda_o_corpo_com_o_token_e_aceita_resposta_vazia():
     pedidos = []
 
     def responder(pedido):
         pedidos.append(pedido)
         return httpx.Response(202) if pedido.url.path.endswith("/send") else httpx.Response(201, json={"id": "r1"})
 
-    conta = _conta(executor, responder)
+    conta = _conta(Tokens("token-1"), responder)
     criado = await conta.post("/me/messages", {"subject": "Oi"})
     enviado = await conta.post("/me/messages/r1/send", None)
 
     assert criado == {"id": "r1"} and enviado == {}
     assert pedidos[0].method == "POST" and pedidos[0].headers["Authorization"] == "Bearer token-1"
     assert pedidos[0].read() == b'{"subject":"Oi"}'
+
+
+class AppFalso:
+    """No lugar do msal.PublicClientApplication."""
+
+    def __init__(self, contas=(), silencioso=None, interativo=None):
+        self.contas = list(contas)
+        self.silencioso = silencioso
+        self.interativo = interativo
+        self.pedidos_silenciosos: list[dict] = []
+        self.pedidos_interativos: list[dict] = []
+
+    def get_accounts(self):
+        return self.contas
+
+    def acquire_token_silent(self, scopes, account, force_refresh=False):
+        self.pedidos_silenciosos.append({"escopos": scopes, "conta": account, "forcar": force_refresh})
+        return self.silencioso
+
+    def acquire_token_interactive(self, scopes, prompt=None):
+        self.pedidos_interativos.append({"escopos": scopes, "prompt": prompt})
+        return self.interativo
+
+
+CONTA = {"username": "eu@empresa.com.br"}
+
+
+async def test_login_guardado_devolve_token_sem_abrir_o_navegador():
+    app = AppFalso(contas=[CONTA], silencioso={"access_token": "t-1"})
+
+    token = await LoginMicrosoft(criar_app=lambda: app).token(False)
+
+    assert token == "t-1"
+    assert app.pedidos_silenciosos == [{"escopos": ESCOPOS, "conta": CONTA, "forcar": False}]
+    assert app.pedidos_interativos == []
+
+
+async def test_forcar_novo_chega_ao_msal():
+    app = AppFalso(contas=[CONTA], silencioso={"access_token": "t-2"})
+
+    await LoginMicrosoft(criar_app=lambda: app).token(True)
+
+    assert app.pedidos_silenciosos[0]["forcar"] is True
+
+
+async def test_sem_conta_guardada_manda_rodar_o_script_de_entrar():
+    login = LoginMicrosoft(criar_app=lambda: AppFalso())
+
+    with pytest.raises(SemContaMicrosoft, match="entrar-microsoft"):
+        await login.token(False)
+
+
+async def test_login_vencido_sem_renovacao_manda_entrar_de_novo():
+    app = AppFalso(contas=[CONTA], silencioso={"error": "invalid_grant"})
+
+    with pytest.raises(SemContaMicrosoft, match="entrar-microsoft"):
+        await LoginMicrosoft(criar_app=lambda: app).token(False)
+
+
+def test_entrar_abre_a_escolha_de_conta_e_diz_quem_entrou():
+    app = AppFalso(interativo={"access_token": "t", "id_token_claims": {"preferred_username": "eu@empresa.com.br"}})
+
+    quem = LoginMicrosoft(criar_app=lambda: app).entrar()
+
+    assert quem == "eu@empresa.com.br"
+    assert app.pedidos_interativos == [{"escopos": ESCOPOS, "prompt": "select_account"}]
+
+
+def test_entrada_recusada_diz_o_motivo():
+    app = AppFalso(interativo={"error": "access_denied", "error_description": "AADSTS65001: falta consentimento"})
+
+    with pytest.raises(SemContaMicrosoft, match="AADSTS65001"):
+        LoginMicrosoft(criar_app=lambda: app).entrar()

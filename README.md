@@ -1,6 +1,6 @@
 # Clarisse
 
-Assistente de voz que roda no seu computador Linux. Você fala, ela entende com um
+Assistente de voz que roda no seu computador Windows. Você fala, ela entende com um
 modelo de linguagem **local** (Gemma), executa a ação na máquina e responde falando.
 Por padrão ela não passa nada para o [Claude Code](https://claude.com/claude-code):
 abre o Claude na tela quando você pede e lê o que ele respondeu, mas não manda
@@ -25,8 +25,8 @@ desliza para a esquerda) para quando o microfone falha ou o lugar está barulhen
 O visual partiu de dois vídeos de assistentes estilo Jarvis; o protótipo está em
 [`docs/prototipos/2026-10-01-orbe-e-cartoes.html`](docs/prototipos/2026-10-01-orbe-e-cartoes.html).
 
-> O código antigo, que dava voz ao Claude Code no Windows, está em
-> [`legado-windows/`](legado-windows/README.md).
+> O código antigo, que fala os resumos do Claude Code com Ctrl+Alt+L, está em
+> [`legado-windows/`](legado-windows/README.md). Ele continua separado e não depende desta Clarisse.
 
 ## O que ela faz
 
@@ -38,7 +38,7 @@ O visual partiu de dois vídeos de assistentes estilo Jarvis; o protótipo está
 | "lê os títulos" | Lê os títulos da lista que está na tela (manchetes, e-mails, notas) |
 | "lê a segunda", "lê a do WhatsApp" (ou clicar na manchete) | O cartão vira um bloco com foto, título e a matéria inteira, que ela lê com o parágrafo da vez aceso; "para" interrompe. Vídeo, galeria ou página de jogo (sem texto) abre no navegador |
 | "volta para a lista" (ou o botão Voltar à lista) | Para de ler e mostra a lista de novo |
-| "o que eu tenho na agenda hoje?", "e amanhã?", "e na semana?" | Lê o Outlook pela conta Microsoft do GNOME e mostra os horários |
+| "o que eu tenho na agenda hoje?", "e amanhã?", "e na semana?" | Lê o Outlook pelo login Microsoft da Clarisse e mostra os horários |
 | "tenho e-mail não lido?" | Fala quantos são e mostra os 10 mais recentes; "de quem são?" lê remetente e assunto |
 | "lê o e-mail 2" (ou clicar nele) | Abre o e-mail na tela e lê inteiro, sem o histórico da conversa citado embaixo |
 | "escreve um e-mail para a Ana Souza dizendo que a proposta chega amanhã", "manda um e-mail para fulano arroba empresa ponto com…" | Acha o endereço nos seus contatos (ou usa o que você ditou), escreve, mostra na tela, salva nos rascunhos do Outlook e pergunta "Deseja enviar?". Só envia com o seu "sim"; com nome ambíguo, pergunta quem é |
@@ -48,7 +48,7 @@ O visual partiu de dois vídeos de assistentes estilo Jarvis; o protótipo está
 | "procura nas notas sobre sicoob captcha", "lê a nota 1" | Busca no cofre do Obsidian (`CLARISSE_COFRE_DE_NOTAS`) e lê a nota sem a marcação do Markdown |
 | "me lembra em 20 minutos de ligar para o financeiro", "me lembra às 9h de…" | Marca o lembrete; na hora, ela fala e mostra o cartão. "Quais lembretes?" e "cancela o lembrete 1" também |
 | "lê o que o Claude disse no projeto omni-api", "lê a última resposta do Claude" | Lê na íntegra a última resposta do Claude Code: da conversa mais recente que mexeu no projeto, ou da mais recente de todas |
-| "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e um terminal com o Claude já trabalhando no pedido |
+| "abre o Claude no omni api e pede pra ele corrigir o teste" | Abre o VS Code e o Windows Terminal com o Claude já trabalhando no pedido |
 | "abre o chrome", "fecha o chrome" | Abre ou fecha um aplicativo cadastrado (fechar pede confirmação) |
 | "quais programas estão abertos?" | Diz quais aplicativos cadastrados estão abertos |
 | "abre a pasta de downloads" | Abre a pasta (só dentro da sua pasta pessoal) |
@@ -86,7 +86,7 @@ navegador (anel e cartões)                  servidor local (127.0.0.1:8765)
 │ cartões e fileira    │ ◄── cartões ── │   └─► segurança ─► ferramentas   │
 │ voz da Clarisse      │ ◄── mp3 ────── │ voz: Kokoro (na máquina)         │
 └──────────────────────┘                └──────────────────────────────────┘
-atalho do GNOME ─► scripts/alternar-escuta.sh ─► liga/desliga o microfone
+tecla Insert (registrada pelo próprio servidor) ─► liga/desliga o microfone
 ```
 
 O modelo **não executa nada**. Ele só escolhe uma ferramenta de uma lista fechada;
@@ -107,60 +107,72 @@ As escolhas foram medidas, não supostas:
 
 ## Requisitos
 
-- Linux com GNOME (testado no Ubuntu 26.04, Wayland) e PipeWire.
+- Windows 11 com o Windows Terminal (já vem instalado).
 - [uv](https://docs.astral.sh/uv/) — ele instala o Python 3.12 sozinho.
-- [Ollama](https://ollama.com) com o modelo `gemma4:e4b-it-qat`.
-- Placa de vídeo com pelo menos 6 GB é recomendada; a transcrição roda no processador.
-- Chrome ou Firefox, para a tela e o microfone.
-- `espeak-ng` do sistema, que a voz usa para pronunciar: `sudo apt install espeak-ng`.
-- Para a agenda e o e-mail: a conta Microsoft 365 ligada em Configurações → Contas on-line.
+- [Ollama para Windows](https://ollama.com/download/windows) com o modelo `gemma4:e4b-it-qat`.
+- Placa de vídeo com pelo menos 6 GB é recomendada; a transcrição e a voz rodam no processador.
+- Chrome ou Edge, para a tela e o microfone.
+- Para a agenda e o e-mail: uma conta Microsoft 365 de trabalho (veja "Conta Microsoft" abaixo).
 - Para o GitHub: o `gh` instalado e logado.
-- Para mexer nas janelas: a extensão [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/)
-  do GNOME e o teclado virtual (`scripts/instalar-teclado-virtual.sh`).
-- Só com o Claude ligado: Claude Code instalado e logado, e Node.js (`npx`).
+- Para rodar projetos: Node.js (`npm`).
+- Só com o Claude ligado: Claude Code instalado e logado.
 
 ## Instalação
 
-```bash
+No PowerShell:
+
+```powershell
 git clone https://github.com/Pujol0100/clarisse.git
 cd clarisse
 uv sync
 ollama pull gemma4:e4b-it-qat
-cp config/projetos.exemplo.json config/projetos.json
-cp config/aplicativos.exemplo.json config/aplicativos.json
-cp config/pastas.exemplo.json config/pastas.json
+Copy-Item config\projetos.exemplo.json config\projetos.json
+Copy-Item config\aplicativos.exemplo.json config\aplicativos.json
+Copy-Item config\pastas.exemplo.json config\pastas.json
 ```
 
 Edite os três arquivos em `config/` com os seus projetos, aplicativos e pastas.
-Eles nunca vão para o git.
+Eles nunca vão para o git. Em `aplicativos.json`, `abrir` é o comando que abre o
+programa (o caminho completo quando ele não está no `PATH`, como o Chrome e o Edge) e
+`processo` é o nome que aparece no Gerenciador de Tarefas, com `.exe`, usado para
+fechar e para achar a janela. O Explorador de Arquivos fica fora de propósito:
+fechar o `explorer.exe` derruba a barra de tarefas.
 
 Opcional: `config/bancos.json` (copie de `config/bancos.exemplo.json`) dá nome aos
 bancos que os seus projetos usam e marca os de produção. Ao rodar um projeto, a
 Clarisse fala o nome do banco e **recusa** os marcados como produção.
 
-Opcional, uma vez só:
+Opcional, uma vez só: `scripts\instalar-no-menu.ps1` põe a Clarisse no menu Iniciar.
+O atalho guarda o caminho da pasta: se ela mudar de lugar, rode o script de novo a
+partir da pasta nova.
 
-```bash
-scripts/instalar-no-menu.sh    # põe a Clarisse no menu de aplicativos
-scripts/instalar-atalho.sh     # a tecla Insert liga e desliga o microfone, com qualquer janela na frente
-scripts/instalar-teclado-virtual.sh   # ydotool e wl-clipboard, para colar texto e apertar atalhos (pede senha)
+O texto que ela escreve em outros programas entra **colado**, não digitado letra por
+letra, para não perder acentos. Por isso ele fica na área de transferência depois.
+
+### Conta Microsoft
+
+Para a agenda e o e-mail, entre uma vez:
+
+```powershell
+scripts\entrar-microsoft.ps1
 ```
 
-O atalho guarda o caminho do script: se a pasta da Clarisse mudar de lugar, rode
-`scripts/instalar-atalho.sh` de novo a partir da pasta nova.
+O navegador abre para escolher a conta. O acesso fica guardado num arquivo em
+`%LOCALAPPDATA%\Clarisse`, criptografado pelo Windows para o seu usuário, e renova
+sozinho. A Clarisse nunca abre o navegador no meio de uma pergunta: sem login, ela
+responde pedindo para rodar o script.
 
-O teclado virtual precisa de permissão no `/dev/uinput`. O script dá essa permissão
-só a quem está usando a máquina, sem pôr o usuário no grupo `input`, que também
-lê tudo o que é digitado no teclado de verdade.
-
-O texto entra **colado**, não digitado letra por letra: o `ydotool` digita como
-teclado americano e, no ABNT2, perderia os acentos e trocaria símbolos. Por isso
-o texto colado fica na área de transferência depois.
+O login usa o aplicativo público do **Microsoft Graph PowerShell**, da própria
+Microsoft: nada é registrado no Entra da empresa. O risco é que o administrador do
+Microsoft 365 pode bloquear esse aplicativo ou exigir a aprovação dele para algum
+acesso; nesse caso a entrada mostra o motivo (um código `AADSTS…`). Acessos pedidos:
+ler o perfil, ler a agenda, ler e escrever rascunhos de e-mail, enviar e-mail e
+buscar pessoas.
 
 ## Uso
 
-```bash
-scripts/ligar.sh
+```powershell
+scripts\ligar.ps1
 ```
 
 Ela confere o ambiente, liga o Ollama se precisar e abre a página. Na primeira vez,
@@ -174,7 +186,7 @@ clique em qualquer lugar da página e autorize o microfone.
   O cartão de escolha fica na tela até o próximo cartão chegar.
 - **Escrever:** botão Escrever, no canto inferior esquerdo. O chat também mostra a
   conversa por voz. O × fecha e volta só para a voz.
-- **Desligar:** `Ctrl+C` na janela do terminal, ou `scripts/desligar.sh`.
+- **Desligar:** `Ctrl+C` na janela do terminal, ou `scripts\desligar.ps1`.
 
 Ajustes ficam em `.env`; veja `.env.example`. Os principais:
 
@@ -186,17 +198,9 @@ Ajustes ficam em `.env`; veja `.env.example`. Os principais:
 | `CLARISSE_MODELO` | Modelo local |
 | `CLARISSE_VOZ`, `CLARISSE_VOZ_VELOCIDADE` | Receita da voz do Kokoro (padrão `pf_dora*0.8+af_bella*0.2`, a Dora com 20% de Bella) e velocidade |
 
-### Calendário do Linux
-
-O calendário do GNOME é uma cópia da agenda do Outlook, e sozinho ele quase não
-atualiza (em 29/09/2026 ficou duas horas parado). Enquanto está ligada, a
-Clarisse pede ao Linux que busque as mudanças a cada 5 minutos
-(`CLARISSE_AGENDA_INTERVALO_MINUTOS`). A leitura da agenda pela Clarisse vai direto
-ao Outlook e não depende dessa cópia.
-
 ## Testes
 
-```bash
+```powershell
 uv run pytest
 ```
 
@@ -205,7 +209,7 @@ uv run pytest
 - O modelo, a transcrição, a auditoria, as notas do Obsidian e os lembretes ficam na máquina.
 - **A voz é gerada na máquina** (Kokoro): nada do que ela fala sai do notebook. Na primeira
   vez, o modelo de voz (~330 MB) é baixado do Hugging Face.
-- A agenda e o e-mail são lidos no Microsoft Graph com o acesso da conta do GNOME. A única
+- A agenda e o e-mail são lidos no Microsoft Graph com o login da Clarisse. A única
   escrita é o e-mail que você pediu: rascunho, e envio só depois do seu "sim".
 - O GitHub é lido pelo `gh`; o Dokploy, com a chave de leitura que o Claude Code já usa.
 - As notícias vêm do feed do g1; as fotos das matérias, do servidor de imagens da Globo.
@@ -219,7 +223,7 @@ Detalhes e riscos aceitos em [`SEGURANCA.md`](SEGURANCA.md).
 
 - Acordar com a palavra "Clarisse" (em agosto nenhum motor gratuito acertou isso em
   português; fica para uma medição nova).
-- Criar compromisso na agenda sem o Claude (a conta do GNOME permite; não foi feito).
+- Criar compromisso na agenda sem o Claude (precisaria do acesso de escrita na agenda; não foi feito).
 - Pesquisar na internet sem o Claude.
 - Escolher o contato no WhatsApp: ela cola o texto na conversa que estiver aberta
   (não existe API oficial para conta pessoal).
