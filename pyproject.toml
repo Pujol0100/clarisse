@@ -37,6 +37,8 @@ pythonpath = ["."]
 addopts = "-q"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# Aviso informativo do pywinauto ao achar o COM já ligado pelo pycaw; o modo final é o certo.
+filterwarnings = ["ignore:Revert to STA COM threading mode:UserWarning:pywinauto"]
 
 [tool.uv]
 package = false

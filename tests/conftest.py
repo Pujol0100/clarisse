@@ -34,9 +34,36 @@ class ExecutorFalso:
         return self.quantos_encerrar
 
 
+class AreaFalsa:
+    """Registra o que seria feito nas janelas, sem tocar na área de trabalho de verdade."""
+
+    def __init__(self):
+        self.janelas: list[dict] = []
+        self.ativadas: list[int] = []
+        self.coladas: list[str] = []
+        self.apertadas: list[str] = []
+
+    def listar(self):
+        return list(self.janelas)
+
+    def ativar(self, janela):
+        self.ativadas.append(janela)
+
+    def colar(self, texto):
+        self.coladas.append(texto)
+
+    def apertar(self, teclas):
+        self.apertadas.append(teclas)
+
+
 @pytest.fixture
 def executor():
     return ExecutorFalso()
+
+
+@pytest.fixture
+def area():
+    return AreaFalsa()
 
 
 @pytest.fixture

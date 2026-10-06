@@ -8,6 +8,7 @@ import httpx
 
 from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, manter_agendas_atualizadas
 from clarisse.agente import Agente
+from clarisse.area_de_trabalho import AreaDeTrabalho
 from clarisse.auditoria import Auditoria
 from clarisse.config import CAMINHO_DA_CHAVE, PASTA_LOCAL, Ajustes, Cadastros
 from clarisse.confirmacoes import Confirmacoes
@@ -113,7 +114,7 @@ def montar_registro(
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),
         *ferramentas_de_projetos(cadastros, executor),
-        *ferramentas_de_janelas(cadastros, executor),
+        *ferramentas_de_janelas(cadastros, AreaDeTrabalho()),
         *ferramentas_de_leitura(executor, cadastros=cadastros),
         *ferramentas_de_aplicacoes(
             executor, delegacoes,
