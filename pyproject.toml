@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi>=0.141.1",
+    "fastapi>=0.142.2",
     "faster-whisper>=1.2.1",
     "httpx>=0.28.1",
     "kokoro>=0.9.4",
