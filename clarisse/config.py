@@ -1,11 +1,16 @@
 """Ajustes (variáveis CLARISSE_* e .env) e cadastros pessoais (config/*.json)."""
 import json
+import os
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PASTA_DO_USUARIO = Path(os.environ["APPDATA"]) / "Clarisse"
+PASTA_LOCAL = Path(os.environ["LOCALAPPDATA"]) / "Clarisse"
+CAMINHO_DA_CHAVE = PASTA_DO_USUARIO / "chave"
 
 
 class Ajustes(BaseSettings):

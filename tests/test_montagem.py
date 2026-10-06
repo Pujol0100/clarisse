@@ -1,12 +1,12 @@
 import json
+import os
 import re
-import stat
 from pathlib import Path
 
 import httpx
 
 from clarisse import montagem
-from clarisse.config import Ajustes
+from clarisse.config import CAMINHO_DA_CHAVE, Ajustes
 from clarisse.ferramentas.claude import Delegacoes
 from clarisse.montagem import gravar_chave, montar_registro
 
@@ -49,14 +49,21 @@ def test_sem_o_claude_fica_so_o_que_roda_aqui_e_continua_abrindo_e_lendo_o_claud
     assert set(registro.nomes()) == LOCAIS
 
 
-def test_chave_gravada_so_para_o_dono(tmp_path):
-    caminho = tmp_path / "config" / "clarisse" / "chave"
+def test_chave_nova_substitui_a_antiga(tmp_path):
+    caminho = tmp_path / "Clarisse" / "chave"
 
     gravar_chave(caminho, "segredo-da-sessao")
     gravar_chave(caminho, "outra-sessao")
 
-    assert caminho.read_text() == "outra-sessao"
-    assert stat.S_IMODE(caminho.stat().st_mode) == 0o600
+    assert caminho.read_text(encoding="utf-8") == "outra-sessao"
+
+
+def test_chave_fica_na_pasta_do_usuario_no_appdata():
+    assert CAMINHO_DA_CHAVE.is_relative_to(Path(os.environ["APPDATA"]))
+
+
+def test_claude_das_tarefas_roda_numa_pasta_local_do_usuario():
+    assert montagem.PASTA_NEUTRA_DO_CLAUDE.is_relative_to(Path(os.environ["LOCALAPPDATA"]))
 
 
 def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):

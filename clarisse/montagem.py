@@ -1,6 +1,5 @@
 """Junta as peças da Clarisse a partir dos ajustes e cadastros."""
 import json
-import os
 import secrets
 import sys
 from pathlib import Path
@@ -10,7 +9,7 @@ import httpx
 from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, manter_agendas_atualizadas
 from clarisse.agente import Agente
 from clarisse.auditoria import Auditoria
-from clarisse.config import Ajustes, Cadastros
+from clarisse.config import CAMINHO_DA_CHAVE, PASTA_LOCAL, Ajustes, Cadastros
 from clarisse.confirmacoes import Confirmacoes
 from clarisse.eventos import Eventos
 from clarisse.externas import FerramentasExternas
@@ -38,14 +37,13 @@ from clarisse.redator import redigir_email
 from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
-CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
 RAIZ = Path(__file__).resolve().parent.parent
 # Ferramentas que chamariam outro Claude: o Claude das etapas não pode pedi-las.
 FORA_DO_CLAUDE = {"pedir_ao_claude", "fazer_em_etapas"}
 CONFIRMAR_PARA_O_CLAUDE = {"apertar_atalho"}
 PASTA_WEB = Path(__file__).resolve().parent.parent / "web"
 # Fora de qualquer repositório: dentro de um, o Claude carrega o CLAUDE.md dele e acha que a pergunta é sobre o código.
-PASTA_NEUTRA_DO_CLAUDE = Path.home() / ".local" / "share" / "clarisse" / "claude"
+PASTA_NEUTRA_DO_CLAUDE = PASTA_LOCAL / "claude"
 # Palavras que a transcrição erra sem dica: "git" virou "G de" na medição de 29/09/2026.
 VOCABULARIO_FALADO = ["Clarisse", "Claude", "git", "git status", "git pull", "VS Code"]
 # Versão fixa: com @latest o npx baixaria código novo sem revisão a cada tarefa.
@@ -53,11 +51,8 @@ PLAYWRIGHT_MCP = "@playwright/mcp@0.0.83"
 
 
 def gravar_chave(caminho: Path, chave: str) -> None:
-    caminho.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    caminho.unlink(missing_ok=True)
-    descritor = os.open(caminho, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descritor, "w") as arquivo:
-        arquivo.write(chave)
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    caminho.write_text(chave, encoding="utf-8")
 
 
 def _config_do_navegador() -> Path:

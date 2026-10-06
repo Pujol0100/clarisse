@@ -6,14 +6,14 @@ cartões da tela. Rode com: python -m clarisse.mcp_servidor
 """
 import asyncio
 import os
-from pathlib import Path
 
 import httpx
 from mcp import types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
-CAMINHO_DA_CHAVE = Path.home() / ".config" / "clarisse" / "chave"
+from clarisse.config import CAMINHO_DA_CHAVE
+
 # Confirmação pela voz (até 60 s) mais a ferramenta (até 180 s).
 _ESPERA = 300
 
@@ -40,7 +40,7 @@ async def chamar(http: httpx.AsyncClient, nome: str, argumentos: dict) -> types.
 def _cliente() -> httpx.AsyncClient:
     porta = os.environ.get("CLARISSE_PORTA", "8765")
     return httpx.AsyncClient(
-        base_url=f"http://127.0.0.1:{porta}", headers={"X-Clarisse-Chave": CAMINHO_DA_CHAVE.read_text().strip()},
+        base_url=f"http://127.0.0.1:{porta}", headers={"X-Clarisse-Chave": CAMINHO_DA_CHAVE.read_text(encoding="utf-8").strip()},
     )
 
 
