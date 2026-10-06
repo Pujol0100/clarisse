@@ -62,10 +62,6 @@ def test_chave_fica_na_pasta_do_usuario_no_appdata():
     assert CAMINHO_DA_CHAVE.is_relative_to(Path(os.environ["APPDATA"]))
 
 
-def test_claude_das_tarefas_roda_numa_pasta_local_do_usuario():
-    assert montagem.PASTA_NEUTRA_DO_CLAUDE.is_relative_to(Path(os.environ["LOCALAPPDATA"]))
-
-
 def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
     monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
 

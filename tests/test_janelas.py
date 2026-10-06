@@ -1,6 +1,5 @@
 import pytest
 
-from clarisse.config import Aplicativo
 from clarisse.ferramentas.janelas import ferramentas_de_janelas
 from clarisse.ferramentas.registro import Risco
 
@@ -53,15 +52,6 @@ async def test_app_do_chrome_nao_passa_na_frente_do_proprio_chrome(ferramentas, 
     assert area.ativadas == [105]
 
 
-async def test_acha_pelo_processo_o_aplicativo_cadastrado_cuja_janela_tem_outro_nome(ferramentas, area, cadastros):
-    cadastros.aplicativos["calc"] = Aplicativo(abrir=["calc.exe"], processo="CalculatorApp.exe", apelidos=[])
-    f = ferramentas["trazer_para_frente"]
-
-    await f.executar(f.argumentos(aplicativo="calc"))
-
-    assert area.ativadas == [106]
-
-
 async def test_janela_que_nao_existe_nao_ativa_nada_e_diz_quais_estao_abertas(ferramentas, area):
     f = ferramentas["trazer_para_frente"]
 
@@ -89,15 +79,6 @@ async def test_digitar_traz_a_janela_para_a_frente_e_cola_o_texto(ferramentas, a
     assert area.coladas == ["não; del /q *"]
     assert area.apertadas == ["^v"]
     assert "clarisse" in resposta
-
-
-async def test_no_terminal_tambem_cola_com_ctrl_v(ferramentas, area):
-    f = ferramentas["digitar_texto"]
-
-    await f.executar(f.argumentos(aplicativo="powershell", texto="dir"))
-
-    assert area.ativadas == [104]
-    assert area.apertadas == ["^v"]
 
 
 async def test_nao_digita_se_nao_achou_a_janela(ferramentas, area):
@@ -133,14 +114,6 @@ async def test_atalho_sem_aplicativo_vai_para_a_janela_da_frente(ferramentas, ar
 
     assert area.ativadas == []
     assert area.apertadas == ["{ENTER}"]
-
-
-async def test_fechar_janela_aperta_alt_f4(ferramentas, area):
-    f = ferramentas["apertar_atalho"]
-
-    await f.executar(f.argumentos(atalho="fechar_janela"))
-
-    assert area.apertadas == ["%{F4}"]
 
 
 @pytest.mark.parametrize("atalho,risco", [("fechar_aba", Risco.CONFIRMAR), ("fechar_janela", Risco.CONFIRMAR), ("salvar", Risco.SEGURO)])

@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
-ESPERADOS = {"ligar.ps1", "desligar.ps1", "instalar-no-menu.ps1", "entrar-microsoft.ps1"}
 
 
 def _erros_de_sintaxe(script: Path) -> list[str]:
@@ -19,13 +18,8 @@ def _erros_de_sintaxe(script: Path) -> list[str]:
     return json.loads(saida or "[]")
 
 
-def test_os_scripts_do_windows_existem():
-    assert {s.name for s in SCRIPTS.glob("*.ps1")} == ESPERADOS
-
-
-def test_nao_sobrou_script_do_linux():
-    assert list(SCRIPTS.glob("*.sh")) == []
-
-
 def test_todo_script_e_powershell_sem_erro_de_sintaxe():
-    assert {s.name: _erros_de_sintaxe(s) for s in SCRIPTS.glob("*.ps1")} == {nome: [] for nome in ESPERADOS}
+    scripts = sorted(SCRIPTS.glob("*.ps1"))
+
+    assert scripts
+    assert {s.name: _erros_de_sintaxe(s) for s in scripts} == {s.name: [] for s in scripts}

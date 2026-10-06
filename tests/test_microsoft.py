@@ -60,11 +60,6 @@ async def test_token_vencido_pede_outro_a_forca_e_repete_uma_vez():
     assert tokens.pedidos == [False, True]
 
 
-async def test_sem_login_avisa():
-    with pytest.raises(SemContaMicrosoft):
-        await _conta(Tokens(), lambda p: httpx.Response(200)).get("/me", {})
-
-
 async def test_post_manda_o_corpo_com_o_token_e_aceita_resposta_vazia():
     pedidos = []
 

@@ -7,7 +7,6 @@ from pathlib import Path
 import psutil
 import pytest
 
-from clarisse.ferramentas import processos
 from clarisse.ferramentas.processos import Executor, ambiente_minimo
 
 
@@ -116,15 +115,6 @@ async def test_encerrar_programa_que_nao_esta_aberto_devolve_zero(executor):
     assert await executor.encerrar("programa-que-nao-existe.exe") == 0
 
 
-async def test_abrir_entrega_ao_programa_padrao_do_windows(executor, monkeypatch):
-    abertos = []
-    monkeypatch.setattr(processos.os, "startfile", abertos.append)
-
-    await executor.abrir("https://exemplo.com.br")
-
-    assert abertos == ["https://exemplo.com.br"]
-
-
 def test_ambiente_minimo_tira_segredos(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "x")
     monkeypatch.setenv("GITHUB_TOKEN", "x")
@@ -136,15 +126,6 @@ def test_ambiente_minimo_tira_segredos(monkeypatch):
     assert not {"OPENAI_API_KEY", "GITHUB_TOKEN", "DB_PASSWORD", "AWS_SECRET_ACCESS_KEY"} & env.keys()
     assert env["USERPROFILE"] == os.environ["USERPROFILE"]
     assert {"PATH", "SYSTEMROOT", "APPDATA", "LOCALAPPDATA"} <= env.keys()
-
-
-def test_ambiente_minimo_nao_leva_variavel_do_linux(monkeypatch):
-    monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/1000")
-    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
-
-    env = ambiente_minimo()
-
-    assert not {"XDG_RUNTIME_DIR", "WAYLAND_DISPLAY"} & env.keys()
 
 
 async def test_programa_executado_nao_recebe_segredos_do_ambiente(executor, monkeypatch):

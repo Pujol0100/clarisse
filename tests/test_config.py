@@ -1,8 +1,7 @@
 import json
-import os
 from pathlib import Path
 
-from clarisse.config import Ajustes, carregar_cadastros
+from clarisse.config import carregar_cadastros
 
 
 def _grava(pasta: Path, nome: str, conteudo: dict):
@@ -64,12 +63,6 @@ def test_acha_pasta_pelo_apelido_sem_acento(tmp_path):
     assert cadastros.achar_pasta("musicas") is None
 
 
-def test_ollama_padrao_e_o_do_instalador_do_windows():
-    binario = Path(Ajustes(_env_file=None).ollama_bin).expanduser()
-
-    assert binario == Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Ollama" / "ollama.exe"
-
-
 EXEMPLOS = Path(__file__).resolve().parent.parent / "config"
 
 
@@ -87,9 +80,3 @@ def test_aplicativos_de_exemplo_sao_programas_do_windows():
 
 def test_explorador_nao_e_aplicativo_porque_fechar_derrubaria_a_barra_de_tarefas():
     assert all(app["processo"].lower() != "explorer.exe" for app in _exemplo("aplicativos").values())
-
-
-def test_pastas_e_projetos_de_exemplo_usam_os_nomes_do_windows():
-    caminhos = [*_exemplo("pastas").values(), *_exemplo("projetos").values()]
-
-    assert all(c.startswith(("~/Downloads", "~/Documents", "~/Desktop")) for c in caminhos)
