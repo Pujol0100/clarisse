@@ -108,7 +108,7 @@ def montar_registro(
         return await redigir_email(redator, sobre, para, assinatura)
 
     async def abrir_no_navegador(endereco: str) -> None:
-        await executor.iniciar(["xdg-open", endereco])
+        await executor.abrir(endereco)
 
     ferramentas = [
         *ferramentas_do_sistema(cadastros, executor, sites=sites_da_empresa, raizes=raizes),

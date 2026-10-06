@@ -160,7 +160,7 @@ async def test_quando_o_site_responde_abre_o_navegador_e_avisa(montar, executor,
     await f.executar(f.argumentos(projeto="smart-anchor"))
     await delegacoes.aguardar()
 
-    assert (["xdg-open", "http://localhost:3100"], None) in executor.iniciados
+    assert executor.abertos == ["http://localhost:3100"]
     [(_, texto)] = avisos.recebidos
     assert "no ar" in texto
 
@@ -172,7 +172,7 @@ async def test_site_que_nao_responde_vira_aviso_sem_abrir_navegador(montar, exec
     await f.executar(f.argumentos(projeto="smart-anchor"))
     await delegacoes.aguardar()
 
-    assert not any(a[0] == "xdg-open" for a, _ in executor.iniciados)
+    assert executor.abertos == []
     [(_, texto)] = avisos.recebidos
     assert "terminal" in texto.lower()
 
@@ -189,7 +189,7 @@ async def test_endereco_do_site_vem_do_script(montar, executor, delegacoes, tmp_
     await f.executar(f.argumentos(projeto="painel"))
     await delegacoes.aguardar()
 
-    assert (["xdg-open", endereco], None) in executor.iniciados
+    assert executor.abertos == [endereco]
 
 
 async def test_projeto_sem_script_de_dev_nao_roda(montar, executor, tmp_path):
@@ -357,7 +357,7 @@ async def test_abrir_sistema_da_internet_pelo_apelido(todas, executor):
 
     resposta = await f.executar(f.argumentos(nome="quadro"))
 
-    assert executor.iniciados == [(["xdg-open", "https://kanban.exemplo.com/"], None)]
+    assert executor.abertos == ["https://kanban.exemplo.com/"]
     assert "kanban" in resposta
 
 
@@ -379,7 +379,7 @@ async def test_escolhido_o_site_abre_o_site(todas, executor, tmp_path):
 
     await f.executar(f.argumentos(nome="omni", onde="site"))
 
-    assert executor.iniciados == [(["xdg-open", "https://omni.exemplo.com/"], None)]
+    assert executor.abertos == ["https://omni.exemplo.com/"]
 
 
 async def test_escolhido_o_local_roda_o_projeto_com_confirmacao(todas, executor, tmp_path):

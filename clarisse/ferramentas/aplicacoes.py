@@ -193,7 +193,7 @@ def ferramentas_de_aplicacoes(
 
     async def _quando_subir(projeto: Path, endereco: str, limite: float) -> str:
         if await esperar_site(endereco, limite):
-            await executor.iniciar(["xdg-open", endereco])
+            await executor.abrir(endereco)
             return f"O {projeto.name} está no ar. Abri {endereco} no navegador."
         return f"O {projeto.name} não respondeu em {endereco}. Olhe o erro no terminal dele."
 
@@ -254,7 +254,7 @@ def ferramentas_de_aplicacoes(
             await executor.iniciar(alvo.abrir)
             return f"Abri o {args.nome}."
         if tipo == "site":
-            await executor.iniciar(["xdg-open", alvo.endereco])
+            await executor.abrir(alvo.endereco)
             return f"Abri o {alvo.nome} no navegador."
         if tipo == "local":
             return await rodar_aplicacao(alvo)
