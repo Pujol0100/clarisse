@@ -39,7 +39,7 @@ def _pasta_das_conversas_do(caminho):
 
 
 async def test_le_na_integra_o_que_o_claude_respondeu_depois_da_ultima_pergunta(executor, tmp_path):
-    _gravar(tmp_path / "projects" / "-home-x-proj" / "sessao-a.jsonl", CONVERSA)
+    _gravar(tmp_path / "projects" / "C--Users-x-proj" / "sessao-a.jsonl", CONVERSA)
     f = _ferramenta(executor, tmp_path)
 
     resultado = await f.executar(f.argumentos())
@@ -49,8 +49,8 @@ async def test_le_na_integra_o_que_o_claude_respondeu_depois_da_ultima_pergunta(
 
 
 async def test_sem_nome_usa_a_conversa_mais_recente(executor, tmp_path):
-    _gravar(tmp_path / "projects" / "-home-x-a" / "velha.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Velha."}])], idade=500)
-    _gravar(tmp_path / "projects" / "-home-x-b" / "nova.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Nova."}])])
+    _gravar(tmp_path / "projects" / "C--Users-x-a" / "velha.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Velha."}])], idade=500)
+    _gravar(tmp_path / "projects" / "C--Users-x-b" / "nova.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Nova."}])])
     f = _ferramenta(executor, tmp_path)
 
     resultado = await f.executar(f.argumentos())
@@ -59,11 +59,11 @@ async def test_sem_nome_usa_a_conversa_mais_recente(executor, tmp_path):
 
 
 async def test_pelo_nome_acha_a_conversa_aberta(executor, tmp_path):
-    _gravar(tmp_path / "projects" / "-home-x-meus-programas-clarisse" / "abc.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Da clarisse."}])], idade=500)
-    _gravar(tmp_path / "projects" / "-home-x-outro" / "def.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "De outra."}])])
+    _gravar(tmp_path / "projects" / "C--Users-x-meus-programas-clarisse" / "abc.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "Da clarisse."}])], idade=500)
+    _gravar(tmp_path / "projects" / "C--Users-x-outro" / "def.jsonl", [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": "De outra."}])])
     executor.respostas.append(Resultado(0, json.dumps([
-        {"name": "clarisse", "cwd": "/home/x/meus.programas/clarisse", "sessionId": "abc"},
-        {"name": "omni", "cwd": "/home/x/outro", "sessionId": "def"},
+        {"name": "clarisse", "cwd": "C:\\Users\\x\\meus.programas\\clarisse", "sessionId": "abc"},
+        {"name": "omni", "cwd": "C:\\Users\\x\\outro", "sessionId": "def"},
     ]), ""))
     f = _ferramenta(executor, tmp_path)
 
@@ -74,7 +74,7 @@ async def test_pelo_nome_acha_a_conversa_aberta(executor, tmp_path):
 
 
 async def test_nome_que_nao_existe_diz_quais_conversas_estao_abertas(executor, tmp_path):
-    executor.respostas.append(Resultado(0, json.dumps([{"name": "omni", "cwd": "/home/x", "sessionId": "d"}]), ""))
+    executor.respostas.append(Resultado(0, json.dumps([{"name": "omni", "cwd": "C:\\Users\\x", "sessionId": "d"}]), ""))
     f = _ferramenta(executor, tmp_path)
 
     resultado = await f.executar(f.argumentos(conversa="financeiro"))
@@ -95,7 +95,7 @@ async def test_pelo_projeto_le_a_conversa_mais_recente_dele(executor, tmp_path, 
     resposta = lambda texto: [_linha("user", "p"), _linha("assistant", [{"type": "text", "text": texto}])]  # noqa: E731
     _gravar(pasta / "velha.jsonl", resposta("Do omni, velha."), idade=900)
     _gravar(pasta / "nova.jsonl", resposta("Do omni, nova."), idade=300)
-    _gravar(tmp_path / "projects" / "-home-x-outro" / "mais-nova.jsonl", resposta("De outro projeto."))
+    _gravar(tmp_path / "projects" / "C--Users-x-outro" / "mais-nova.jsonl", resposta("De outro projeto."))
     f = _ferramenta(executor, tmp_path, cadastros)
 
     resultado = await f.executar(f.argumentos(projeto="Omni API"))

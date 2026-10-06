@@ -103,11 +103,11 @@ async def test_dia_sem_compromisso():
 
 
 async def test_sem_conta_microsoft_explica_onde_ligar():
-    conta = ContaFalsa({}, falhar=SemContaMicrosoft("Não achei conta Microsoft nas contas on-line do GNOME."))
+    conta = ContaFalsa({}, falhar=SemContaMicrosoft("Entre na conta Microsoft: rode o scripts\\entrar-microsoft.ps1."))
 
     resposta = await _chamar(_ferramentas(conta), "consultar_agenda")
 
-    assert resposta == "Não achei conta Microsoft nas contas on-line do GNOME."
+    assert resposta == "Entre na conta Microsoft: rode o scripts\\entrar-microsoft.ps1."
 
 
 CAIXA = {
