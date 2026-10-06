@@ -32,7 +32,7 @@ from clarisse.sites import carregar_sites, manter_sites_atualizados, servidores_
 from clarisse.ferramentas.sistema import ferramentas_do_sistema
 from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
-from clarisse.microsoft import ContaMicrosoft
+from clarisse.microsoft import ContaMicrosoft, LoginMicrosoft
 from clarisse.redator import redigir_email
 from clarisse.tecla import escutar_pela_tecla
 from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
@@ -134,7 +134,7 @@ def montar_registro(
         ),
         *ferramentas_de_noticias(http, abrir=abrir_no_navegador, escolhas=escolhas),
         *ferramentas_do_tempo(http, cidade_padrao=ajustes.cidade),
-        *ferramentas_do_outlook(ContaMicrosoft(executor, http), escolhas=escolhas, redigir=redigir),
+        *ferramentas_do_outlook(ContaMicrosoft(LoginMicrosoft().token, http), escolhas=escolhas, redigir=redigir),
         *ferramentas_do_github(executor, cadastros),
         *ferramentas_do_dokploy(http, _paineis_do_dokploy),
         *ferramentas_de_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json")),

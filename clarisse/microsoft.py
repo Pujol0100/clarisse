@@ -1,16 +1,27 @@
-"""Leitura do Outlook (agenda e e-mail) pelo Microsoft Graph, com o token da conta Microsoft 365 que
-já está ligada no GNOME (Configurações → Contas on-line). Nenhum app registrado, nada passa pelo Claude.
+"""Leitura do Outlook (agenda e e-mail) pelo Microsoft Graph, com login próprio pelo MSAL.
 
-O token nunca vai para log nem para o modelo: só para o cabeçalho do pedido ao Graph."""
+O login usa o aplicativo público do Microsoft Graph PowerShell (escolha do usuário em 05/10/2026):
+nada é registrado no Entra, e o administrador do Microsoft 365 pode bloquear esse aplicativo.
+O navegador só abre pelo scripts\\entrar-microsoft.ps1; durante uma pergunta o token vem em silêncio
+do cache, que o Windows criptografa para o usuário.
+
+O token nunca vai para log nem para o modelo: só para o cabeçalho do pedido ao Graph.
+Para entrar: python -m clarisse.microsoft entrar"""
+import asyncio
 import json
-import re
+import sys
+from collections.abc import Awaitable, Callable
 
 import httpx
 
+from clarisse.config import PASTA_LOCAL
+
 GRAPH = "https://graph.microsoft.com/v1.0"
-_GOA = ["gdbus", "call", "--session", "--dest", "org.gnome.OnlineAccounts"]
-_CONTA = re.compile(r"'(/org/gnome/OnlineAccounts/Accounts/account_[0-9_]+)'")
-_TOKEN = re.compile(r"^\('([^']+)'")
+GRAPH_POWERSHELL = "14d82eec-204b-4c2f-b7e8-296a70dab67e"
+AUTORIDADE = "https://login.microsoftonline.com/organizations"
+# Só o que ferramentas/outlook.py usa: agenda, caixa de entrada, rascunho, envio e busca de pessoas.
+ESCOPOS = ["User.Read", "Calendars.Read", "Mail.ReadWrite", "Mail.Send", "People.Read"]
+_ENTRE = "Entre na conta Microsoft: rode o scripts\\entrar-microsoft.ps1."
 # Horários da agenda já no fuso de Brasília.
 FUSO = 'outlook.timezone="E. South America Standard Time"'
 
@@ -19,37 +30,52 @@ class SemContaMicrosoft(RuntimeError):
     pass
 
 
+def _app_do_msal():
+    import msal
+    from msal_extensions import FilePersistenceWithDataProtection, PersistedTokenCache
+
+    PASTA_LOCAL.mkdir(parents=True, exist_ok=True)
+    cache = PersistedTokenCache(FilePersistenceWithDataProtection(str(PASTA_LOCAL / "conta-microsoft.bin")))
+    return msal.PublicClientApplication(GRAPH_POWERSHELL, authority=AUTORIDADE, token_cache=cache)
+
+
+class LoginMicrosoft:
+    def __init__(self, criar_app: Callable[[], object] = _app_do_msal):
+        self._criar_app = criar_app
+        self._app = None
+
+    def _aplicativo(self):
+        if self._app is None:
+            self._app = self._criar_app()
+        return self._app
+
+    def _silencioso(self, forcar_novo: bool) -> str:
+        app = self._aplicativo()
+        contas = app.get_accounts()
+        if not contas:
+            raise SemContaMicrosoft(_ENTRE)
+        resultado = app.acquire_token_silent(ESCOPOS, account=contas[0], force_refresh=forcar_novo)
+        if not resultado or "access_token" not in resultado:
+            raise SemContaMicrosoft(_ENTRE)
+        return resultado["access_token"]
+
+    async def token(self, forcar_novo: bool) -> str:
+        return await asyncio.to_thread(self._silencioso, forcar_novo)
+
+    def entrar(self) -> str:
+        """Abre o navegador para escolher a conta; devolve o e-mail de quem entrou."""
+        resultado = self._aplicativo().acquire_token_interactive(ESCOPOS, prompt="select_account")
+        if "access_token" not in resultado:
+            motivo = resultado.get("error_description") or resultado.get("error")
+            raise SemContaMicrosoft(f"A Microsoft recusou a entrada: {motivo}")
+        return resultado["id_token_claims"]["preferred_username"]
+
+
 class ContaMicrosoft:
-    def __init__(self, executor, http: httpx.AsyncClient):
-        self._executor = executor
+    def __init__(self, pedir_token: Callable[[bool], Awaitable[str]], http: httpx.AsyncClient):
+        self._pedir_token = pedir_token
         self._http = http
         self._token: str | None = None
-        self._caminho: str | None = None
-
-    async def _conta(self) -> str:
-        objetos = await self._executor.executar(
-            [*_GOA, "--object-path", "/org/gnome/OnlineAccounts",
-             "--method", "org.freedesktop.DBus.ObjectManager.GetManagedObjects"],
-            timeout=15,
-        )
-        achadas = list(_CONTA.finditer(objetos.saida))
-        for i, achada in enumerate(achadas):
-            fim = achadas[i + 1].start() if i + 1 < len(achadas) else len(objetos.saida)
-            if "'ProviderType': <'ms_graph'>" in objetos.saida[achada.end():fim]:
-                return achada.group(1)
-        raise SemContaMicrosoft("Não achei conta Microsoft nas contas on-line do GNOME.")
-
-    async def _novo_token(self) -> str:
-        self._caminho = self._caminho or await self._conta()
-        conta = self._caminho
-        resposta = await self._executor.executar(
-            [*_GOA, "--object-path", conta, "--method", "org.gnome.OnlineAccounts.OAuth2Based.GetAccessToken"],
-            timeout=15,
-        )
-        achado = _TOKEN.match(resposta.saida.strip())
-        if not achado:
-            raise SemContaMicrosoft("A conta Microsoft do GNOME não devolveu acesso; entre de novo nas contas on-line.")
-        return achado.group(1)
 
     async def _pedir(self, metodo: str, caminho: str, parametros: dict | None = None,
                      corpo: dict | None = None, cabecalhos: dict | None = None) -> dict:
@@ -57,7 +83,7 @@ class ContaMicrosoft:
         extras = {"Content-Type": "application/json"} if conteudo is not None else {}
         for tentativa in range(2):
             if self._token is None or tentativa:
-                self._token = await self._novo_token()
+                self._token = await self._pedir_token(tentativa > 0)
             resposta = await self._http.request(
                 metodo, f"{GRAPH}{caminho}", params=parametros, content=conteudo, timeout=15,
                 headers={"Authorization": f"Bearer {self._token}", **extras, **(cabecalhos or {})},
@@ -73,3 +99,7 @@ class ContaMicrosoft:
     async def post(self, caminho: str, corpo: dict | None) -> dict:
         """Escrita: só criar rascunho e enviar o rascunho que o usuário confirmou."""
         return await self._pedir("POST", caminho, corpo=corpo)
+
+
+if __name__ == "__main__" and sys.argv[1:] == ["entrar"]:
+    print(f"Entrou como {LoginMicrosoft().entrar()}. A Clarisse já pode ler a agenda e os e-mails.")

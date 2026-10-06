@@ -1,4 +1,4 @@
-"""Agenda e e-mail do Outlook, só leitura, pela conta Microsoft do GNOME (ver clarisse/microsoft.py).
+"""Agenda e e-mail do Outlook pelo Microsoft Graph, com o login da Clarisse (clarisse/microsoft.py)."""
 
 A lista de e-mails é falada pelo sistema, sem passar pelo modelo: assunto de e-mail é escrito por
 qualquer um e não pode virar instrução. O mesmo vale para o corpo, lido na íntegra."""
