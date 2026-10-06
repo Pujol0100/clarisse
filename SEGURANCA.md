@@ -19,7 +19,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 3 | Public Key DB (chaves públicas vs. privadas de banco) | não se aplica | Sem banco de dados |
 | 4 | Ativar RLS (Row Level Security) | não se aplica | Sem banco e sem múltiplos usuários |
 | 5 | Criptografia de dados | feito | A chave de sessão vem de `secrets.token_urlsafe(32)` (`clarisse/montagem.py`) e é comparada em tempo constante (`secrets.compare_digest`, `clarisse/web.py`). Chamadas externas (g1, Microsoft Graph, Anthropic, Hugging Face para baixar o modelo de voz uma vez) em HTTPS com verificação de certificado padrão. Nada sensível guardado em repouso além da auditoria local |
-| 6 | Auth server-side | feito | `Portaria` em `clarisse/web.py`: toda rota `/api/*`, `/audio/*` e o WebSocket exigem a chave da sessão (cookie ou cabeçalho `X-Clarisse-Chave`). A chave nasce a cada início e é gravada em `~/.config/clarisse/chave` com permissão 600 para o script do atalho |
+| 6 | Auth server-side | feito | `Portaria` em `clarisse/web.py`: toda rota `/api/*`, `/audio/*` e o WebSocket exigem a chave da sessão (cookie ou cabeçalho `X-Clarisse-Chave`). A chave nasce a cada início e é gravada em `%APPDATA%\Clarisse\chave`, dentro do perfil do usuário, que o Windows já restringe a ele, para o servidor MCP da Clarisse |
 | 7 | Restringir acessos (authorization / IDOR) | feito | Um usuário só. Documentação automática do FastAPI desligada (`docs_url=None`, `openapi_url=None`). Áudio servido só com nome gerado pelo sistema (32 hexadecimais + `.mp3`) |
 | 8 | Bloquear Mass Assignment | feito | Entrada da API e argumentos de ferramenta em modelos Pydantic com `extra="forbid"` (`clarisse/web.py`, `clarisse/ferramentas/registro.py`) |
 | 9 | Proteger Cookies | parcial | Cookie `HttpOnly; SameSite=Strict; Path=/`, sem `Domain`. **Sem `Secure`**: a página é servida em `http://127.0.0.1`, que nunca sai da máquina. CSRF barrado por `SameSite=Strict` mais a conferência do `Origin` |
@@ -34,7 +34,7 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 | 18 | Add security headers | feito | CSP sem `unsafe-inline`/`unsafe-eval` com `frame-ancestors 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (só microfone), `Cache-Control: no-store` — `Portaria` em `clarisse/web.py`. Sem CORS: só a própria origem |
 | 19 | Forçar HTTPS | não se aplica | Servidor só em `127.0.0.1`; o tráfego não sai da máquina. Chamadas externas já são HTTPS |
 | 20 | Scan de dependências | feito | `uv.lock` versionado; `pip-audit` no CI (sem vulnerabilidade conhecida em 29/09/2026); `.github/dependabot.yml` |
-| 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache (Kokoro e o modelo de voz são Apache-2.0). O pronunciador que o Kokoro usa é **GPL-3.0**: `phonemizer-fork` (biblioteca Python, sem modificação) e o `espeak-ng` do sistema, carregado pela biblioteca compartilhada — leitura técnica; a decisão final é do jurídico |
+| 21 | Código de origem open source (procedência e risco de supply chain) | feito | Nenhum código copiado. Fonte Atkinson Hyperlegible Next embutida (tabela abaixo). Licenças das dependências diretas: MIT/BSD/Apache (Kokoro e o modelo de voz são Apache-2.0). O pronunciador que o Kokoro usa é **GPL-3.0**: `phonemizer-fork` (biblioteca Python, sem modificação) e o `espeak-ng` que vem no pacote `espeakng-loader`, carregado como biblioteca compartilhada — leitura técnica; a decisão final é do jurídico |
 | 22 | Log de auditoria, monitoramento e backup | parcial | Toda ferramenta executada vira uma linha em `dados/auditoria.jsonl` (quando, qual, argumentos, risco, resultado, duração), e cada troca da conversa uma linha em `dados/conversa.jsonl`. Portaria e segurança negam quando algo falha. **Sem monitoramento externo** (é local) e **sem backup** (não há dado a preservar além da auditoria) |
 | 23 | IA, LLM e MCP na aplicação | feito | Fala do usuário e resultados externos entram como mensagens `user` e `tool`, nunca como instrução de sistema; o prompt de sistema não tem segredo nem regra de autorização (a autorização está em `clarisse/seguranca.py`). Ações que alteram algo — fechar aplicativo, `git pull`, criar compromisso — pedem confirmação decidida por palavra, não pelo modelo. O modelo só escolhe entre ferramentas cadastradas, com argumentos validados. Tetos de tokens e de gasto no item 11. Dois servidores MCP, cada um só para o seu Claude, com `--strict-mcp-config` e `--tools` restrito: o Playwright (`@playwright/mcp`, versão fixa 0.0.83, Apache-2.0) nas tarefas no navegador, que pedem confirmação e proíbem enviar, comprar, apagar ou alterar; e o da própria Clarisse (`clarisse/mcp_servidor.py`, SDK `mcp` 2.2.0, MIT) nas tarefas em etapas, que só repassa chamadas para a avaliação e a confirmação da Clarisse |
 
@@ -54,9 +54,14 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   pede permissão. Com `--tools` ele nem enxerga a ferramenta (testado).
 - **Mensagem para uma conversa aberta** pede confirmação, e quem recebe a trata
   como vinda de outra sessão, não como aprovação do usuário.
-- **Teclado virtual** (`ydotool`): o `/dev/uinput` é liberado por `TAG+="uaccess"`
-  só para quem está na sessão, **sem o grupo `input`**, que daria leitura de tudo o
-  que é digitado no teclado de verdade (`scripts/instalar-teclado-virtual.sh`).
+- **Teclado e janelas** pelo próprio Windows (`clarisse/area_de_trabalho.py`, com
+  `pywinauto` e `pyperclip`), sem instalar serviço nem dar permissão extra. As teclas só
+  saem depois que o Windows confirma que a janela pedida está na frente, para não cair
+  noutra janela.
+- **Programa `.cmd` ou `.bat` não recebe argumento com `& | < > ^ % " !`**
+  (`clarisse/ferramentas/processos.py`): o `cmd.exe` interpretaria esses caracteres
+  mesmo vindo como argumento separado. O executor continua sem shell e com lista de
+  argumentos.
 - **Rodar aplicação** só roda o script de desenvolvimento do `package.json`
   (`dev` ou `start:dev`), em terminal visível, depois de confirmação. Lê do `.env`
   só endereço e porta das variáveis de banco que o servidor de desenvolvimento usa
@@ -65,7 +70,8 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   que respeita o `package-lock.json` e não altera o repositório), no mesmo terminal
   visível, e a confirmação avisa.
 - **Abrir arquivo** só dentro da pasta pessoal, sem pastas ocultas, e recusa o que
-  executa programa ao abrir (`.sh`, `.desktop`, `.AppImage`, arquivo executável).
+  executa programa ao abrir (`.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.msi`, `.lnk`, `.scr`,
+  `.reg`, `.hta` e outros da lista em `clarisse/ferramentas/sistema.py`), e não procura em `AppData`.
 - **Claude das tarefas em etapas** (`fazer_em_etapas`): roda com `--strict-mcp-config`
   e só enxerga o servidor MCP da Clarisse (`clarisse/mcp_servidor.py`) mais busca na
   web. O servidor **não executa nada**: repassa cada chamada às rotas
@@ -86,9 +92,11 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
   só vai depois do "sim" falado, decidido por palavra e não pelo modelo (prova por mutação em
   01/10/2026). Destinatário por nome: se casar com mais de uma pessoa nos contatos, não escreve
   e pergunta. O texto é escrito pelo modelo local numa chamada sem ferramentas.
-- **Leitura:** agenda e e-mail: `GET` no Microsoft Graph com o token da conta
-  Microsoft do GNOME (`clarisse/microsoft.py`), pedido por D-Bus a cada vez que vence e
-  usado só no cabeçalho, nunca em log nem no modelo. GitHub: `gh search prs` e
+- **Leitura:** agenda e e-mail: `GET` no Microsoft Graph com o token do login MSAL
+  (`clarisse/microsoft.py`), renovado em silêncio a partir do cache criptografado pelo
+  Windows (DPAPI) em `%LOCALAPPDATA%\Clarisse\conta-microsoft.bin` e usado só no
+  cabeçalho, nunca em log nem no modelo. O navegador do login só abre pelo
+  `scripts\entrar-microsoft.ps1`, nunca no meio de uma pergunta. GitHub: `gh search prs` e
   `gh pr checks`. Dokploy: `project.all` (só nome, identificador e situação de cada
   aplicação) e `deployment.all`, com a chave de leitura que o Claude Code já usa; nada
   lê variável de ambiente. Notas: arquivos `.md` do cofre, fora da pasta `.obsidian`.
@@ -104,16 +112,19 @@ máquina**, e um modelo de linguagem decide quais. Os dois riscos centrais são:
 - **A voz é 100% local desde 02/10/2026** (Kokoro, no processador): o que a Clarisse fala,
   inclusive e-mail, matéria e resposta do Claude lida, não sai mais da máquina. Com o Claude
   ligado, o pedido delegado vai para a Anthropic; o nome da cidade vai para o Open-Meteo.
-- **Qualquer programa da sua sessão consegue pedir o token da conta Microsoft** ao
-  GNOME, como a Clarisse pede. Isso já era assim antes dela; a Clarisse só lê.
+- **O login Microsoft usa o aplicativo público do Microsoft Graph PowerShell**
+  (`14d82eec-204b-4c2f-b7e8-296a70dab67e`), escolha do usuário em 05/10/2026: nada é
+  registrado no Entra da empresa, mas a identidade é de outro aplicativo, e o
+  administrador do Microsoft 365 pode bloqueá-lo a qualquer momento.
+- **Qualquer programa rodando como o seu usuário consegue abrir o cache do login
+  Microsoft**: a criptografia do Windows protege contra outros usuários e contra o
+  arquivo copiado para outra máquina, não contra programas da sua própria sessão.
 - **Lembretes ficam em texto aberto** em `dados/lembretes.json`, fora do git.
 - **Qualquer programa rodando como o seu usuário** consegue ler a chave em
-  `~/.config/clarisse/chave` — o mesmo programa já poderia executar comandos
+  `%APPDATA%\Clarisse\chave` — o mesmo programa já poderia executar comandos
   sozinho, então a chave não protege contra ele.
-- **Qualquer programa da sua sessão consegue simular teclado** pelo
-  `/dev/uinput` depois da instalação, inclusive digitar num terminal. O mesmo
-  programa já poderia executar comandos sozinho, então o risco novo é pequeno; o
-  que se evitou foi o grupo `input`, que abriria a leitura do teclado.
+- **A tecla Insert fica com a Clarisse enquanto ela está ligada**: nos outros
+  programas ela deixa de alternar entre inserir e sobrescrever.
 - **Texto colado fica na área de transferência** e substitui o que estava lá.
 - **Banco não reconhecido é só avisado.** Um `.env` que aponte para produção por
   uma variável fora da convenção, ou um banco de produção que não está em

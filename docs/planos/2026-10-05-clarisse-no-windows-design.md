@@ -72,8 +72,6 @@ instalar espeak-ng.**
 
 - Transcrição e voz na placa de vídeo: continuam no processador, como no Linux.
 - Camada que serve Linux e Windows.
-- Diferenciar a janela do Chrome dos apps instalados pelo Chrome (no Windows todos são
-  `chrome.exe`). O teste `test_app_do_chrome_nao_passa_na_frente_do_proprio_chrome` sai.
 
 ## Bibliotecas novas (aprovadas em 05/10/2026)
 
@@ -88,3 +86,24 @@ instalar espeak-ng.**
   `.cmd` criado no teste).
 - As fronteiras com o sistema (`pywinauto`, `pycaw`, `RegisterHotKey`, `msal`) não têm teste de
   unidade; a verificação é manual, na máquina, no fim de cada fase.
+
+## Mudanças durante a execução (06/10/2026)
+
+- **O Chrome continua na frente dos apps instalados por ele.** No Windows todos são
+  `chrome.exe`, mas o título do Chrome tem "Google Chrome" e o do app não; entre janelas
+  do mesmo programa vem primeiro a que tem o nome do aplicativo no título. O teste ficou.
+- **Janelas pelo backend `win32` do pywinauto, não pelo `uia`.** Medido nesta máquina: o
+  `uia` levou 3 s para listar as janelas, o `win32` menos de 0,1 s. A lista segue a regra do
+  Alt+Tab: fica de fora janela de ferramenta (`WS_EX_TOOLWINDOW`) e janela escondida pelo
+  Windows (`DWMWA_CLOAKED`), o que tira "Program Manager", o overlay da NVIDIA e a entrada
+  de texto do Windows.
+- **`ativar` espera o Windows confirmar a janela na frente** antes de voltar. Com espera fixa
+  de 0,3 s a colagem falhou em 1 de 2 rodadas numa janela de teste; esperando o primeiro
+  plano, 4 de 4 sem espera fixa.
+- **O Explorador de Arquivos não entra nos aplicativos de exemplo**: fechar o `explorer.exe`
+  derruba a barra de tarefas. Chrome e Edge vão com caminho completo, porque não estão no
+  `PATH`.
+- **Volume chamado direto, sem `asyncio.to_thread`**: o `pycaw` usa COM, que o `comtypes`
+  inicia só na thread principal.
+- **O teste de sintaxe dos `.ps1` força UTF-8 na saída do PowerShell.** Sem isso, a mensagem
+  de erro em cp850 (com acento) não decodificava e o teste passava com script quebrado.
