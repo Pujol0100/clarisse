@@ -34,7 +34,6 @@ class Ajustes(BaseSettings):
     cidade: str | None = None
     # Cofre do Obsidian para buscar e ler notas; sem ele, as ferramentas de notas não existem.
     cofre_de_notas: Path | None = None
-    agenda_intervalo_minutos: float = 5
     pasta_config: Path = Path("config")
     pasta_dados: Path = Path("dados")
     abrir_navegador: bool = True

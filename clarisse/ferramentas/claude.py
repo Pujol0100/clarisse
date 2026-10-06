@@ -143,7 +143,6 @@ def ferramentas_do_claude(
     timeout: float,
     teto_usd: float,
     agora: Callable[[], datetime] = datetime.now,
-    apos_mudar_agenda: Callable[[], Awaitable[None]] | None = None,
     mcp_navegador: Path | None = None,
     mcp_clarisse: Path | None = None,
 ) -> list[Ferramenta]:
@@ -208,8 +207,6 @@ def ferramentas_do_claude(
             )
             ferramentas.append(_BUSCAR_PESSOAS)
         resultado = await rodar_claude(executor, pedido, _pasta_neutra(), ferramentas, modelo, _TIMEOUT_DA_AGENDA, teto_usd)
-        if apos_mudar_agenda:
-            await apos_mudar_agenda()
         return resultado
 
     def confirmar_compromisso(args: ArgsCompromisso) -> str:

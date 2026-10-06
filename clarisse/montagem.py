@@ -6,7 +6,6 @@ from pathlib import Path
 
 import httpx
 
-from clarisse.agenda_linux import agendas_do_microsoft365, atualizar_agendas, manter_agendas_atualizadas
 from clarisse.agente import Agente
 from clarisse.area_de_trabalho import AreaDeTrabalho
 from clarisse.auditoria import Auditoria
@@ -60,7 +59,7 @@ def _config_do_navegador() -> Path:
     """O Claude das tarefas no navegador só enxerga este servidor: o Playwright, com janela visível para login."""
     PASTA_NEUTRA_DO_CLAUDE.mkdir(parents=True, exist_ok=True)
     caminho = PASTA_NEUTRA_DO_CLAUDE / "mcp-navegador.json"
-    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "npx", "args": ["-y", PLAYWRIGHT_MCP]}}}), encoding="utf-8")
+    caminho.write_text(json.dumps({"mcpServers": {"playwright": {"command": "cmd", "args": ["/c", "npx", "-y", PLAYWRIGHT_MCP]}}}), encoding="utf-8")
     return caminho
 
 
@@ -93,7 +92,6 @@ def _paineis_do_dokploy() -> list[tuple[str, str]]:
 
 def montar_registro(
     ajustes: Ajustes, cadastros: Cadastros, executor, http: httpx.AsyncClient, delegacoes: Delegacoes,
-    apos_mudar_agenda=None,
 ) -> Registro:
     registro = Registro()
     http_local = httpx.AsyncClient()
@@ -130,7 +128,6 @@ def montar_registro(
             modelo=ajustes.claude_modelo,
             timeout=ajustes.claude_timeout,
             teto_usd=ajustes.claude_teto_usd,
-            apos_mudar_agenda=apos_mudar_agenda,
             mcp_navegador=_config_do_navegador(),
             mcp_clarisse=_config_da_clarisse(ajustes.porta),
         ),
@@ -161,9 +158,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     http_externo = httpx.AsyncClient()
     executor = Executor()
 
-    async def atualizar_agenda_do_linux():
-        await atualizar_agendas(executor, agendas_do_microsoft365())
-
     async def manter_sites_da_empresa():
         await manter_sites_atualizados(
             http_externo, Path.home() / ".claude.json", ajustes.pasta_config / "sites-dokploy.json",
@@ -176,10 +170,7 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
     async def avisar_os_lembretes():
         await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
 
-    async def manter_agenda_do_linux():
-        await manter_agendas_atualizadas(executor, agendas_do_microsoft365, ajustes.agenda_intervalo_minutos * 60)
-
-    registro = montar_registro(ajustes, cadastros, executor, http_externo, delegacoes, apos_mudar_agenda=atualizar_agenda_do_linux)
+    registro = montar_registro(ajustes, cadastros, executor, http_externo, delegacoes)
     modelo = ClienteOllama(httpx.AsyncClient(base_url=ajustes.ollama_url), ajustes.modelo)
     agente = Agente(
         modelo, registro, eventos, Auditoria(ajustes.pasta_dados / "auditoria.jsonl"),
@@ -196,6 +187,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[aquecer_a_voz, manter_agenda_do_linux, manter_sites_da_empresa, avisar_os_lembretes],
+        tarefas_de_fundo=[aquecer_a_voz, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )

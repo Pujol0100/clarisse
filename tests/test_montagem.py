@@ -75,6 +75,15 @@ def test_playwright_do_navegador_tem_versao_fixa(tmp_path, monkeypatch):
     assert re.fullmatch(r"@playwright/mcp@\d+\.\d+\.\d+", pacote)
 
 
+def test_playwright_do_navegador_abre_o_npx_pelo_cmd(tmp_path, monkeypatch):
+    monkeypatch.setattr(montagem, "PASTA_NEUTRA_DO_CLAUDE", tmp_path)
+
+    servidor = json.loads(montagem._config_do_navegador().read_text(encoding="utf-8"))["mcpServers"]["playwright"]
+
+    assert servidor["command"] == "cmd"
+    assert servidor["args"][:3] == ["/c", "npx", "-y"]
+
+
 def test_claude_abre_o_servidor_mcp_da_clarisse_com_o_python_do_projeto(tmp_path, monkeypatch):
     import sys
 
