@@ -34,6 +34,7 @@ from clarisse.ferramentas.tempo import ferramentas_do_tempo
 from clarisse.llm import ClienteOllama
 from clarisse.microsoft import ContaMicrosoft
 from clarisse.redator import redigir_email
+from clarisse.tecla import escutar_pela_tecla
 from clarisse.voz import Locutor, Transcritor, carregar_whisper, gerar_local
 from clarisse.web import criar_anunciador, criar_app, criar_avisador
 
@@ -167,6 +168,9 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         # O modelo de voz leva alguns segundos para carregar: carrega ao ligar, não na primeira resposta.
         await locutor.sintetizar("Pronta.")
 
+    async def falar_pela_tecla():
+        await escutar_pela_tecla(eventos.publicar)
+
     async def avisar_os_lembretes():
         await manter_lembretes(Lembretes(ajustes.pasta_dados / "lembretes.json"), criar_avisador(eventos, locutor))
 
@@ -187,6 +191,6 @@ def montar_app(ajustes: Ajustes, cadastros: Cadastros):
         agente=agente, eventos=eventos, transcritor=transcritor, locutor=locutor,
         chave=chave, porta=ajustes.porta, pasta_web=PASTA_WEB, pasta_audio=ajustes.pasta_dados / "audio",
         conversa=Auditoria(ajustes.pasta_dados / "conversa.jsonl"),
-        tarefas_de_fundo=[aquecer_a_voz, manter_sites_da_empresa, avisar_os_lembretes],
+        tarefas_de_fundo=[aquecer_a_voz, falar_pela_tecla, manter_sites_da_empresa, avisar_os_lembretes],
         externas=FerramentasExternas(registro, agente, fora=FORA_DO_CLAUDE, sempre_confirmar=CONFIRMAR_PARA_O_CLAUDE),
     )
