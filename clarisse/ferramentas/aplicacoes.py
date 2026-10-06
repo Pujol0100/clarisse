@@ -19,6 +19,7 @@ from pydantic import Field
 
 from clarisse.config import Cadastros, normalizar
 from clarisse.ferramentas.registro import Argumentos, Ferramenta, Risco
+from clarisse.terminal import terminal
 from clarisse.sites import Site, achar_sites
 
 _ARQUIVOS_ENV = (".env", ".env.local", ".env.development")
@@ -29,8 +30,6 @@ _PREFIXOS_HOST_PORTA = ("DB", "POSTGRES", "PG", "MYSQL")
 _LOCAIS = {"localhost", "127.0.0.1", "::1"}
 _ESPERA_DO_SITE = 120
 _ESPERA_COM_INSTALACAO = 600
-# Sem isto a janela fecha quando o servidor morre e o erro some junto.
-_SEGURAR_A_JANELA = "; echo; echo 'O servidor parou. Veja o erro acima e aperte Enter para fechar.'; read"
 _PORTA_NO_SCRIPT = re.compile(r"(?:-p|--port)[ =](\d+)")
 _PORTA_PADRAO = {"next": 3000, "vite": 5173, "react-scripts": 3000, "nuxt": 3000}
 
@@ -164,7 +163,7 @@ def ferramentas_de_aplicacoes(
         """Comando de instalação, se a parte ainda não tem as dependências nesta máquina."""
         if (parte.pasta / "node_modules").is_dir() or (projeto / "node_modules").is_dir():
             return None
-        return "npm ci" if (parte.pasta / "package-lock.json").is_file() else "npm install"
+        return "npm.cmd ci" if (parte.pasta / "package-lock.json").is_file() else "npm.cmd install"
 
     def _nome_da_parte(projeto: Path, parte: Parte) -> str:
         return parte.pasta.name if parte.pasta != projeto else projeto.name
@@ -203,14 +202,13 @@ def ferramentas_de_aplicacoes(
             return motivo
         instala = False
         for parte in partes:
-            # Só nomes fixos no bash: o script vem de _SCRIPTS_DE_DEV, nunca do pedido.
-            comando = f"npm run {parte.script}"
+            # Só nomes fixos no PowerShell: o script vem de _SCRIPTS_DE_DEV, nunca do pedido.
+            # npm.cmd e não npm: o npm.ps1 é barrado pela política de scripts padrão do Windows.
+            comando = f"npm.cmd run {parte.script}"
             if instalar := _instalar(projeto, parte):
-                comando = f"{instalar} && {comando}"
+                comando = f"{instalar}; if ($LASTEXITCODE -eq 0) {{ {comando} }}"
                 instala = True
-            await executor.iniciar(
-                ["ptyxis", "--new-window", "-d", str(parte.pasta), "--", "bash", "-c", comando + _SEGURAR_A_JANELA]
-            )
+            await executor.iniciar(terminal(parte.pasta, comando))
         demora = " Como preciso instalar as dependências antes, pode levar alguns minutos." if instala else ""
         web = next((p for p in partes if p.porta_web), None)
         if web is None:

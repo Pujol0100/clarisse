@@ -1,3 +1,4 @@
+import base64
 import json
 
 import pytest
@@ -38,9 +39,14 @@ def _smart_anchor(raiz, banco="10.0.0.5:65432"):
 
 
 def _comando(argumentos):
-    """O que roda dentro do terminal: ptyxis ... -- bash -c "<comando>"."""
-    assert argumentos[-3:-1] == ["bash", "-c"]
-    return argumentos[-1]
+    """O que roda dentro do terminal: wt.exe ... powershell.exe -NoExit -EncodedCommand <comando>."""
+    assert argumentos[-2] == "-EncodedCommand"
+    return base64.b64decode(argumentos[-1]).decode("utf-16-le")
+
+
+def _pasta(argumentos):
+    assert argumentos[:4] == ["wt.exe", "-w", "new", "-d"]
+    return argumentos[4]
 
 
 class Avisos:
@@ -146,11 +152,8 @@ async def test_abre_um_terminal_visivel_por_parte(montar, executor, tmp_path):
 
     await f.executar(f.argumentos(projeto="smart-anchor"))
 
-    assert [a[:4] for a, _ in executor.iniciados] == [
-        ["ptyxis", "--new-window", "-d", str(projeto / "backend")],
-        ["ptyxis", "--new-window", "-d", str(projeto / "frontend")],
-    ]
-    assert all(_comando(a).startswith("npm run dev;") for a, _ in executor.iniciados)
+    assert [_pasta(a) for a, _ in executor.iniciados] == [str(projeto / "backend"), str(projeto / "frontend")]
+    assert all(_comando(a) == "npm.cmd run dev" for a, _ in executor.iniciados)
 
 
 async def test_quando_o_site_responde_abre_o_navegador_e_avisa(montar, executor, delegacoes, avisos, tmp_path):
@@ -274,8 +277,8 @@ async def test_usa_start_dev_quando_nao_ha_dev(montar, executor, tmp_path):
     await f.executar(f.argumentos(projeto="omni api"))
 
     [(argumentos, _)] = executor.iniciados
-    assert argumentos[3] == str(tmp_path / "omni-api")
-    assert _comando(argumentos).startswith("npm run start:dev;")
+    assert _pasta(argumentos) == str(tmp_path / "omni-api")
+    assert _comando(argumentos) == "npm.cmd run start:dev"
 
 
 
@@ -294,8 +297,9 @@ async def test_sem_dependencias_instala_com_npm_ci_antes_de_rodar(montar, execut
     assert "instalar as dependências" in frase
     assert "minutos" in resposta
     backend, frontend = (a for a, _ in executor.iniciados[:2])
-    assert backend[3] == str(projeto / "backend") and _comando(backend).startswith("npm ci && npm run dev;")
-    assert frontend[3] == str(projeto / "frontend") and _comando(frontend).startswith("npm run dev;")
+    assert _pasta(backend) == str(projeto / "backend")
+    assert _comando(backend) == "npm.cmd ci; if ($LASTEXITCODE -eq 0) { npm.cmd run dev }"
+    assert _pasta(frontend) == str(projeto / "frontend") and _comando(frontend) == "npm.cmd run dev"
     assert esperas == [600]
 
 
@@ -305,7 +309,7 @@ async def test_sem_package_lock_instala_com_npm_install(montar, executor, tmp_pa
 
     await f.executar(f.argumentos(projeto="painel"))
 
-    assert _comando(executor.iniciados[0][0]).startswith("npm install && npm run dev;")
+    assert _comando(executor.iniciados[0][0]) == "npm.cmd install; if ($LASTEXITCODE -eq 0) { npm.cmd run dev }"
 
 
 async def test_com_dependencias_espera_o_site_so_dois_minutos(montar, delegacoes, esperas, tmp_path):
@@ -336,9 +340,7 @@ async def test_terminal_fica_aberto_mostrando_o_erro_quando_o_servidor_para(mont
 
     await f.executar(f.argumentos(projeto="painel"))
 
-    comando = _comando(executor.iniciados[0][0])
-    assert comando.startswith("npm run dev;")
-    assert comando.rstrip().endswith("read")
+    assert "-NoExit" in executor.iniciados[0][0]
 
 
 
@@ -390,7 +392,7 @@ async def test_escolhido_o_local_roda_o_projeto_com_confirmacao(todas, executor,
     assert f.risco_de(args) is Risco.CONFIRMAR
     assert "Vou rodar o omni" in f.frase_de_confirmacao(args)
     await f.executar(args)
-    assert executor.iniciados[0][0][:4] == ["ptyxis", "--new-window", "-d", str(tmp_path / "omni")]
+    assert _pasta(executor.iniciados[0][0]) == str(tmp_path / "omni")
 
 
 async def test_projeto_sem_site_roda_local_com_confirmacao(todas, executor, tmp_path):
@@ -400,7 +402,7 @@ async def test_projeto_sem_site_roda_local_com_confirmacao(todas, executor, tmp_
 
     assert f.risco_de(args) is Risco.CONFIRMAR
     await f.executar(args)
-    assert executor.iniciados[0][0][3] == str(projeto / "backend")
+    assert _pasta(executor.iniciados[0][0]) == str(projeto / "backend")
 
 
 async def test_varios_sites_com_o_nome_pergunta_qual(todas, executor):
