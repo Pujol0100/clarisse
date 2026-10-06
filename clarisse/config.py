@@ -18,7 +18,7 @@ class Ajustes(BaseSettings):
 
     porta: int = 8765
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_bin: str = "~/.local/ollama/bin/ollama"
+    ollama_bin: str = "~/AppData/Local/Programs/Ollama/ollama.exe"
     modelo: str = "gemma4:e4b-it-qat"
     whisper_modelo: str = "small"
     whisper_dispositivo: str = "cpu"

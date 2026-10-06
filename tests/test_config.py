@@ -1,7 +1,8 @@
 import json
+import os
 from pathlib import Path
 
-from clarisse.config import carregar_cadastros
+from clarisse.config import Ajustes, carregar_cadastros
 
 
 def _grava(pasta: Path, nome: str, conteudo: dict):
@@ -61,3 +62,9 @@ def test_acha_pasta_pelo_apelido_sem_acento(tmp_path):
 
     assert cadastros.achar_pasta("area de trabalho") == "área de trabalho"
     assert cadastros.achar_pasta("musicas") is None
+
+
+def test_ollama_padrao_e_o_do_instalador_do_windows():
+    binario = Path(Ajustes(_env_file=None).ollama_bin).expanduser()
+
+    assert binario == Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Ollama" / "ollama.exe"

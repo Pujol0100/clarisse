@@ -46,7 +46,7 @@ def garantir_ollama(ajustes: Ajustes) -> bool:
     registro.parent.mkdir(parents=True, exist_ok=True)
     subprocess.Popen(
         [str(binario), "serve"],
-        stdout=registro.open("a"), stderr=subprocess.STDOUT, start_new_session=True,
+        stdout=registro.open("a"), stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         env={**os.environ, "OLLAMA_HOST": ajustes.ollama_url.removeprefix("http://")},
     )
     for _ in range(40):
